@@ -1,73 +1,216 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>body{font:16px system-ui;margin:0;padding:24px;background:#222b31;color:#eef}input,button{font:inherit;padding:12px;width:100%;margin:6px 0;border-radius:6px;border:0}
-button{background:#f0b429;font-weight:600}button.stop{background:#b3402f;color:#fff}.card{background:#2f3a41;padding:14px;border-radius:8px;margin:12px 0}.hide{display:none}#err{color:#ffb4a8;font-weight:600}#dbg{font-size:12px;opacity:.75;word-break:break-all}</style></head><body>
-<p id="dbg"></p>
-<div id="lg"><h2>Driver sign in</h2><input id="em" type="email" placeholder="Email"><input id="pw" type="password" placeholder="Password"><button onclick="signIn()">Sign in</button></div>
-<div id="app" class="hide"><h2 id="who"></h2><div class="card" id="st">Stopped</div>
-<button id="go" onclick="start()">Start trip</button><button class="stop hide" id="stp" onclick="stop()">End trip</button><button onclick="sb.auth.signOut().then(()=>location.reload())" style="background:#444;color:#fff">Sign out</button></div>
-<p id="err"></p>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fleet Tracker</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap">
+<style>
+:root{--bg:#fff7ee;--ink:#26323a;--mut:#6b7a85;--line:#efe3d4;--or:#f28c28;--orl:#ffe9d2;--ord:#b85d00;--gr:#27a46a;--grl:#ddf4e8;--bl:#2f7fe6;--bll:#dcebfd;--rd:#d9534f;--rdl:#fde4e2;--gy:#9aa7b0;--gyl:#eef1f3}
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;font:14px/1.45 Nunito,system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+.hide{display:none!important}button{font:inherit}
+#app{display:flex;height:100%}aside{width:210px;background:#fff;border-right:1px solid var(--line);padding:14px 12px;display:flex;flex-direction:column;gap:6px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:17px;padding:4px 6px 14px}.brand i{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--or),#f6b25f);color:#fff;display:grid;place-items:center}
+.nb{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;font-weight:600;color:var(--mut)}
+.nb i{width:20px;text-align:center}.nb:hover{background:var(--gyl)}.nb.on{background:var(--orl);color:var(--ord)}.nb:focus-visible{outline:2px solid var(--bl)}.nb.out{margin-top:auto;color:var(--rd)}
+.wrap{flex:1;display:flex;flex-direction:column;min-width:0}
+header{display:flex;align-items:center;gap:12px;padding:12px 20px;background:#fff;border-bottom:1px solid var(--line)}
+header h1{font-size:19px;margin:0;flex:1;font-weight:800}#me{color:var(--mut)}
+.pill{padding:4px 10px;border-radius:99px;font-weight:700;font-size:12px;background:var(--grl);color:var(--gr)}.pill.bad{background:var(--rdl);color:var(--rd)}
+main{flex:1;min-height:0;padding:16px 20px;overflow:auto}
+section{display:none;height:100%;flex-direction:column;gap:14px}section.on{display:flex}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kpi{display:flex;align-items:center;gap:12px;padding:12px 14px}.kpi .ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:18px}
+.kpi b{font-size:22px;display:block;line-height:1.1}.kpi span{color:var(--mut);font-size:12px}
+.bl .ic{background:var(--bll);color:var(--bl)}.gr .ic{background:var(--grl);color:var(--gr)}.or .ic{background:var(--orl);color:var(--or)}.gy .ic{background:var(--gyl);color:var(--gy)}.rd .ic{background:var(--rdl);color:var(--rd)}
+.split{flex:1;min-height:0;display:grid;grid-template-columns:320px 1fr;gap:14px}
+.panel{display:flex;flex-direction:column;gap:10px;min-height:0;padding:12px}.list{overflow:auto;flex:1}
+.map{border-radius:14px;border:1px solid var(--line);overflow:hidden;min-height:340px;height:100%}.mapc{flex:1;min-height:340px}
+.veh{display:flex;gap:10px;align-items:center;padding:10px;border-radius:10px;cursor:pointer}.veh:hover{background:var(--bg)}
+.veh .av{width:34px;height:34px;border-radius:50%;color:#fff;display:grid;place-items:center;flex:none}.veh .t{flex:1;min-width:0}.veh small{color:var(--mut)}
+.chip{font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}.field label{font-weight:700;font-size:12px;color:var(--mut)}
+input,select{font:inherit;height:40px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:#fff;width:100%;min-width:0}
+input:focus,select:focus{outline:2px solid var(--bl);border-color:transparent}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:end}
+.btn{height:40px;padding:0 16px;border:0;border-radius:10px;font-weight:700;color:#fff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}
+.btn:hover{filter:brightness(.95)}.btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.btn.b{background:var(--bl)}.btn.g{background:var(--gr)}.btn.o{background:var(--or)}.btn.r{background:var(--rdl);color:var(--rd)}.btn.sm{height:34px;padding:0 12px}
+.tw{flex:none;overflow:auto;border-radius:12px;border:1px solid var(--line);background:#fff}table{border-collapse:collapse;width:100%}
+th{background:#fffaf4;text-align:left;font-size:12px;color:var(--mut);padding:10px 14px}td{padding:10px 14px;border-top:1px solid var(--line)}
+td select{height:36px}#evt,#rep{height:auto;min-height:100%}.cgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px}.cgrid .card{height:270px;position:relative}.tw a{color:var(--bl);font-weight:700;text-decoration:none}
+.seg{display:flex;background:#fff;border-radius:10px;box-shadow:0 1px 6px #0003;padding:3px;gap:2px}.seg button{border:0;background:none;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;color:var(--mut);font-size:12px}
+.seg button.on{background:var(--bl);color:#fff}
+.mk{width:32px;height:32px;border-radius:50%;border:3px solid #fff;box-shadow:0 1px 6px #0006;display:grid;place-items:center;color:#fff;font-size:13px}
+#login{margin:auto;width:340px;padding:28px;display:flex;flex-direction:column;gap:14px;text-align:center}#login .brand{justify-content:center;padding:0}
+.err{color:var(--rd);min-height:18px;margin:0;font-weight:600}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:10px 18px;border-radius:10px;color:#fff;font-weight:700;opacity:0;pointer-events:none;transition:opacity .2s}#toast.show{opacity:1}#toast.ok{background:var(--gr)}#toast.bad{background:var(--rd)}
+@media(max-width:820px){#app{flex-direction:column}aside{width:auto;flex-direction:row;overflow-x:auto;padding:8px}.brand,.nb span{display:none}.nb.out{margin:0}.split{grid-template-columns:1fr;grid-template-rows:230px 1fr}#me{display:none}}
+</style></head><body>
+<div id="login" class="card"><div class="brand"><i class="fa-solid fa-truck-fast"></i>Fleet Tracker</div>
+<div class="field"><input id="em" type="email" placeholder="Email"></div><div class="field"><input id="pw" type="password" placeholder="Password"></div>
+<button class="btn b" onclick="signIn()"><i class="fa-solid fa-right-to-bracket"></i>Sign in</button><p class="err" id="lerr"></p></div>
+
+<div id="app" class="hide"><aside><div class="brand"><i class="fa-solid fa-truck-fast"></i>Fleet Tracker</div>
+<button class="nb on" data-t="live" data-h="Live map"><i class="fa-solid fa-location-crosshairs"></i><span>Live map</span></button>
+<button class="nb" data-t="hist" data-h="History"><i class="fa-solid fa-route"></i><span>History</span></button>
+<button class="nb" data-t="evt" data-h="Driving events"><i class="fa-solid fa-triangle-exclamation"></i><span>Events <b id="evb" class="chip" style="background:var(--rd);color:#fff;display:none">0</b></span></button>
+<button class="nb" data-t="rep" data-h="Reports"><i class="fa-solid fa-chart-column"></i><span>Reports</span></button>
+<button class="nb" data-t="veh" data-h="Vehicles"><i class="fa-solid fa-truck"></i><span>Vehicles</span></button>
+<button class="nb" data-t="drv" data-h="Drivers"><i class="fa-solid fa-id-card"></i><span>Drivers</span></button>
+<button class="nb" data-t="usr" data-h="Users"><i class="fa-solid fa-users-gear"></i><span>Users</span></button>
+<button class="nb out" onclick="sb.auth.signOut().then(()=>location.reload())"><i class="fa-solid fa-right-from-bracket"></i><span>Sign out</span></button></aside>
+<div class="wrap"><header><h1 id="title">Live map</h1><span id="me"></span><span class="pill" id="conn"><i class="fa-solid fa-circle" style="font-size:8px"></i> <span id="connT">Connecting</span></span></header>
+<main>
+<section id="live" class="on"><div class="kpis">
+<div class="card kpi bl"><div class="ic"><i class="fa-solid fa-truck"></i></div><div><b id="k_all">0</b><span>Vehicles</span></div></div>
+<div class="card kpi gr"><div class="ic"><i class="fa-solid fa-gauge-high"></i></div><div><b id="k_go">0</b><span>Moving</span></div></div>
+<div class="card kpi or"><div class="ic"><i class="fa-solid fa-square-parking"></i></div><div><b id="k_stop">0</b><span>Stopped</span></div></div>
+<div class="card kpi gy"><div class="ic"><i class="fa-solid fa-wifi"></i></div><div><b id="k_off">0</b><span>No signal</span></div></div>
+<div class="card kpi rd"><div class="ic"><i class="fa-solid fa-triangle-exclamation"></i></div><div><b id="k_over">0</b><span>Overspeed</span></div></div></div>
+<div class="split"><div class="card panel"><div class="field"><input id="q" placeholder="Search vehicle or driver" oninput="renderList()"></div><div class="list" id="liveList"></div></div><div class="map" id="mapLive"></div></div></section>
+<section id="hist"><div class="card fgrid">
+<div class="field"><label>Vehicle</label><select id="hv"></select></div><div class="field"><label>From</label><input id="hf" type="datetime-local"></div><div class="field"><label>To</label><input id="ht" type="datetime-local"></div>
+<button class="btn b" onclick="loadHist()"><i class="fa-solid fa-route"></i>Show route</button><button class="btn g" onclick="csv()"><i class="fa-solid fa-file-csv"></i>Export CSV</button></div>
+<div class="kpis" id="hstat"></div><div class="map mapc" id="mapHist"></div></section>
+<section id="evt"><div class="card fgrid"><div class="field"><label>Vehicle</label><select id="ev_v"></select></div>
+<div class="field"><label>Event type</label><select id="ev_t"><option value="">All events</option><option value="harsh_braking">Harsh braking</option><option value="harsh_acceleration">Harsh acceleration</option><option value="overspeed">Overspeed</option></select></div>
+<div class="field"><label>From</label><input id="ev_f" type="datetime-local"></div><div class="field"><label>To</label><input id="ev_to" type="datetime-local"></div>
+<button class="btn b" onclick="loadEvt()"><i class="fa-solid fa-magnifying-glass"></i>Search</button></div>
+<div class="kpis" id="evK"></div><div class="cgrid"><div class="card"><canvas id="c1"></canvas></div><div class="card"><canvas id="c2"></canvas></div><div class="card"><canvas id="c3"></canvas></div></div><div class="tw" id="evT"></div></section>
+<section id="rep"><div class="card fgrid"><div class="field"><label>From</label><input id="rp_f" type="date"></div><div class="field"><label>To</label><input id="rp_t" type="date"></div>
+<button class="btn b" onclick="loadRep()"><i class="fa-solid fa-chart-column"></i>Build report</button><button class="btn g" onclick="repCsv()"><i class="fa-solid fa-file-csv"></i>Export CSV</button></div>
+<div class="kpis" id="rpK"></div><div class="cgrid"><div class="card"><canvas id="r1"></canvas></div><div class="card"><canvas id="r2"></canvas></div><div class="card"><canvas id="r3"></canvas></div></div><div class="tw" id="rpT"></div></section>
+<section id="veh"><div class="card"><form class="fgrid" onsubmit="add(event,'vehicles',['name','plate'])"><div class="field"><label>Vehicle name</label><input name="name" required></div><div class="field"><label>Plate number</label><input name="plate"></div><button class="btn g"><i class="fa-solid fa-plus"></i>Add vehicle</button></form></div><div class="tw" id="vehT"></div></section>
+<section id="drv"><div class="card"><form class="fgrid" onsubmit="add(event,'drivers',['name','phone'])"><div class="field"><label>Driver name</label><input name="name" required></div><div class="field"><label>Phone</label><input name="phone"></div><button class="btn g"><i class="fa-solid fa-plus"></i>Add driver</button></form></div><div class="tw" id="drvT"></div></section>
+<section id="usr"><div class="card"><i class="fa-solid fa-circle-info" style="color:var(--bl)"></i> Create the login in Supabase (Authentication → Users → Add user). It appears here, then link it to a vehicle and a driver.</div><div class="tw" id="usrT"></div></section>
+</main></div></div><div id="toast"></div>
 <script>
-const $=i=>document.getElementById(i);
-window.onerror=(m,s,l)=>{$('err').textContent='Error: '+m+' (line '+l+')'};
-window.addEventListener('unhandledrejection',e=>{$('err').textContent='Error: '+(e.reason&&e.reason.message||e.reason)});
+window.onerror=(m,s,l)=>{document.getElementById('lerr').textContent='Error: '+m+' (line '+l+')'};
+window.addEventListener('unhandledrejection',e=>{document.getElementById('lerr').textContent='Error: '+(e.reason&&e.reason.message||e.reason)});
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
-const MOVING_EVERY=10, STOPPED_EVERY=60, MIN_MOVING_KMH=2; // GPS noise below ~2 km/h counts as stopped
-let sb=null,CFG_OK=false;
-try{
- const u=String(typeof SUPABASE_URL==='undefined'?'':SUPABASE_URL),k=String(typeof SUPABASE_KEY==='undefined'?'':SUPABASE_KEY);
- const okU=/^https:\/\/[a-z0-9]{15,30}\.supabase\.co$/.test(u),okK=k.startsWith('eyJ')&&k.length>100;
- $('dbg').textContent='Build 3 | Server: '+(u||'(empty)')+' '+(okU?'(looks OK)':'(WRONG)')+' | Key: '+(okK?'looks OK':'WRONG');
- if(!okU)$('err').textContent='The Server address in config.js is wrong. It must look like https://abcdefghijklmnopqrst.supabase.co';
- else if(!okK)$('err').textContent='The Key in config.js is wrong. It must be the long anon key starting with eyJ';
- else{sb=supabase.createClient(u,k);CFG_OK=true}
-}catch(e){$('err').textContent='Setup error: '+(e.message||e)}
-let me,asg,watcher,lastSent=0,queue=JSON.parse(localStorage.q||'[]');
+const SPEED_LIMIT=100, STALE_MIN=3; // km/h over which a vehicle counts as speeding; minutes without data = no signal
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const toast=(m,ok)=>{const t=$('toast');t.textContent=m;t.className='show '+(ok?'ok':'bad');setTimeout(()=>t.className='',3500)};
+let evN=0,charts={},rep=[],mapL,mapH,markers={},last={},hLayer,hData=[],vehicles=[],drivers=[];
+const COL={go:'#27a46a',stop:'#f28c28',off:'#9aa7b0',over:'#d9534f'},LBL={go:'Moving',stop:'Stopped',off:'No signal',over:'Overspeed'};
+const st=p=>Date.now()-new Date(p.recorded_at)>STALE_MIN*6e4?'off':(p.speed>SPEED_LIMIT?'over':(p.speed>0?'go':'stop'));
+function mkMap(id){
+ const m=L.map(id).setView([23.6,58.5],8);
+ const T=(u,a,o={})=>L.tileLayer(u,{attribution:a,maxZoom:20,...o});
+ const G=l=>T('https://{s}.google.com/vt/lyrs='+l+'&x={x}&y={y}&z={z}','Map data © Google',{subdomains:['mt0','mt1','mt2','mt3']});
+ const base={'Street Map':T('https://tile.openstreetmap.org/{z}/{x}/{y}.png','© OpenStreetMap',{maxZoom:19}),'Google Map':G('m'),'Google Satellite':G('s'),'Google Hybrid':G('y'),'Esri Satellite':T('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}','Tiles © Esri')};
+ let cur=localStorage.base;if(!base[cur])cur='Street Map';let layer=base[cur].addTo(m);
+ const c=L.control({position:'topright'});
+ c.onAdd=()=>{const d=L.DomUtil.create('div','seg');L.DomEvent.disableClickPropagation(d);
+  for(const n in base){const b=L.DomUtil.create('button',n===cur?'on':'',d);b.textContent=n;b.onclick=()=>{m.removeLayer(layer);layer=base[n].addTo(m);localStorage.base=n;d.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b))}}
+  return d};c.addTo(m);return m}
 async function signIn(){
- $('err').textContent='Signing in...';
- try{
-  if(!CFG_OK)throw new Error('Fix config.js first (see the top line of this screen).');
-  const {error}=await sb.auth.signInWithPassword({email:$('em').value.trim(),password:$('pw').value});
-  if(error)throw error;
-  $('err').textContent='';await init();
- }catch(e){$('err').textContent='Error: '+(e.message||e)}
+ $('lerr').textContent='Signing in...';
+ try{const {error}=await sb.auth.signInWithPassword({email:$('em').value.trim(),password:$('pw').value});
+ if(error)throw error;$('lerr').textContent='';await boot()}catch(e){$('lerr').textContent='Error: '+(e.message||e)}}
+async function boot(){
+ const {data:{session}}=await sb.auth.getSession();if(!session)return;
+ const {data:p}=await sb.from('profiles').select('role').eq('id',session.user.id).single();
+ if(p?.role!=='admin'){$('lerr').textContent='This account is not an admin. The dashboard is for admins only.';await sb.auth.signOut();return}
+ $('login').classList.add('hide');$('app').classList.remove('hide');$('me').textContent=session.user.email;
+ mapL=mkMap('mapLive');mapH=mkMap('mapHist');
+ const d=new Date(),f=n=>new Date(n-d.getTimezoneOffset()*6e4).toISOString().slice(0,16);$('ht').value=f(d);$('hf').value=f(d-864e5);$('ev_to').value=f(d);$('ev_f').value=f(d-7*864e5);$('rp_t').value=f(d).slice(0,10);$('rp_f').value=f(d-7*864e5).slice(0,10);
+ await refs();await loadLive();
+ sb.channel('pos').on('postgres_changes',{event:'INSERT',schema:'public',table:'positions'},e=>upsert(e.new)).subscribe(s=>{const ok=s==='SUBSCRIBED';$('conn').className='pill'+(ok?'':' bad');$('connT').textContent=ok?'Live':'Reconnecting'});
+ sb.channel('ev').on('postgres_changes',{event:'INSERT',schema:'public',table:'events'},e=>{const x=e.new;toast('⚠ '+EV[x.type][0]+': '+(x.vehicle_name||'')+' / '+(x.driver_name||''));evN++;$('evb').style.display='';$('evb').textContent=evN}).subscribe();
+ setInterval(renderList,15000);
 }
-async function init(){
- if(!sb)return;
- const {data:{session}}=await sb.auth.getSession();if(!session)return;me=session.user;
- const {data}=await sb.from('assignments').select('vehicle_id,driver_id,vehicles(name),drivers(name)').eq('user_id',me.id).maybeSingle();
- asg=data;$('lg').classList.add('hide');$('app').classList.remove('hide');
- $('who').innerHTML=asg?.vehicles?`${asg.vehicles.name}<br><small>${asg.drivers?.name||'No driver linked'}</small>`:'No vehicle linked. Ask your admin.';
-}
-async function start(){
- if(!asg?.vehicle_id){$('err').textContent='No vehicle linked to this user.';return}
- try{
- const BG=Capacitor.registerPlugin('BackgroundGeolocation');
- watcher=await BG.addWatcher({backgroundTitle:'Trip in progress',backgroundMessage:'Sending location to fleet dashboard',requestPermissions:true,stale:false,distanceFilter:0},
- async(loc,err)=>{
-  if(err){if(err.code==='NOT_AUTHORIZED')$('err').textContent='Allow location "All the time" in app settings.';return}
-  const kmh=Math.max(0,(loc.speed||0)*3.6),moving=kmh>=MIN_MOVING_KMH,every=(moving?MOVING_EVERY:STOPPED_EVERY)*1000;
-  $('st').textContent=`${Math.round(kmh)} km/h · ${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}`;
-  detect(loc,kmh);if(Date.now()-lastSent<every-500)return;lastSent=Date.now();
-  queue.push({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,lat:loc.latitude,lng:loc.longitude,speed:moving?kmh:0,recorded_at:new Date(loc.time||Date.now()).toISOString()});
-  flush()});
- $('go').classList.add('hide');$('stp').classList.remove('hide');
- }catch(e){$('err').textContent='Error: '+(e.message||e)}
-}
-// ---- driving events (thresholds: change here)
-const LIM={speed:100,brake:-3.0,accel:2.5},lastEv={};let prev=null,osSince=0;
-function detect(loc,kmh){
- if(loc.accuracy>25)return;
- const t=(loc.time||Date.now())/1000,v=kmh/3.6;
- if(prev&&t-prev.t>=0.8&&t-prev.t<=4){const a=(v-prev.v)/(t-prev.t);
-  if(a<=LIM.brake)ev('harsh_braking',loc,kmh,a);else if(a>=LIM.accel)ev('harsh_acceleration',loc,kmh,a)}
- if(!prev||t-prev.t>=0.8)prev={t,v};
- if(kmh>LIM.speed){osSince=osSince||t;if(t-osSince>=5)ev('overspeed',loc,kmh,kmh)}else osSince=0}
-function ev(type,loc,kmh,val){const n=Date.now();if(n-(lastEv[type]||0)<30000)return;lastEv[type]=n;
- sb.from('events').insert({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,type,lat:loc.latitude,lng:loc.longitude,speed:kmh,value:val,recorded_at:new Date(loc.time||n).toISOString()}).then(({error})=>{if(error)$('err').textContent='Event error: '+error.message})}
-async function flush(){localStorage.q=JSON.stringify(queue);if(!queue.length)return;const batch=queue.slice(0,50);const {error}=await sb.from('positions').insert(batch);if(error){$('err').textContent='Upload error: '+error.message;return}queue=queue.slice(batch.length);localStorage.q=JSON.stringify(queue)}
-async function stop(){await Capacitor.registerPlugin('BackgroundGeolocation').removeWatcher({id:watcher});$('go').classList.remove('hide');$('stp').classList.add('hide');$('st').textContent='Stopped'}
-init();
+document.querySelectorAll('.nb[data-t]').forEach(b=>b.onclick=()=>{
+ document.querySelectorAll('.nb').forEach(x=>x.classList.remove('on'));b.classList.add('on');$('title').textContent=b.dataset.h;
+ document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===b.dataset.t));
+ setTimeout(()=>{mapL.invalidateSize();mapH.invalidateSize()},50);
+ if(b.dataset.t==='evt'){evN=0;$('evb').style.display='none';loadEvt()}if(b.dataset.t==='usr')users();if(b.dataset.t==='veh'||b.dataset.t==='drv')refs()});
+async function refs(){
+ vehicles=(await sb.from('vehicles').select('*').order('name')).data||[];drivers=(await sb.from('drivers').select('*').order('name')).data||[];
+ $('hv').innerHTML=vehicles.map(v=>`<option value="${v.id}">${esc(v.name)}</option>`).join('');
+ $('ev_v').innerHTML='<option value="">All vehicles</option>'+vehicles.map(v=>`<option value="${v.id}">${esc(v.name)}</option>`).join('');
+ $('vehT').innerHTML=tbl(vehicles,['name','plate'],'vehicles');$('drvT').innerHTML=tbl(drivers,['name','phone'],'drivers')}
+const tbl=(rows,cols,t)=>`<table><tr>${cols.map(c=>`<th>${c}</th>`).join('')}<th></th></tr>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(r[c])}</td>`).join('')}<td style="text-align:right"><button class="btn r sm" onclick="del('${t}','${r.id}')"><i class="fa-solid fa-trash"></i>Delete</button></td></tr>`).join('')||'<tr><td colspan="9">Nothing here yet. Add one above.</td></tr>'}</table>`;
+async function add(e,t,cols){e.preventDefault();const o={};cols.forEach(c=>o[c]=e.target[c].value||null);const {error}=await sb.from(t).insert(o);if(error)return toast(error.message);toast('Added',1);e.target.reset();refs()}
+async function del(t,id){if(confirm('Delete this item?')){await sb.from(t).delete().eq('id',id);refs()}}
+async function users(){
+ const {data:ps}=await sb.from('profiles').select('*').order('email');const {data:as}=await sb.from('assignments').select('*');
+ const opt=(l,s)=>`<option value="">— none —</option>`+l.map(x=>`<option value="${x.id}" ${x.id===s?'selected':''}>${esc(x.name)}</option>`).join('');
+ $('usrT').innerHTML=`<table><tr><th>User</th><th>Vehicle</th><th>Driver</th><th></th></tr>${(ps||[]).map(p=>{const a=(as||[]).find(x=>x.user_id===p.id)||{};
+ return `<tr><td><i class="fa-solid fa-user"></i> ${esc(p.email)}${p.role==='admin'?' <span class="chip" style="background:var(--bll);color:var(--bl)">admin</span>':''}</td><td><select id="v_${p.id}">${opt(vehicles,a.vehicle_id)}</select></td><td><select id="d_${p.id}">${opt(drivers,a.driver_id)}</select></td><td style="text-align:right"><button class="btn g sm" onclick="link('${p.id}')"><i class="fa-solid fa-link"></i>Save link</button></td></tr>`}).join('')}</table>`}
+async function link(id){const {error}=await sb.from('assignments').upsert({user_id:id,vehicle_id:$('v_'+id).value||null,driver_id:$('d_'+id).value||null});error?toast(error.message):toast('Link saved',1)}
+// ---- live
+const icon=p=>L.divIcon({className:'',html:`<div class="mk" style="background:${COL[st(p)]}"><i class="fa-solid fa-truck"></i></div>`,iconSize:[32,32],iconAnchor:[16,16]});
+const pop=p=>`<b>${esc(p.vehicle_name||'Unassigned')}</b><br><i class="fa-solid fa-id-card"></i> ${esc(p.driver_name||'-')}<br><i class="fa-solid fa-gauge-high"></i> ${Math.round(p.speed)} km/h · ${LBL[st(p)]}<br><i class="fa-regular fa-clock"></i> ${new Date(p.recorded_at).toLocaleString()}`;
+async function loadLive(){const {data}=await sb.from('latest_positions').select('*');(data||[]).forEach(upsert);const a=Object.values(last);if(a.length)mapL.fitBounds(a.map(p=>[p.lat,p.lng]),{maxZoom:14,padding:[40,40]})}
+function upsert(p){last[p.user_id]=p;const ll=[p.lat,p.lng];
+ if(markers[p.user_id])markers[p.user_id].setLatLng(ll).setIcon(icon(p)).setPopupContent(pop(p));else markers[p.user_id]=L.marker(ll,{icon:icon(p)}).addTo(mapL).bindPopup(pop(p));renderList()}
+function renderList(){
+ const all=Object.values(last),n={go:0,stop:0,off:0,over:0};all.forEach(p=>{n[st(p)]++;markers[p.user_id]?.setIcon(icon(p))});
+ $('k_all').textContent=all.length;$('k_go').textContent=n.go;$('k_stop').textContent=n.stop;$('k_off').textContent=n.off;$('k_over').textContent=n.over;
+ const q=$('q').value.toLowerCase();
+ $('liveList').innerHTML=all.filter(p=>((p.vehicle_name||'')+(p.driver_name||'')).toLowerCase().includes(q)).sort((a,b)=>(a.vehicle_name||'').localeCompare(b.vehicle_name||'')).map(p=>{const s=st(p);
+ return `<div class="veh" onclick="mapL.setView([${p.lat},${p.lng}],16);markers['${p.user_id}'].openPopup()"><div class="av" style="background:${COL[s]}"><i class="fa-solid fa-truck"></i></div><div class="t"><b>${esc(p.vehicle_name||'Unassigned')}</b><br><small>${esc(p.driver_name||'-')} · ${new Date(p.recorded_at).toLocaleTimeString()}</small></div><div style="text-align:right"><b>${Math.round(p.speed)}</b> <small>km/h</small><br><span class="chip" style="background:${COL[s]}22;color:${COL[s]}">${LBL[s]}</span></div></div>`}).join('')||'<p style="color:var(--mut);padding:8px">No vehicles to show yet.</p>'}
+// ---- history
+const km=(a,b)=>{const r=x=>x*Math.PI/180,h=Math.sin(r(b.lat-a.lat)/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(r(b.lng-a.lng)/2)**2;return 12742*Math.asin(Math.sqrt(h))};
+const tile=(c,i,v,l)=>`<div class="card kpi ${c}"><div class="ic"><i class="fa-solid ${i}"></i></div><div><b>${v}</b><span>${l}</span></div></div>`;
+async function loadHist(){
+ const hf=new Date($('hf').value).toISOString(),ht=new Date($('ht').value).toISOString();
+ const data=await fetchAll(()=>sb.from('positions').select('lat,lng,speed,recorded_at,driver_name').eq('vehicle_id',$('hv').value).gte('recorded_at',hf).lte('recorded_at',ht).order('recorded_at'));
+ if(hLayer)hLayer.remove();hData=data;if(!data.length){$('hstat').innerHTML='';return toast('No data in this period.')}
+ hLayer=L.layerGroup().addTo(mapH);const pts=data.map(p=>[p.lat,p.lng]);L.polyline(pts,{color:'#2f7fe6',weight:5,opacity:.85}).addTo(hLayer);
+ L.circleMarker(pts[0],{color:'#27a46a',fillOpacity:1,radius:9}).addTo(hLayer).bindPopup('Start '+new Date(data[0].recorded_at).toLocaleString());
+ const e=data.at(-1);L.circleMarker(pts.at(-1),{color:'#d9534f',fillOpacity:1,radius:9}).addTo(hLayer).bindPopup('End '+new Date(e.recorded_at).toLocaleString());
+ data.forEach(p=>L.circleMarker([p.lat,p.lng],{radius:3,color:'#f28c28',weight:1,fillOpacity:.9}).addTo(hLayer).bindPopup(`${new Date(p.recorded_at).toLocaleString()}<br>${Math.round(p.speed)} km/h`));
+ (await fetchAll(()=>sb.from('events').select('*').eq('vehicle_id',$('hv').value).gte('recorded_at',hf).lte('recorded_at',ht))).forEach(x=>L.marker([x.lat,x.lng],{icon:evIcon(x.type)}).addTo(hLayer).bindPopup(`<b>${EV[x.type][0]}</b><br>${Math.round(x.speed)} km/h<br>${new Date(x.recorded_at).toLocaleString()}`));
+ let d=0;for(let i=1;i<data.length;i++)d+=km(data[i-1],data[i]);
+ const mv=data.filter(p=>p.speed>0),mins=Math.round((new Date(e.recorded_at)-new Date(data[0].recorded_at))/6e4);
+ $('hstat').innerHTML=tile('bl','fa-location-dot',data.length,'Points')+tile('gr','fa-road',d.toFixed(1)+' km','Distance')+tile('or','fa-gauge-high',Math.round(Math.max(...data.map(p=>p.speed)))+' km/h','Max speed')+tile('gy','fa-gauge',Math.round(mv.length?mv.reduce((a,p)=>a+p.speed,0)/mv.length:0)+' km/h','Average moving speed')+tile('bl','fa-hourglass-half',Math.floor(mins/60)+'h '+mins%60+'m','Time span');
+ mapH.fitBounds(pts,{padding:[40,40]})}
+function csv(){if(!hData.length)return toast('Show a route first');
+ const r=['time,lat,lng,speed_kmh,driver',...hData.map(p=>[p.recorded_at,p.lat,p.lng,Math.round(p.speed),'"'+(p.driver_name||'')+'"'].join(','))];
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([r.join('\n')],{type:'text/csv'}));a.download='route.csv';a.click()}
+// ---- events + reports + charts
+const EV={harsh_braking:['Harsh braking','fa-hand','#d9534f','rd'],harsh_acceleration:['Harsh acceleration','fa-bolt','#f28c28','or'],overspeed:['Overspeed','fa-gauge-high','#2f7fe6','bl']};
+const evIcon=t=>L.divIcon({className:'',html:`<div class="mk" style="background:${EV[t][2]}"><i class="fa-solid ${EV[t][1]}"></i></div>`,iconSize:[32,32],iconAnchor:[16,16]});
+async function fetchAll(q){let a=[];for(let i=0;i<30;i++){const {data,error}=await q().range(i*1000,i*1000+999);if(error){toast(error.message);break}a=a.concat(data);if(data.length<1000)break}return a}
+function chart(id,type,labels,sets,o={}){charts[id]?.destroy();charts[id]=new Chart($(id),{type,data:{labels,datasets:sets},options:{maintainAspectRatio:false,indexAxis:o.h?'y':'x',plugins:{title:{display:true,text:o.t},legend:{display:sets.length>1||type==='doughnut'}},scales:type==='doughnut'?{}:{x:{stacked:!!o.s},y:{stacked:!!o.s,beginAtZero:true}}}})}
+const cnt=(rows,f)=>rows.reduce((o,r)=>{const k=f(r)||'-';o[k]=(o[k]||0)+1;return o},{});
+async function loadEvt(){
+ const v=$('ev_v').value,t=$('ev_t').value,f=new Date($('ev_f').value).toISOString(),to=new Date($('ev_to').value).toISOString();
+ const rows=await fetchAll(()=>{let q=sb.from('events').select('*').gte('recorded_at',f).lte('recorded_at',to).order('recorded_at',{ascending:false});if(v)q=q.eq('vehicle_id',v);if(t)q=q.eq('type',t);return q});
+ const ty=cnt(rows,r=>r.type);
+ $('evK').innerHTML=tile('gy','fa-bell',rows.length,'Total events')+Object.keys(EV).map(k=>tile(EV[k][3],EV[k][1],ty[k]||0,EV[k][0])).join('');
+ chart('c1','doughnut',Object.keys(EV).map(k=>EV[k][0]),[{data:Object.keys(EV).map(k=>ty[k]||0),backgroundColor:Object.keys(EV).map(k=>EV[k][2])}],{t:'Events by type'});
+ const days=[...new Set(rows.map(r=>new Date(r.recorded_at).toLocaleDateString('en-CA')))].sort();
+ chart('c2','bar',days,Object.keys(EV).map(k=>({label:EV[k][0],backgroundColor:EV[k][2],data:days.map(d=>rows.filter(r=>r.type===k&&new Date(r.recorded_at).toLocaleDateString('en-CA')===d).length)})),{t:'Events per day',s:1});
+ const dr=Object.entries(cnt(rows,r=>r.driver_name)).sort((a,b)=>b[1]-a[1]).slice(0,8);
+ chart('c3','bar',dr.map(x=>x[0]),[{label:'Events',backgroundColor:'#f28c28',data:dr.map(x=>x[1])}],{t:'Drivers with most events',h:1});
+ $('evT').innerHTML=`<table><tr><th>Time</th><th>Vehicle</th><th>Driver</th><th>Event</th><th>Speed</th><th>Place</th></tr>${rows.slice(0,300).map(r=>`<tr><td>${new Date(r.recorded_at).toLocaleString()}</td><td>${esc(r.vehicle_name)}</td><td>${esc(r.driver_name)}</td><td><span class="chip" style="background:${EV[r.type][2]}22;color:${EV[r.type][2]}"><i class="fa-solid ${EV[r.type][1]}"></i> ${EV[r.type][0]}</span></td><td>${Math.round(r.speed)} km/h</td><td><a target="_blank" href="https://www.google.com/maps?q=${r.lat},${r.lng}"><i class="fa-solid fa-location-dot"></i> Map</a></td></tr>`).join('')||'<tr><td colspan="6">No events in this period.</td></tr>'}</table>`}
+async function loadRep(){
+ const f=new Date($('rp_f').value+'T00:00:00').toISOString(),t=new Date($('rp_t').value+'T23:59:59').toISOString();
+ const {data,error}=await sb.rpc('vehicle_report',{p_from:f,p_to:t,p_tz:Intl.DateTimeFormat().resolvedOptions().timeZone});
+ if(error)return toast(error.message);
+ const evs=await fetchAll(()=>sb.from('events').select('vehicle_id,type').gte('recorded_at',f).lte('recorded_at',t));
+ const V={},D={},K={harsh_braking:'b',harsh_acceleration:'a',overspeed:'o'};
+ data.forEach(r=>{const o=V[r.vehicle_id]??={name:r.vehicle_name,km:0,max:0,dr:0,sp:0,b:0,a:0,o:0};o.km+=+r.km;o.max=Math.max(o.max,+r.max_speed);o.dr+=+r.drive_min;o.sp+=+r.stop_min;D[r.day]=(D[r.day]||0)+ +r.km});
+ evs.forEach(e=>{if(V[e.vehicle_id])V[e.vehicle_id][K[e.type]]++});
+ rep=Object.values(V).map(o=>({...o,score:Math.max(0,Math.round(100-2*(o.b+o.a+o.o)/Math.max(o.km,10)*100))}));
+ const sum=k=>rep.reduce((a,o)=>a+o[k],0),n=rep.map(o=>o.name);
+ $('rpK').innerHTML=tile('bl','fa-road',sum('km').toFixed(0)+' km','Total distance')+tile('gr','fa-clock',(sum('dr')/60).toFixed(1)+' h','Driving time')+tile('or','fa-triangle-exclamation',sum('b')+sum('a')+sum('o'),'Driving events')+tile('gr','fa-shield-halved',rep.length?Math.round(sum('score')/rep.length):0,'Average safety score');
+ chart('r1','bar',n,[{label:'km',backgroundColor:'#2f7fe6',data:rep.map(o=>+o.km.toFixed(1))}],{t:'Distance per vehicle (km)'});
+ chart('r2','line',Object.keys(D),[{label:'km',borderColor:'#27a46a',backgroundColor:'#27a46a33',fill:true,tension:.3,data:Object.values(D).map(x=>+x.toFixed(1))}],{t:'Fleet distance per day (km)'});
+ chart('r3','bar',n,[{label:'Driving (h)',backgroundColor:'#27a46a',data:rep.map(o=>+(o.dr/60).toFixed(1))},{label:'Stopped (h)',backgroundColor:'#f28c28',data:rep.map(o=>+(o.sp/60).toFixed(1))}],{t:'Driving vs stopped time',s:1});
+ const sc=s=>s>=80?'gr':s>=60?'or':'rd';
+ $('rpT').innerHTML=`<table><tr><th>Vehicle</th><th>Distance</th><th>Max speed</th><th>Driving</th><th>Stopped</th><th>Braking</th><th>Accel.</th><th>Overspeed</th><th>Safety score</th></tr>${rep.sort((a,b)=>b.score-a.score).map(o=>`<tr><td><b>${esc(o.name)}</b></td><td>${o.km.toFixed(1)} km</td><td>${o.max} km/h</td><td>${(o.dr/60).toFixed(1)} h</td><td>${(o.sp/60).toFixed(1)} h</td><td>${o.b}</td><td>${o.a}</td><td>${o.o}</td><td><span class="chip" style="background:var(--${sc(o.score)}l);color:var(--${sc(o.score)})">${o.score}</span></td></tr>`).join('')||'<tr><td colspan="9">No data in this period.</td></tr>'}</table>`}
+function repCsv(){if(!rep.length)return toast('Build a report first');
+ const r=['vehicle,km,max_speed,driving_h,stopped_h,harsh_braking,harsh_accel,overspeed,score',...rep.map(o=>['"'+o.name+'"',o.km.toFixed(1),o.max,(o.dr/60).toFixed(1),(o.sp/60).toFixed(1),o.b,o.a,o.o,o.score].join(','))];
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([r.join('\n')],{type:'text/csv'}));a.download='fleet-report.csv';a.click()}
+boot();
 </script></body></html>
