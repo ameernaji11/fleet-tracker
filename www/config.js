@@ -1,0 +1,3 @@
+// Replace ONLY the text between the quotes. Keep the quotes and the semicolons.
+const SUPABASE_URL = "https://FleetTrack.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpkYXFhY2FjZGloa29saXllaWFvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI5MTE4NTIsImV4cCI6MjEwODQ4Nzg1Mn0.xgXP070sTF9FvF3R_ZART5v9IU_coMxKaW2nX9QlHhg";

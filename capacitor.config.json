@@ -1,0 +1,7 @@
+{
+  "appId": "com.example.fleettracker",
+  "appName": "Fleet Tracker",
+  "webDir": "www",
+  "server": { "androidScheme": "https" },
+  "android": { "useLegacyBridge": true }
+}
