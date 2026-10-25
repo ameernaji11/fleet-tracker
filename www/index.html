@@ -2,7 +2,7 @@
 <style>body{font:16px system-ui;margin:0;padding:24px;background:#222b31;color:#eef}input,button{font:inherit;padding:12px;width:100%;margin:6px 0;border-radius:6px;border:0}
 button{background:#f0b429;font-weight:600}button.stop{background:#b3402f;color:#fff}.card{background:#2f3a41;padding:14px;border-radius:8px;margin:12px 0}.hide{display:none}#err{color:#ffb4a8;font-weight:600}#dbg{font-size:12px;opacity:.75;word-break:break-all}</style></head><body>
 <p id="dbg"></p>
-<div id="lg"><h2>Driver sign in</h2><input id="em" type="email" placeholder="Email"><input id="pw" type="password" placeholder="Password"><button onclick="signIn()">Sign in</button></div>
+<div id="lg"><h2>Driver sign in</h2><input id="em" placeholder="Username or email"><input id="pw" type="password" placeholder="Password"><button onclick="signIn()">Sign in</button></div>
 <div id="app" class="hide"><h2 id="who"></h2><div class="card" id="st">Stopped</div>
 <button id="go" onclick="start()">Start trip</button><button class="stop hide" id="stp" onclick="stop()">End trip</button><button onclick="sb.auth.signOut().then(()=>location.reload())" style="background:#444;color:#fff">Sign out</button></div>
 <p id="err"></p>
@@ -14,12 +14,13 @@ window.addEventListener('unhandledrejection',e=>{$('err').textContent='Error: '+
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
-const MOVING_EVERY=10, STOPPED_EVERY=60, MIN_MOVING_KMH=2; // GPS noise below ~2 km/h counts as stopped
+const MOVING_EVERY=1, STOPPED_EVERY=60, MIN_MOVING_KMH=2; // GPS noise below ~2 km/h counts as stopped
+const mail=u=>u.includes('@')?u.trim():u.trim().toLowerCase()+'@fleet.local';
 let sb=null,CFG_OK=false;
 try{
  const u=String(typeof SUPABASE_URL==='undefined'?'':SUPABASE_URL),k=String(typeof SUPABASE_KEY==='undefined'?'':SUPABASE_KEY);
  const okU=/^https:\/\/[a-z0-9]{15,30}\.supabase\.co$/.test(u),okK=k.startsWith('eyJ')&&k.length>100;
- $('dbg').textContent='Build 3 | Server: '+(u||'(empty)')+' '+(okU?'(looks OK)':'(WRONG)')+' | Key: '+(okK?'looks OK':'WRONG');
+ $('dbg').textContent='Build 4 | Server: '+(u||'(empty)')+' '+(okU?'(looks OK)':'(WRONG)')+' | Key: '+(okK?'looks OK':'WRONG');
  if(!okU)$('err').textContent='The Server address in config.js is wrong. It must look like https://abcdefghijklmnopqrst.supabase.co';
  else if(!okK)$('err').textContent='The Key in config.js is wrong. It must be the long anon key starting with eyJ';
  else{sb=supabase.createClient(u,k);CFG_OK=true}
@@ -29,7 +30,7 @@ async function signIn(){
  $('err').textContent='Signing in...';
  try{
   if(!CFG_OK)throw new Error('Fix config.js first (see the top line of this screen).');
-  const {error}=await sb.auth.signInWithPassword({email:$('em').value.trim(),password:$('pw').value});
+  const {error}=await sb.auth.signInWithPassword({email:mail($('em').value),password:$('pw').value});
   if(error)throw error;
   $('err').textContent='';await init();
  }catch(e){$('err').textContent='Error: '+(e.message||e)}
@@ -37,13 +38,14 @@ async function signIn(){
 async function init(){
  if(!sb)return;
  const {data:{session}}=await sb.auth.getSession();if(!session)return;me=session.user;
- const {data}=await sb.from('assignments').select('vehicle_id,driver_id,vehicles(name),drivers(name)').eq('user_id',me.id).maybeSingle();
+ const {data}=await sb.from('assignments').select('vehicle_id,driver_id,vehicles(name,speed_limit),drivers(name)').eq('user_id',me.id).maybeSingle();
  asg=data;$('lg').classList.add('hide');$('app').classList.remove('hide');
  $('who').innerHTML=asg?.vehicles?`${asg.vehicles.name}<br><small>${asg.drivers?.name||'No driver linked'}</small>`:'No vehicle linked. Ask your admin.';
 }
 async function start(){
  if(!asg?.vehicle_id){$('err').textContent='No vehicle linked to this user.';return}
  try{
+ await loadRules();pollBat();batT=setInterval(pollBat,30000);
  const BG=Capacitor.registerPlugin('BackgroundGeolocation');
  watcher=await BG.addWatcher({backgroundTitle:'Trip in progress',backgroundMessage:'Sending location to fleet dashboard',requestPermissions:true,stale:false,distanceFilter:0},
  async(loc,err)=>{
@@ -51,23 +53,25 @@ async function start(){
   const kmh=Math.max(0,(loc.speed||0)*3.6),moving=kmh>=MIN_MOVING_KMH,every=(moving?MOVING_EVERY:STOPPED_EVERY)*1000;
   $('st').textContent=`${Math.round(kmh)} km/h · ${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}`;
   detect(loc,kmh);if(Date.now()-lastSent<every-500)return;lastSent=Date.now();
-  queue.push({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,lat:loc.latitude,lng:loc.longitude,speed:moving?kmh:0,recorded_at:new Date(loc.time||Date.now()).toISOString()});
-  flush()});
+  lastLoc=loc;queue.push(row(loc,moving?kmh:0,true));if(queue.length>=5||!moving)flush()});
  $('go').classList.add('hide');$('stp').classList.remove('hide');
  }catch(e){$('err').textContent='Error: '+(e.message||e)}
 }
 // ---- driving events (thresholds: change here)
-const LIM={speed:100,brake:-3.0,accel:2.5},lastEv={};let prev=null,osSince=0;
+const LIM={speed:100,brake:-3,accel:2.5},ON={harsh_braking:1,harsh_acceleration:1,overspeed:1},lastEv={};let prev=null,osSince=0,lastA=0,lastLoc=null,bat={},fl=false,batT;
 function detect(loc,kmh){
  if(loc.accuracy>25)return;
  const t=(loc.time||Date.now())/1000,v=kmh/3.6;
- if(prev&&t-prev.t>=0.8&&t-prev.t<=4){const a=(v-prev.v)/(t-prev.t);
+ if(prev&&t-prev.t>=0.8&&t-prev.t<=4){const a=lastA=(v-prev.v)/(t-prev.t);
   if(a<=LIM.brake)ev('harsh_braking',loc,kmh,a);else if(a>=LIM.accel)ev('harsh_acceleration',loc,kmh,a)}
  if(!prev||t-prev.t>=0.8)prev={t,v};
  if(kmh>LIM.speed){osSince=osSince||t;if(t-osSince>=5)ev('overspeed',loc,kmh,kmh)}else osSince=0}
-function ev(type,loc,kmh,val){const n=Date.now();if(n-(lastEv[type]||0)<30000)return;lastEv[type]=n;
+function ev(type,loc,kmh,val){if(!ON[type])return;const n=Date.now();if(n-(lastEv[type]||0)<30000)return;lastEv[type]=n;
  sb.from('events').insert({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,type,lat:loc.latitude,lng:loc.longitude,speed:kmh,value:val,recorded_at:new Date(loc.time||n).toISOString()}).then(({error})=>{if(error)$('err').textContent='Event error: '+error.message})}
-async function flush(){localStorage.q=JSON.stringify(queue);if(!queue.length)return;const batch=queue.slice(0,50);const {error}=await sb.from('positions').insert(batch);if(error){$('err').textContent='Upload error: '+error.message;return}queue=queue.slice(batch.length);localStorage.q=JSON.stringify(queue)}
-async function stop(){await Capacitor.registerPlugin('BackgroundGeolocation').removeWatcher({id:watcher});$('go').classList.remove('hide');$('stp').classList.add('hide');$('st').textContent='Stopped'}
+async function loadRules(){const {data}=await sb.from('event_rules').select('*');(data||[]).forEach(r=>{ON[r.type]=r.enabled;if(r.type==='overspeed')LIM.speed=asg.vehicles?.speed_limit||r.threshold;if(r.type==='harsh_braking')LIM.brake=-r.threshold;if(r.type==='harsh_acceleration')LIM.accel=r.threshold})}
+async function pollBat(){try{const b=await Capacitor.registerPlugin('Device').getBatteryInfo();bat={p:Math.round(b.batteryLevel*100),c:b.isCharging}}catch(e){}}
+const row=(loc,speed,ign)=>({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,lat:loc.latitude,lng:loc.longitude,speed,accuracy:loc.accuracy,altitude:loc.altitude,heading:loc.bearing,ignition:ign,accel:+lastA.toFixed(2),battery_pct:bat.p,charging:bat.c,recorded_at:new Date(loc.time||Date.now()).toISOString()});
+async function flush(){if(fl)return;fl=true;try{localStorage.q=JSON.stringify(queue);while(queue.length){const b=queue.slice(0,200);const {error}=await sb.from('positions').insert(b);if(error){$('err').textContent='Upload error: '+error.message;break}queue=queue.slice(b.length);localStorage.q=JSON.stringify(queue)}}finally{fl=false}}
+async function stop(){clearInterval(batT);if(lastLoc){queue.push(row(lastLoc,0,false));flush()}await Capacitor.registerPlugin('BackgroundGeolocation').removeWatcher({id:watcher});$('go').classList.remove('hide');$('stp').classList.add('hide');$('st').textContent='Stopped'}
 init();
 </script></body></html>
