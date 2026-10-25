@@ -2,38 +2,26 @@
 <title>Fleet Tracker</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
-:root{--ink:
-#1c2227;--side:
-#222b31;--amber:
-#f0b429;--go:
-#2fa56b;--stale:
-#8a949b;--line:
-#d9dee2;--bg:
-#f4f5f3}
+:root{--ink:#1c2227;--side:#222b31;--amber:#f0b429;--go:#2fa56b;--stale:#8a949b;--line:#d9dee2;--bg:#f4f5f3}
 *{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,sans-serif;color:var(--ink);background:var(--bg);display:flex;height:100vh}
-nav{width:190px;background:var(--side);color:
-#dfe5e8;padding:16px 10px;display:flex;flex-direction:column;gap:4px}
+nav{width:190px;background:var(--side);color:#dfe5e8;padding:16px 10px;display:flex;flex-direction:column;gap:4px}
 nav b{font-size:16px;padding:0 8px 12px;color:var(--amber)}nav button{all:unset;cursor:pointer;padding:8px;border-radius:4px}
-nav button:hover{background:
-#2f3a41}nav button.on{background:var(--amber);color:
-#1c2227;font-weight:600}nav button:focus-visible{outline:2px solid var(--amber)}
+nav button:hover{background:#2f3a41}nav button.on{background:var(--amber);color:#1c2227;font-weight:600}nav button:focus-visible{outline:2px solid var(--amber)}
 nav .out{margin-top:auto}main{flex:1;display:flex;min-width:0}section{display:none;flex:1;min-width:0}section.on{display:flex}
 #live,#hist{flex-direction:row}.side{width:280px;border-right:1px solid var(--line);overflow:auto;padding:12px;background:#fff}
 .map{flex:1;min-height:300px}.pad{padding:20px;overflow:auto;flex:1;flex-direction:column}
 .veh{padding:8px;border-bottom:1px solid var(--line);cursor:pointer}.veh:hover{background:var(--bg)}
 .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
 input,select,button.b{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:4px;background:#fff}
-button.b{background:var(--ink);color:#fff;cursor:pointer;border:0}button.b.red{background:
-#b3402f}
+button.b{background:var(--ink);color:#fff;cursor:pointer;border:0}button.b.red{background:#b3402f}
 table{border-collapse:collapse;width:100%;max-width:760px;background:#fff}td,th{padding:8px;border-bottom:1px solid var(--line);text-align:left}
 form{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 18px}label{display:block;margin:8px 0 2px}
 #login{margin:auto;width:300px;background:#fff;padding:24px;border:1px solid var(--line)}#login input{width:100%;margin:4px 0}
-.err{color:
-#b3402f}.hide{display:none!important}
+.err{color:#b3402f}.hide{display:none!important}
 @media(max-width:700px){body{flex-direction:column}nav{width:auto;flex-direction:row;flex-wrap:wrap}nav b{display:none}nav .out{margin:0}#live,#hist{flex-direction:column}.side{width:auto;max-height:35vh}}
 </style></head><body>
 <div id="login"><h2>Fleet Tracker</h2><input id="em" type="email" placeholder="Email"><input id="pw" type="password" placeholder="Password">
-<button class="b" onclick="signIn()">Sign in</button><p class="err" id="lerr"></p></div>
+<button class="b" onclick="signIn()">Sign in</button><p class="err" id="lerr"></p><small id="dbg"></small></div>
 
 <nav class="hide" id="nav"><b>Fleet Tracker</b>
 <button data-t="live" class="on">Live map</button><button data-t="hist">History</button>
@@ -51,13 +39,22 @@ form{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 18px}label{display:block;
 <section id="usr" class="pad"><h2>Users</h2><p>Create the login in Supabase (Authentication → Users → Add user). It appears here; then link it to a vehicle and driver.</p><div id="usrT"></div></section>
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+window.onerror=(m,s,l)=>{document.getElementById('lerr').textContent='Error: '+m+' (line '+l+')'};
+window.addEventListener('unhandledrejection',e=>{document.getElementById('lerr').textContent='Error: '+(e.reason&&e.reason.message||e.reason)});
+</script>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+document.getElementById('dbg').textContent='Build 2 | '+SUPABASE_URL;
 const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let mapL,mapH,markers={},last={},hLayer,vehicles=[],drivers=[];
-async function signIn(){const {error}=await sb.auth.signInWithPassword({email:$('em').value,password:$('pw').value});if(error)$('lerr').textContent=error.message;else boot()}
+async function signIn(){
+ $('lerr').textContent='Signing in...';
+ try{const {error}=await sb.auth.signInWithPassword({email:$('em').value.trim(),password:$('pw').value});
+ if(error)throw error;$('lerr').textContent='';await boot()}
+ catch(e){$('lerr').textContent='Error: '+(e.message||e)}}
 async function boot(){
  const {data:{session}}=await sb.auth.getSession(); if(!session)return;
  const {data:p}=await sb.from('profiles').select('role').eq('id',session.user.id).single();
@@ -78,44 +75,37 @@ document.querySelectorAll('nav [data-t]').forEach(b=>b.onclick=()=>{
  if(b.dataset.t==='usr')users();if(b.dataset.t==='veh'||b.dataset.t==='drv')refs();});
 async function refs(){
  vehicles=(await sb.from('vehicles').select('*').order('name')).data||[];drivers=(await sb.from('drivers').select('*').order('name')).data||[];
- $('hv').innerHTML=vehicles.map(v=><option value="${v.id}">${esc(v.name)}</option>).join('');
+ $('hv').innerHTML=vehicles.map(v=>`<option value="${v.id}">${esc(v.name)}</option>`).join('');
  $('vehT').innerHTML=tbl(vehicles,['name','plate'],'vehicles');$('drvT').innerHTML=tbl(drivers,['name','phone'],'drivers');
 }
-const tbl=(rows,cols,t)=><table><tr>${cols.map(c=><th>${c}</th>).join('')}<th></th></tr>${rows.map(r=><tr>${cols.map(c=><td>${esc(r[c])}</td>).join('')}<td><button class="b red" onclick="del('${t}','${r.id}')">Delete</button></td></tr>).join('')||'<tr><td>None yet. Add one above.</td></tr>'}</table>;
+const tbl=(rows,cols,t)=>`<table><tr>${cols.map(c=>`<th>${c}</th>`).join('')}<th></th></tr>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(r[c])}</td>`).join('')}<td><button class="b red" onclick="del('${t}','${r.id}')">Delete</button></td></tr>`).join('')||'<tr><td>None yet. Add one above.</td></tr>'}</table>`;
 async function add(e,t,cols){e.preventDefault();const o={};cols.forEach(c=>o[c]=e.target[c].value||null);const {error}=await sb.from(t).insert(o);if(error)alert(error.message);e.target.reset();refs()}
 async function del(t,id){if(confirm('Delete?')){await sb.from(t).delete().eq('id',id);refs()}}
 async function users(){
  const {data:ps}=await sb.from('profiles').select('*').order('email');const {data:as}=await sb.from('assignments').select('*');
- const opt=(list,sel)=><option value="">— none —</option>+list.map(x=><option value="${x.id}" ${x.id===sel?'selected':''}>${esc(x.name)}</option>).join('');
- $('usrT').innerHTML=<table><tr><th>User</th><th>Vehicle</th><th>Driver</th><th></th></tr>${(ps||[]).map(p=>{const a=(as||[]).find(x=>x.user_id===p.id)||{};
- return <tr><td>${esc(p.email)}${p.role==='admin'?' (admin)':''}</td><td><select id="v_${p.id}">${opt(vehicles,a.vehicle_id)}</select></td><td><select id="d_${p.id}">${opt(drivers,a.driver_id)}</select></td><td><button class="b" onclick="link('${p.id}')">Save link</button></td></tr>}).join('')}</table>}
+ const opt=(list,sel)=>`<option value="">— none —</option>`+list.map(x=>`<option value="${x.id}" ${x.id===sel?'selected':''}>${esc(x.name)}</option>`).join('');
+ $('usrT').innerHTML=`<table><tr><th>User</th><th>Vehicle</th><th>Driver</th><th></th></tr>${(ps||[]).map(p=>{const a=(as||[]).find(x=>x.user_id===p.id)||{};
+ return `<tr><td>${esc(p.email)}${p.role==='admin'?' (admin)':''}</td><td><select id="v_${p.id}">${opt(vehicles,a.vehicle_id)}</select></td><td><select id="d_${p.id}">${opt(drivers,a.driver_id)}</select></td><td><button class="b" onclick="link('${p.id}')">Save link</button></td></tr>`}).join('')}</table>`}
 async function link(id){const {error}=await sb.from('assignments').upsert({user_id:id,vehicle_id:$('v_'+id).value||null,driver_id:$('d_'+id).value||null});alert(error?error.message:'Saved')}
 // ---- live
-const color=p=>Date.now()-new Date(p.recorded_at)>3*60e3?'
-#8a949b':(p.speed>0?'
-#2fa56b':'
-#f0b429');
-const icon=p=>L.divIcon({className:'',html:<div style="width:16px;height:16px;border-radius:50%;background:${color(p)};border:3px solid #fff;box-shadow:0 0 0 1px #1c2227"></div>,iconSize:[16,16]});
-const pop=p=><b>${esc(p.vehicle_name||'Unassigned')}</b><br>Driver: ${esc(p.driver_name||'-')}<br>Speed: ${Math.round(p.speed)} km/h<br>${new Date(p.recorded_at).toLocaleString()};
+const color=p=>Date.now()-new Date(p.recorded_at)>3*60e3?'#8a949b':(p.speed>0?'#2fa56b':'#f0b429');
+const icon=p=>L.divIcon({className:'',html:`<div style="width:16px;height:16px;border-radius:50%;background:${color(p)};border:3px solid #fff;box-shadow:0 0 0 1px #1c2227"></div>`,iconSize:[16,16]});
+const pop=p=>`<b>${esc(p.vehicle_name||'Unassigned')}</b><br>Driver: ${esc(p.driver_name||'-')}<br>Speed: ${Math.round(p.speed)} km/h<br>${new Date(p.recorded_at).toLocaleString()}`;
 async function loadLive(){const {data}=await sb.from('latest_positions').select('*');(data||[]).forEach(upsert);const a=Object.values(last);if(a.length)mapL.fitBounds(a.map(p=>[p.lat,p.lng]),{maxZoom:14,padding:[40,40]})}
 function upsert(p){last[p.user_id]=p;const ll=[p.lat,p.lng];
  if(markers[p.user_id])markers[p.user_id].setLatLng(ll).setIcon(icon(p)).setPopupContent(pop(p));else markers[p.user_id]=L.marker(ll,{icon:icon(p)}).addTo(mapL).bindPopup(pop(p));renderList()}
 function renderList(){Object.values(last).forEach(p=>markers[p.user_id]?.setIcon(icon(p)));
- $('liveList').innerHTML=Object.values(last).sort((a,b)=>(a.vehicle_name||'').localeCompare(b.vehicle_name||'')).map(p=><div class="veh" onclick="mapL.setView([${p.lat},${p.lng}],16);markers['${p.user_id}'].openPopup()"><span class="dot" style="background:${color(p)}"></span><b>${esc(p.vehicle_name||'Unassigned')}</b> · ${Math.round(p.speed)} km/h<br><small>${esc(p.driver_name||'-')} · ${new Date(p.recorded_at).toLocaleTimeString()}</small></div>).join('')||'<p>No vehicles reporting yet.</p>'}
+ $('liveList').innerHTML=Object.values(last).sort((a,b)=>(a.vehicle_name||'').localeCompare(b.vehicle_name||'')).map(p=>`<div class="veh" onclick="mapL.setView([${p.lat},${p.lng}],16);markers['${p.user_id}'].openPopup()"><span class="dot" style="background:${color(p)}"></span><b>${esc(p.vehicle_name||'Unassigned')}</b> · ${Math.round(p.speed)} km/h<br><small>${esc(p.driver_name||'-')} · ${new Date(p.recorded_at).toLocaleTimeString()}</small></div>`).join('')||'<p>No vehicles reporting yet.</p>'}
 // ---- history
 const km=(a,b)=>{const r=x=>x*Math.PI/180,h=Math.sin(r(b.lat-a.lat)/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(r(b.lng-a.lng)/2)**2;return 12742*Math.asin(Math.sqrt(h))};
 async function loadHist(){
  const {data,error}=await sb.from('positions').select('lat,lng,speed,recorded_at,driver_name').eq('vehicle_id',$('hv').value).gte('recorded_at',new Date($('hf').value).toISOString()).lte('recorded_at',new Date($('ht').value).toISOString()).order('recorded_at').limit(10000);
  if(error)return alert(error.message);if(hLayer)hLayer.remove();if(!data.length){$('hstat').textContent='No data in this period.';return}
- hLayer=L.layerGroup().addTo(mapH);const pts=data.map(p=>[p.lat,p.lng]);L.polyline(pts,{color:'
-#2b6cb0',weight:4}).addTo(hLayer);
- L.circleMarker(pts[0],{color:'
-#2fa56b',radius:8}).addTo(hLayer).bindPopup('Start '+new Date(data[0].recorded_at).toLocaleString());
- const e=data.at(-1);L.circleMarker(pts.at(-1),{color:'
-#b3402f',radius:8}).addTo(hLayer).bindPopup('End '+new Date(e.recorded_at).toLocaleString());
- data.forEach(p=>L.circleMarker([p.lat,p.lng],{radius:3,color:'
-#1c2227',weight:1,fillOpacity:.8}).addTo(hLayer).bindPopup(${new Date(p.recorded_at).toLocaleString()}<br>${Math.round(p.speed)} km/h<br>${esc(p.driver_name||'')}));
+ hLayer=L.layerGroup().addTo(mapH);const pts=data.map(p=>[p.lat,p.lng]);L.polyline(pts,{color:'#2b6cb0',weight:4}).addTo(hLayer);
+ L.circleMarker(pts[0],{color:'#2fa56b',radius:8}).addTo(hLayer).bindPopup('Start '+new Date(data[0].recorded_at).toLocaleString());
+ const e=data.at(-1);L.circleMarker(pts.at(-1),{color:'#b3402f',radius:8}).addTo(hLayer).bindPopup('End '+new Date(e.recorded_at).toLocaleString());
+ data.forEach(p=>L.circleMarker([p.lat,p.lng],{radius:3,color:'#1c2227',weight:1,fillOpacity:.8}).addTo(hLayer).bindPopup(`${new Date(p.recorded_at).toLocaleString()}<br>${Math.round(p.speed)} km/h<br>${esc(p.driver_name||'')}`));
  let d=0;for(let i=1;i<data.length;i++)d+=km(data[i-1],data[i]);
- $('hstat').innerHTML=<p>Points: <b>${data.length}</b><br>Distance: <b>${d.toFixed(1)} km</b><br>Max speed: <b>${Math.round(Math.max(...data.map(p=>p.speed)))} km/h</b></p>;mapH.fitBounds(pts,{padding:[40,40]})}
+ $('hstat').innerHTML=`<p>Points: <b>${data.length}</b><br>Distance: <b>${d.toFixed(1)} km</b><br>Max speed: <b>${Math.round(Math.max(...data.map(p=>p.speed)))} km/h</b></p>`;mapH.fitBounds(pts,{padding:[40,40]})}
 boot();
 </script></body></html>
