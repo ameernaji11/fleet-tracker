@@ -12,6 +12,7 @@ window.onerror=(m,s,l)=>{$('err').textContent='Error: '+m+' (line '+l+')'};
 window.addEventListener('unhandledrejection',e=>{$('err').textContent='Error: '+(e.reason&&e.reason.message||e.reason)});
 </script>
 <script src="config.js"></script>
+<script src="bridge.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 const MOVING_EVERY=10, STOPPED_EVERY=60, MIN_MOVING_KMH=2; // GPS noise below ~2 km/h counts as stopped
@@ -20,7 +21,7 @@ let sb=null,CFG_OK=false;
 try{
  const u=String(typeof SUPABASE_URL==='undefined'?'':SUPABASE_URL),k=String(typeof SUPABASE_KEY==='undefined'?'':SUPABASE_KEY);
  const okU=/^https:\/\/[a-z0-9]{15,30}\.supabase\.co$/.test(u),okK=k.startsWith('eyJ')&&k.length>100;
- $('dbg').textContent='Build 7 | Server: '+(u||'(empty)')+' '+(okU?'(looks OK)':'(WRONG)')+' | Key: '+(okK?'looks OK':'WRONG');
+ $('dbg').textContent='Build 8 | Server: '+(u||'(empty)')+' '+(okU?'(looks OK)':'(WRONG)')+' | Key: '+(okK?'looks OK':'WRONG');
  if(!okU)$('err').textContent='The Server address in config.js is wrong. It must look like https://abcdefghijklmnopqrst.supabase.co';
  else if(!okK)$('err').textContent='The Key in config.js is wrong. It must be the long anon key starting with eyJ';
  else{sb=supabase.createClient(u,k);CFG_OK=true}
@@ -46,7 +47,7 @@ async function start(){
  if(!asg?.vehicle_id){$('err').textContent='No vehicle linked to this user.';return}
  try{
  await loadRules();pollBat();batT=setInterval(pollBat,30000);cfgT=setInterval(loadRules,300000);
- const BG=Capacitor.registerPlugin('BackgroundGeolocation');
+ if(!window.CapPlugins)throw new Error('Plugin bridge missing: rebuild the APK with the latest build-apk.yml');const BG=CapPlugins.BG;
  watcher=await BG.addWatcher({backgroundTitle:'Trip in progress',backgroundMessage:'Sending location to fleet dashboard',requestPermissions:true,stale:false,distanceFilter:0},
  async(loc,err)=>{
   if(err){if(err.code==='NOT_AUTHORIZED')$('err').textContent='Allow location "All the time" in app settings.';return}
@@ -73,9 +74,9 @@ async function loadRules(){
  if(a.data)asg=a.data;const S={};(t.data||[]).forEach(x=>S[x.key]=+x.value);const v=asg.vehicles||{};
  (r.data||[]).forEach(x=>{ON[x.type]=x.enabled;if(x.type==='overspeed')LIM.speed=v.speed_limit||x.threshold;if(x.type==='harsh_braking')LIM.brake=-(v.brake_limit||x.threshold)/3.6;if(x.type==='harsh_acceleration')LIM.accel=(v.accel_limit||x.threshold)/3.6});
  MOV=Math.max(1,v.moving_interval||S.moving_interval||10);STP=Math.max(1,v.stopped_interval||S.stopped_interval||60)}
-async function pollBat(){try{const b=await Capacitor.registerPlugin('Device').getBatteryInfo();bat={p:Math.round(b.batteryLevel*100),c:b.isCharging}}catch(e){}}
+async function pollBat(){try{const b=await CapPlugins.Device.getBatteryInfo();bat={p:Math.round(b.batteryLevel*100),c:b.isCharging}}catch(e){}}
 const row=(loc,speed,ign)=>({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,lat:loc.latitude,lng:loc.longitude,speed,accuracy:loc.accuracy,altitude:loc.altitude,heading:loc.bearing,ignition:ign,accel:+(lastA*3.6).toFixed(1),battery_pct:bat.p,charging:bat.c,recorded_at:new Date(loc.time||Date.now()).toISOString()});
 async function flush(){if(fl)return;fl=true;try{localStorage.q=JSON.stringify(queue);while(queue.length){const b=queue.slice(0,200);const {error}=await sb.from('positions').insert(b);if(error){$('err').textContent='Upload error: '+error.message;break}queue=queue.slice(b.length);localStorage.q=JSON.stringify(queue)}}finally{fl=false}}
-async function stop(){clearInterval(batT);clearInterval(cfgT);if(lastLoc){queue.push(row(lastLoc,0,false));flush()}await Capacitor.registerPlugin('BackgroundGeolocation').removeWatcher({id:watcher});$('go').classList.remove('hide');$('stp').classList.add('hide');$('st').textContent='Stopped'}
+async function stop(){clearInterval(batT);clearInterval(cfgT);if(lastLoc){queue.push(row(lastLoc,0,false));flush()}await CapPlugins.BG.removeWatcher({id:watcher});$('go').classList.remove('hide');$('stp').classList.add('hide');$('st').textContent='Stopped'}
 init();
 </script></body></html>
