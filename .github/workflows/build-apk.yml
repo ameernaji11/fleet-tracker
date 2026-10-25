@@ -3,6 +3,8 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -18,7 +20,10 @@ jobs:
       - name: Create Android project
         run: |
           npm init -y
-          npm i @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7 @capacitor/device@7 @capacitor-community/background-geolocation@1.2.26
+          npm i @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7 @capacitor/device@7 @capacitor-community/background-geolocation@1.2.26 esbuild
+          echo "import { registerPlugin } from '@capacitor/core';" > bridge.js
+          echo "window.CapPlugins = { BG: registerPlugin('BackgroundGeolocation'), Device: registerPlugin('Device') };" >> bridge.js
+          npx esbuild bridge.js --bundle --minify --outfile=www/bridge.js
           npx cap add android
           sed -i 's#</manifest>#<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/><uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/><uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/><uses-permission android:name="android.permission.POST_NOTIFICATIONS"/></manifest>#' android/app/src/main/AndroidManifest.xml
           npx cap sync android
@@ -31,3 +36,10 @@ jobs:
         with:
           name: fleet-tracker-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Publish APK as a release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk fleet-tracker.apk
+          gh release delete latest --yes --cleanup-tag --repo ${{ github.repository }} || true
+          gh release create latest fleet-tracker.apk --title "Fleet Tracker APK" --notes "Latest build" --repo ${{ github.repository }}
