@@ -14,13 +14,13 @@ window.addEventListener('unhandledrejection',e=>{$('err').textContent='Error: '+
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
-const MOVING_EVERY=1, STOPPED_EVERY=60, MIN_MOVING_KMH=2; // GPS noise below ~2 km/h counts as stopped
+const MOVING_EVERY=10, STOPPED_EVERY=60, MIN_MOVING_KMH=2; // GPS noise below ~2 km/h counts as stopped
 const mail=u=>u.includes('@')?u.trim():u.trim().toLowerCase()+'@fleet.local';
 let sb=null,CFG_OK=false;
 try{
  const u=String(typeof SUPABASE_URL==='undefined'?'':SUPABASE_URL),k=String(typeof SUPABASE_KEY==='undefined'?'':SUPABASE_KEY);
  const okU=/^https:\/\/[a-z0-9]{15,30}\.supabase\.co$/.test(u),okK=k.startsWith('eyJ')&&k.length>100;
- $('dbg').textContent='Build 4 | Server: '+(u||'(empty)')+' '+(okU?'(looks OK)':'(WRONG)')+' | Key: '+(okK?'looks OK':'WRONG');
+ $('dbg').textContent='Build 5 | Server: '+(u||'(empty)')+' '+(okU?'(looks OK)':'(WRONG)')+' | Key: '+(okK?'looks OK':'WRONG');
  if(!okU)$('err').textContent='The Server address in config.js is wrong. It must look like https://abcdefghijklmnopqrst.supabase.co';
  else if(!okK)$('err').textContent='The Key in config.js is wrong. It must be the long anon key starting with eyJ';
  else{sb=supabase.createClient(u,k);CFG_OK=true}
@@ -53,7 +53,7 @@ async function start(){
   const kmh=Math.max(0,(loc.speed||0)*3.6),moving=kmh>=MIN_MOVING_KMH,every=(moving?MOVING_EVERY:STOPPED_EVERY)*1000;
   $('st').textContent=`${Math.round(kmh)} km/h · ${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}`;
   detect(loc,kmh);if(Date.now()-lastSent<every-500)return;lastSent=Date.now();
-  lastLoc=loc;queue.push(row(loc,moving?kmh:0,true));if(queue.length>=5||!moving)flush()});
+  lastLoc=loc;queue.push(row(loc,moving?kmh:0,true));if(queue.length>=Math.ceil(5/MOVING_EVERY)||!moving)flush()});
  $('go').classList.add('hide');$('stp').classList.remove('hide');
  }catch(e){$('err').textContent='Error: '+(e.message||e)}
 }
