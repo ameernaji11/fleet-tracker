@@ -20,7 +20,7 @@ let sb=null,CFG_OK=false;
 try{
  const u=String(typeof SUPABASE_URL==='undefined'?'':SUPABASE_URL),k=String(typeof SUPABASE_KEY==='undefined'?'':SUPABASE_KEY);
  const okU=/^https:\/\/[a-z0-9]{15,30}\.supabase\.co$/.test(u),okK=k.startsWith('eyJ')&&k.length>100;
- $('dbg').textContent='Build 5 | Server: '+(u||'(empty)')+' '+(okU?'(looks OK)':'(WRONG)')+' | Key: '+(okK?'looks OK':'WRONG');
+ $('dbg').textContent='Build 7 | Server: '+(u||'(empty)')+' '+(okU?'(looks OK)':'(WRONG)')+' | Key: '+(okK?'looks OK':'WRONG');
  if(!okU)$('err').textContent='The Server address in config.js is wrong. It must look like https://abcdefghijklmnopqrst.supabase.co';
  else if(!okK)$('err').textContent='The Key in config.js is wrong. It must be the long anon key starting with eyJ';
  else{sb=supabase.createClient(u,k);CFG_OK=true}
@@ -45,33 +45,37 @@ async function init(){
 async function start(){
  if(!asg?.vehicle_id){$('err').textContent='No vehicle linked to this user.';return}
  try{
- await loadRules();pollBat();batT=setInterval(pollBat,30000);
+ await loadRules();pollBat();batT=setInterval(pollBat,30000);cfgT=setInterval(loadRules,300000);
  const BG=Capacitor.registerPlugin('BackgroundGeolocation');
  watcher=await BG.addWatcher({backgroundTitle:'Trip in progress',backgroundMessage:'Sending location to fleet dashboard',requestPermissions:true,stale:false,distanceFilter:0},
  async(loc,err)=>{
   if(err){if(err.code==='NOT_AUTHORIZED')$('err').textContent='Allow location "All the time" in app settings.';return}
-  const kmh=Math.max(0,(loc.speed||0)*3.6),moving=kmh>=MIN_MOVING_KMH,every=(moving?MOVING_EVERY:STOPPED_EVERY)*1000;
+  const kmh=Math.max(0,(loc.speed||0)*3.6),moving=kmh>=MIN_MOVING_KMH,every=(moving?MOV:STP)*1000;
   $('st').textContent=`${Math.round(kmh)} km/h · ${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}`;
   detect(loc,kmh);if(Date.now()-lastSent<every-500)return;lastSent=Date.now();
-  lastLoc=loc;queue.push(row(loc,moving?kmh:0,true));if(queue.length>=Math.ceil(5/MOVING_EVERY)||!moving)flush()});
+  lastLoc=loc;queue.push(row(loc,moving?kmh:0,true));if(queue.length>=Math.ceil(5/MOV)||!moving)flush()});
  $('go').classList.add('hide');$('stp').classList.remove('hide');
  }catch(e){$('err').textContent='Error: '+(e.message||e)}
 }
 // ---- driving events (thresholds: change here)
-const LIM={speed:100,brake:-3,accel:2.5},ON={harsh_braking:1,harsh_acceleration:1,overspeed:1},lastEv={};let prev=null,osSince=0,lastA=0,lastLoc=null,bat={},fl=false,batT;
+const LIM={speed:100,brake:-3,accel:2.5},ON={harsh_braking:1,harsh_acceleration:1,overspeed:1},lastEv={};let prev=null,osSince=0,lastA=0,lastLoc=null,bat={},fl=false,batT,cfgT,MOV=10,STP=60;
 function detect(loc,kmh){
  if(loc.accuracy>25)return;
  const t=(loc.time||Date.now())/1000,v=kmh/3.6;
  if(prev&&t-prev.t>=0.8&&t-prev.t<=4){const a=lastA=(v-prev.v)/(t-prev.t);
-  if(a<=LIM.brake)ev('harsh_braking',loc,kmh,a);else if(a>=LIM.accel)ev('harsh_acceleration',loc,kmh,a)}
+  if(a<=LIM.brake)ev('harsh_braking',loc,kmh,a*3.6);else if(a>=LIM.accel)ev('harsh_acceleration',loc,kmh,a*3.6)}
  if(!prev||t-prev.t>=0.8)prev={t,v};
  if(kmh>LIM.speed){osSince=osSince||t;if(t-osSince>=5)ev('overspeed',loc,kmh,kmh)}else osSince=0}
 function ev(type,loc,kmh,val){if(!ON[type])return;const n=Date.now();if(n-(lastEv[type]||0)<30000)return;lastEv[type]=n;
  sb.from('events').insert({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,type,lat:loc.latitude,lng:loc.longitude,speed:kmh,value:val,recorded_at:new Date(loc.time||n).toISOString()}).then(({error})=>{if(error)$('err').textContent='Event error: '+error.message})}
-async function loadRules(){const {data}=await sb.from('event_rules').select('*');(data||[]).forEach(r=>{ON[r.type]=r.enabled;if(r.type==='overspeed')LIM.speed=asg.vehicles?.speed_limit||r.threshold;if(r.type==='harsh_braking')LIM.brake=-r.threshold;if(r.type==='harsh_acceleration')LIM.accel=r.threshold})}
+async function loadRules(){
+ const [a,r,t]=await Promise.all([sb.from('assignments').select('vehicle_id,driver_id,vehicles(name,speed_limit,moving_interval,stopped_interval,brake_limit,accel_limit),drivers(name)').eq('user_id',me.id).maybeSingle(),sb.from('event_rules').select('*'),sb.from('app_settings').select('*')]);
+ if(a.data)asg=a.data;const S={};(t.data||[]).forEach(x=>S[x.key]=+x.value);const v=asg.vehicles||{};
+ (r.data||[]).forEach(x=>{ON[x.type]=x.enabled;if(x.type==='overspeed')LIM.speed=v.speed_limit||x.threshold;if(x.type==='harsh_braking')LIM.brake=-(v.brake_limit||x.threshold)/3.6;if(x.type==='harsh_acceleration')LIM.accel=(v.accel_limit||x.threshold)/3.6});
+ MOV=Math.max(1,v.moving_interval||S.moving_interval||10);STP=Math.max(1,v.stopped_interval||S.stopped_interval||60)}
 async function pollBat(){try{const b=await Capacitor.registerPlugin('Device').getBatteryInfo();bat={p:Math.round(b.batteryLevel*100),c:b.isCharging}}catch(e){}}
-const row=(loc,speed,ign)=>({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,lat:loc.latitude,lng:loc.longitude,speed,accuracy:loc.accuracy,altitude:loc.altitude,heading:loc.bearing,ignition:ign,accel:+lastA.toFixed(2),battery_pct:bat.p,charging:bat.c,recorded_at:new Date(loc.time||Date.now()).toISOString()});
+const row=(loc,speed,ign)=>({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,lat:loc.latitude,lng:loc.longitude,speed,accuracy:loc.accuracy,altitude:loc.altitude,heading:loc.bearing,ignition:ign,accel:+(lastA*3.6).toFixed(1),battery_pct:bat.p,charging:bat.c,recorded_at:new Date(loc.time||Date.now()).toISOString()});
 async function flush(){if(fl)return;fl=true;try{localStorage.q=JSON.stringify(queue);while(queue.length){const b=queue.slice(0,200);const {error}=await sb.from('positions').insert(b);if(error){$('err').textContent='Upload error: '+error.message;break}queue=queue.slice(b.length);localStorage.q=JSON.stringify(queue)}}finally{fl=false}}
-async function stop(){clearInterval(batT);if(lastLoc){queue.push(row(lastLoc,0,false));flush()}await Capacitor.registerPlugin('BackgroundGeolocation').removeWatcher({id:watcher});$('go').classList.remove('hide');$('stp').classList.add('hide');$('st').textContent='Stopped'}
+async function stop(){clearInterval(batT);clearInterval(cfgT);if(lastLoc){queue.push(row(lastLoc,0,false));flush()}await Capacitor.registerPlugin('BackgroundGeolocation').removeWatcher({id:watcher});$('go').classList.remove('hide');$('stp').classList.add('hide');$('st').textContent='Stopped'}
 init();
 </script></body></html>
