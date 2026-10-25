@@ -18,7 +18,7 @@ jobs:
       - name: Create Android project
         run: |
           npm init -y
-          npm i @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7 @capacitor-community/background-geolocation@1.2.26
+          npm i @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7 @capacitor/device@7 @capacitor-community/background-geolocation@1.2.26
           npx cap add android
           sed -i 's#</manifest>#<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/><uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/><uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/><uses-permission android:name="android.permission.POST_NOTIFICATIONS"/></manifest>#' android/app/src/main/AndroidManifest.xml
           npx cap sync android
