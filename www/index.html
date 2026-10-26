@@ -1,11 +1,56 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>body{font:16px system-ui;margin:0;padding:24px;background:#222b31;color:#eef}input,button{font:inherit;padding:12px;width:100%;margin:6px 0;border-radius:6px;border:0}
-button{background:#f0b429;font-weight:600}button.stop{background:#b3402f;color:#fff}.card{background:#2f3a41;padding:14px;border-radius:8px;margin:12px 0}.hide{display:none}#err{color:#ffb4a8;font-weight:600}#dbg{font-size:12px;opacity:.75;word-break:break-all}</style></head><body>
-<p id="dbg"></p>
-<div id="lg"><h2>Driver sign in</h2><input id="em" placeholder="Username or email"><input id="pw" type="password" placeholder="Password"><button onclick="signIn()">Sign in</button></div>
-<div id="app" class="hide"><h2 id="who"></h2><div class="card" id="st">Stopped</div>
-<button id="go" onclick="start()">Start trip</button><button class="stop hide" id="stp" onclick="stop()">End trip</button><button onclick="sb.auth.signOut().then(()=>location.reload())" style="background:#444;color:#fff">Sign out</button></div>
-<p id="err"></p>
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+:root{--bg:#fff7ee;--ink:#26323a;--mut:#6b7a85;--line:#efe3d4;--or:#f28c28;--orl:#ffe9d2;--gr:#27a46a;--grl:#ddf4e8;--bl:#2f7fe6;--bll:#dcebfd;--rd:#d9534f;--rdl:#fde4e2}
+*{box-sizing:border-box}body{margin:0;font:15px/1.4 system-ui,sans-serif;color:var(--ink);background:var(--bg);padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.hide{display:none!important}.screen{padding:16px;max-width:520px;margin:auto}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0}
+input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);border-radius:12px;width:100%;margin:5px 0;background:#fff;color:var(--ink)}
+.btn{font:inherit;font-weight:700;height:46px;border:0;border-radius:12px;width:100%;margin:6px 0;color:#fff;display:flex;align-items:center;justify-content:center;gap:8px}
+.b{background:var(--bl)}.g{background:var(--gr)}.o{background:var(--or)}.r{background:var(--rd)}.gh{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.top{display:flex;justify-content:space-between;align-items:center}.top b{font-size:20px}
+.ib{border:0;background:#fff;border-radius:10px;width:40px;height:40px;border:1px solid var(--line)}
+.id{display:flex;gap:12px;align-items:center}.av{width:46px;height:46px;border-radius:14px;background:var(--orl);color:var(--or);display:grid;place-items:center;font-size:20px}
+.chip{margin-left:auto;font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:var(--bll);color:var(--bl)}
+.spd{text-align:center}.spd b{font-size:56px;line-height:1}.spd span{color:var(--mut);margin-left:6px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.grid div{background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 10px}.grid small{color:var(--mut);display:block}.grid b{font-size:14px}
+#map{height:260px;border-radius:14px;border:1px solid var(--line);margin:10px 0;position:relative}.mapb{position:absolute;z-index:999;right:8px;top:8px;width:auto;padding:0 10px;font-weight:700;font-size:12px}
+.mk{width:34px;height:34px;border-radius:50%;border:3px solid #fff;box-shadow:0 1px 6px #0006;display:grid;place-items:center;color:#fff}
+#alert{position:fixed;top:env(safe-area-inset-top);left:8px;right:8px;background:var(--rd);color:#fff;padding:14px;border-radius:12px;font-weight:700;z-index:9999;text-align:center}
+.err{color:var(--rd);font-weight:600;min-height:20px}.foot{font-size:11px;color:var(--mut);text-align:center;margin:14px 0}
+.eye{position:absolute;right:6px;top:10px;border:0;background:none;color:var(--mut);width:40px;height:36px}
+.step{display:flex;gap:10px;align-items:center}.step i{width:24px;color:var(--bl);text-align:center}
+</style></head><body>
+<div id="lg" class="screen" style="text-align:center;padding-top:40px">
+<svg viewBox="0 0 48 48" width="76"><defs><linearGradient id="lgr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f28c28"/><stop offset="1" stop-color="#2f7fe6"/></linearGradient></defs><rect width="48" height="48" rx="12" fill="url(#lgr)"/><path d="M24 11c-5.5 0-9.5 4.2-9.5 9.4 0 6.7 9.5 16.6 9.5 16.6s9.5-9.9 9.5-16.6C33.5 15.2 29.5 11 24 11z" fill="#fff"/><circle cx="24" cy="20.5" r="3.6" fill="#2f7fe6"/></svg>
+<h2 style="margin:8px 0 18px">Fleet Tracker</h2>
+<input id="em" placeholder="Username or email" autocomplete="username" autocapitalize="none">
+<div style="position:relative"><input id="pw" type="password" placeholder="Password" autocomplete="current-password"><button type="button" class="eye" onclick="eye()"><i class="fa-solid fa-eye" id="eyei"></i></button></div>
+<label style="display:flex;gap:8px;align-items:center;margin:8px 0;font-weight:600"><input type="checkbox" id="rem" style="width:20px;height:20px;margin:0"> Remember me</label>
+<button class="btn b" id="sib" onclick="signIn()"><i class="fa-solid fa-right-to-bracket"></i>Sign in</button></div>
+<div id="pm" class="screen hide"><h2><i class="fa-solid fa-shield-halved" style="color:var(--bl)"></i> Permissions</h2>
+<p>The app needs these to track your trips reliably, even when the screen is off.</p>
+<div class="card step"><i class="fa-solid fa-location-dot"></i><div>Location and notifications<br><small>Tap Allow, then choose "Allow" on each question.</small></div></div>
+<button class="btn b" onclick="pAsk()"><i class="fa-solid fa-check"></i>Allow permissions</button>
+<div class="card step"><i class="fa-solid fa-location-crosshairs"></i><div>Location: "Allow all the time"<br><small>Opens settings. Tap Permissions → Location → Allow all the time.</small></div></div>
+<button class="btn o" onclick="CapPlugins.BG.openSettings()"><i class="fa-solid fa-gear"></i>Open location settings</button>
+<div class="card step"><i class="fa-solid fa-battery-full"></i><div>Battery: "Unrestricted"<br><small>Opens settings. Tap Battery → Unrestricted, so Android never stops tracking.</small></div></div>
+<button class="btn o" onclick="CapPlugins.BG.openSettings()"><i class="fa-solid fa-gear"></i>Open battery settings</button>
+<button class="btn g" onclick="localStorage.perm='1';enter()"><i class="fa-solid fa-arrow-right"></i>Continue</button></div>
+<div id="app" class="screen hide">
+<div class="top"><div><small>Welcome,</small><br><b id="wn"></b><b>!</b></div><button class="ib" onclick="signOut()" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i></button></div>
+<div class="card id"><div class="av"><i id="vi" class="fa-solid fa-car"></i></div><div><b id="vn"></b><br><small><i class="fa-solid fa-id-card"></i> <span id="dn"></span></small></div><span class="chip" id="stc">Not started</span></div>
+<div class="card spd"><b id="sp">0</b><span>km/h</span></div>
+<div class="grid" id="vals"></div>
+<div id="map"><button class="ib mapb" onclick="togMap()" id="mtb">Satellite</button></div>
+<button id="go" class="btn g" onclick="start()"><i class="fa-solid fa-play"></i>Start trip</button>
+<button id="stp" class="btn r hide" onclick="stop()"><i class="fa-solid fa-stop"></i>End trip</button>
+<button id="dash" class="btn o hide" onclick="openDash()"><i class="fa-solid fa-chart-line"></i>Open dashboard</button>
+<button class="btn gh" onclick="show('pm')"><i class="fa-solid fa-shield-halved"></i>Permissions</button></div>
+<p class="err" id="err" style="padding:0 16px"></p>
+<div id="alert" class="hide"></div>
+<div class="foot">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</div>
 <script>
 const $=i=>document.getElementById(i);
 window.onerror=(m,s,l)=>{$('err').textContent='Error: '+m+' (line '+l+')'};
@@ -13,52 +58,54 @@ window.addEventListener('unhandledrejection',e=>{$('err').textContent='Error: '+
 </script>
 <script src="config.js"></script>
 <script src="bridge.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
-const MOVING_EVERY=10, STOPPED_EVERY=60, MIN_MOVING_KMH=2; // GPS noise below ~2 km/h counts as stopped
+const DASH='https://ameernaji11.github.io/fleet-tracker/dashboard/';
 const mail=u=>u.includes('@')?u.trim():u.trim().toLowerCase()+'@fleet.local';
-let sb=null,CFG_OK=false;
-try{
- const u=String(typeof SUPABASE_URL==='undefined'?'':SUPABASE_URL),k=String(typeof SUPABASE_KEY==='undefined'?'':SUPABASE_KEY);
- const okU=/^https:\/\/[a-z0-9]{15,30}\.supabase\.co$/.test(u),okK=k.startsWith('eyJ')&&k.length>100;
- $('dbg').textContent='Build 8 | Server: '+(u||'(empty)')+' '+(okU?'(looks OK)':'(WRONG)')+' | Key: '+(okK?'looks OK':'WRONG');
- if(!okU)$('err').textContent='The Server address in config.js is wrong. It must look like https://abcdefghijklmnopqrst.supabase.co';
- else if(!okK)$('err').textContent='The Key in config.js is wrong. It must be the long anon key starting with eyJ';
- else{sb=supabase.createClient(u,k);CFG_OK=true}
-}catch(e){$('err').textContent='Setup error: '+(e.message||e)}
-let me,asg,watcher,lastSent=0,queue=JSON.parse(localStorage.q||'[]');
+const TI={Car:'fa-car',Sedan:'fa-car-side',Hatchback:'fa-car',SUV:'fa-car-rear',Pickup:'fa-truck-pickup',Van:'fa-van-shuttle',Minibus:'fa-van-shuttle',Bus:'fa-bus',Truck:'fa-truck','Heavy Truck':'fa-truck-moving',Tanker:'fa-truck-droplet',Taxi:'fa-taxi',Ambulance:'fa-truck-medical',Motorbike:'fa-motorcycle',Tractor:'fa-tractor',Trailer:'fa-trailer',Equipment:'fa-tractor'};
+let REM=localStorage.rem!=='0',sb=null,me,asg,role,watcher,lastSent=0,queue=JSON.parse(localStorage.q||'[]'),SENT=0;
+const mk=r=>supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storage:r?localStorage:sessionStorage}});
+try{if(!/^https:\/\/[a-z0-9]{15,30}\.supabase\.co$/.test(SUPABASE_URL)||!String(SUPABASE_KEY).startsWith('eyJ'))throw new Error('config.js has a wrong address or key');sb=mk(REM)}catch(e){$('err').textContent='Setup error: '+(e.message||e)}
+const show=s=>{['lg','pm','app'].forEach(x=>$(x).classList.toggle('hide',x!==s));if(s==='app'&&map)setTimeout(()=>map.invalidateSize(),100)};
+function eye(){const i=$('pw');i.type=i.type==='password'?'text':'password';$('eyei').className='fa-solid '+(i.type==='password'?'fa-eye':'fa-eye-slash')}
 async function signIn(){
- $('err').textContent='Signing in...';
- try{
-  if(!CFG_OK)throw new Error('Fix config.js first (see the top line of this screen).');
-  const {error}=await sb.auth.signInWithPassword({email:mail($('em').value),password:$('pw').value});
-  if(error)throw error;
-  $('err').textContent='';await init();
- }catch(e){$('err').textContent='Error: '+(e.message||e)}
-}
+ if(!sb)return;const want=$('rem').checked;if(want!==REM){REM=want;localStorage.rem=want?'1':'0';sb=mk(REM)}
+ const b=$('sib');b.disabled=true;b.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i>Signing in...';$('err').textContent='';
+ try{const {error}=await sb.auth.signInWithPassword({email:mail($('em').value),password:$('pw').value});if(error)throw error;
+  want?localStorage.user=$('em').value.trim():localStorage.removeItem('user');await init()}catch(e){$('err').textContent='Error: '+(e.message||e)}
+ b.disabled=false;b.innerHTML='<i class="fa-solid fa-right-to-bracket"></i>Sign in'}
+async function signOut(){await sb.auth.signOut();location.reload()}
 async function init(){
- if(!sb)return;
- const {data:{session}}=await sb.auth.getSession();if(!session)return;me=session.user;
- const {data}=await sb.from('assignments').select('vehicle_id,driver_id,vehicles(name,speed_limit),drivers(name)').eq('user_id',me.id).maybeSingle();
- asg=data;$('lg').classList.add('hide');$('app').classList.remove('hide');
- $('who').innerHTML=asg?.vehicles?`${asg.vehicles.name}<br><small>${asg.drivers?.name||'No driver linked'}</small>`:'No vehicle linked. Ask your admin.';
-}
-async function start(){
- if(!asg?.vehicle_id){$('err').textContent='No vehicle linked to this user.';return}
- try{
- await loadRules();pollBat();batT=setInterval(pollBat,30000);cfgT=setInterval(loadRules,300000);
- if(!window.CapPlugins)throw new Error('Plugin bridge missing: rebuild the APK with the latest build-apk.yml');const BG=CapPlugins.BG;
- watcher=await BG.addWatcher({backgroundTitle:'Trip in progress',backgroundMessage:'Sending location to fleet dashboard',requestPermissions:true,stale:false,distanceFilter:0},
- async(loc,err)=>{
-  if(err){if(err.code==='NOT_AUTHORIZED')$('err').textContent='Allow location "All the time" in app settings.';return}
-  const kmh=Math.max(0,(loc.speed||0)*3.6),moving=kmh>=MIN_MOVING_KMH,every=(moving?MOV:STP)*1000;
-  $('st').textContent=`${Math.round(kmh)} km/h · ${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}`;
-  detect(loc,kmh);if(Date.now()-lastSent<every-500)return;lastSent=Date.now();
-  lastLoc=loc;queue.push(row(loc,moving?kmh:0,true));if(queue.length>=Math.ceil(5/MOV)||!moving)flush()});
- $('go').classList.add('hide');$('stp').classList.remove('hide');
- }catch(e){$('err').textContent='Error: '+(e.message||e)}
-}
-// ---- driving events (thresholds: change here)
+ if(!sb)return;const {data:{session}}=await sb.auth.getSession();if(!session)return;me=session.user;
+ const {data:p}=await sb.from('profiles').select('role').eq('id',me.id).maybeSingle();role=p?.role;
+ await loadRules();
+ const nm=(me.email||'').replace('@fleet.local','');$('wn').textContent=nm;
+ const v=asg?.vehicles;$('vn').textContent=v?.name||'No vehicle linked';$('dn').textContent=asg?.drivers?.name||'No driver linked';$('vi').className='fa-solid '+(TI[v?.type]||'fa-car');
+ $('dash').classList.toggle('hide',role!=='admin');
+ [['lat','Latitude','fa-location-dot'],['lng','Longitude','fa-location-dot'],['acc','GPS accuracy','fa-bullseye'],['alt','Elevation','fa-mountain'],['dir','Direction','fa-compass'],['ac','Acceleration','fa-gauge'],['bat','Battery','fa-battery-half'],['lim','Speed limit','fa-triangle-exclamation'],['sent','Records sent','fa-cloud-arrow-up'],['t','Last record','fa-clock']].forEach(x=>{if(!$('v_'+x[0]))$('vals').insertAdjacentHTML('beforeend',`<div><small><i class="fa-solid ${x[2]}"></i> ${x[1]}</small><b id="v_${x[0]}">-</b></div>`)});
+ if(localStorage.perm==='1')enter();else show('pm')}
+function enter(){show('app');initMap();$('v_lim').textContent=Math.round(LIM.speed)+' km/h'}
+// ---- map
+let map,mrk,trail,tiles,sat=false;
+const G=l=>'https://{s}.google.com/vt/lyrs='+l+'&x={x}&y={y}&z={z}';
+function initMap(){if(map)return;map=L.map('map',{zoomControl:false}).setView([23.6,58.5],12);
+ tiles=L.tileLayer(G('m'),{maxZoom:20,subdomains:['mt0','mt1','mt2','mt3'],attribution:'Map data © Google'}).addTo(map);trail=L.polyline([],{color:'#2f7fe6',weight:4}).addTo(map);setTimeout(()=>map.invalidateSize(),200)}
+function togMap(){sat=!sat;tiles.setUrl(G(sat?'y':'m'));$('mtb').textContent=sat?'Map':'Satellite'}
+function mpos(loc,moving){const ll=[loc.latitude,loc.longitude],ic=L.divIcon({className:'',html:`<div class="mk" style="background:${moving?'#27a46a':'#f28c28'}"><i class="fa-solid ${$('vi').className.split(' ')[1]}"></i></div>`,iconSize:[34,34],iconAnchor:[17,17]});
+ mrk?mrk.setLatLng(ll).setIcon(ic):mrk=L.marker(ll,{icon:ic}).addTo(map);trail.addLatLng(ll);map.panTo(ll)}
+// ---- permissions
+async function pAsk(){try{const id=await CapPlugins.BG.addWatcher({requestPermissions:true,backgroundTitle:'Fleet Tracker',backgroundMessage:'Checking permissions'},()=>{});setTimeout(()=>CapPlugins.BG.removeWatcher({id}),3000)}catch(e){$('err').textContent='Location: '+(e.message||e)}
+ try{await CapPlugins.LN.requestPermissions()}catch(e){}}
+// ---- alerts on the phone
+let RUL={};const EVN={harsh_braking:'Harsh braking',harsh_acceleration:'Harsh acceleration',overspeed:'Overspeed'};
+function beep(){try{const a=new (window.AudioContext||window.webkitAudioContext)(),t=a.currentTime;for(let i=0;i<10;i++){const o=a.createOscillator(),g=a.createGain();o.frequency.value=880;g.gain.value=.3;o.connect(g);g.connect(a.destination);o.start(t+i*.5);o.stop(t+i*.5+.25)}}catch(e){}}
+function notify(type,kmh){const R=RUL[type]||{};
+ if(R.alert!==false){const a=$('alert');a.innerHTML='<i class="fa-solid fa-triangle-exclamation"></i> '+EVN[type]+' · '+Math.round(kmh)+' km/h';a.classList.remove('hide');setTimeout(()=>a.classList.add('hide'),6000);
+  try{CapPlugins.LN.schedule({notifications:[{id:Date.now()%2147483647,title:'Fleet Tracker: '+EVN[type],body:Math.round(kmh)+' km/h'}]})}catch(e){}}
+ if(R.beep!==false){beep();navigator.vibrate&&navigator.vibrate([300,200,300,200,300,200,300])}}
+// ---- driving events and telemetry
+const MIN_MOVING_KMH=2;
 const LIM={speed:100,brake:-3,accel:2.5},ON={harsh_braking:1,harsh_acceleration:1,overspeed:1},lastEv={};let prev=null,osSince=0,lastA=0,lastLoc=null,bat={},fl=false,batT,cfgT,MOV=10,STP=60;
 function detect(loc,kmh){
  if(loc.accuracy>25)return;
@@ -67,16 +114,38 @@ function detect(loc,kmh){
   if(a<=LIM.brake)ev('harsh_braking',loc,kmh,a*3.6);else if(a>=LIM.accel)ev('harsh_acceleration',loc,kmh,a*3.6)}
  if(!prev||t-prev.t>=0.8)prev={t,v};
  if(kmh>LIM.speed){osSince=osSince||t;if(t-osSince>=5)ev('overspeed',loc,kmh,kmh)}else osSince=0}
-function ev(type,loc,kmh,val){if(!ON[type])return;const n=Date.now();if(n-(lastEv[type]||0)<30000)return;lastEv[type]=n;
+function ev(type,loc,kmh,val){if(!ON[type])return;const n=Date.now();if(n-(lastEv[type]||0)<30000)return;lastEv[type]=n;notify(type,kmh);
  sb.from('events').insert({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,type,lat:loc.latitude,lng:loc.longitude,speed:kmh,value:val,recorded_at:new Date(loc.time||n).toISOString()}).then(({error})=>{if(error)$('err').textContent='Event error: '+error.message})}
 async function loadRules(){
- const [a,r,t]=await Promise.all([sb.from('assignments').select('vehicle_id,driver_id,vehicles(name,speed_limit,moving_interval,stopped_interval,brake_limit,accel_limit),drivers(name)').eq('user_id',me.id).maybeSingle(),sb.from('event_rules').select('*'),sb.from('app_settings').select('*')]);
- if(a.data)asg=a.data;const S={};(t.data||[]).forEach(x=>S[x.key]=+x.value);const v=asg.vehicles||{};
- (r.data||[]).forEach(x=>{ON[x.type]=x.enabled;if(x.type==='overspeed')LIM.speed=v.speed_limit||x.threshold;if(x.type==='harsh_braking')LIM.brake=-(v.brake_limit||x.threshold)/3.6;if(x.type==='harsh_acceleration')LIM.accel=(v.accel_limit||x.threshold)/3.6});
+ const [a,r,t]=await Promise.all([sb.from('assignments').select('vehicle_id,driver_id,vehicles(name,type,speed_limit,moving_interval,stopped_interval,brake_limit,accel_limit),drivers(name)').eq('user_id',me.id).maybeSingle(),sb.from('event_rules').select('*'),sb.from('app_settings').select('*')]);
+ if(a.data)asg=a.data;const S={};(t.data||[]).forEach(x=>S[x.key]=+x.value);const v=asg?.vehicles||{};
+ (r.data||[]).forEach(x=>{RUL[x.type]=x;ON[x.type]=x.enabled;if(x.type==='overspeed')LIM.speed=v.speed_limit||x.threshold;if(x.type==='harsh_braking')LIM.brake=-(v.brake_limit||x.threshold)/3.6;if(x.type==='harsh_acceleration')LIM.accel=(v.accel_limit||x.threshold)/3.6});
  MOV=Math.max(1,v.moving_interval||S.moving_interval||10);STP=Math.max(1,v.stopped_interval||S.stopped_interval||60)}
-async function pollBat(){try{const b=await CapPlugins.Device.getBatteryInfo();bat={p:Math.round(b.batteryLevel*100),c:b.isCharging}}catch(e){}}
+async function pollBat(){try{const b=await CapPlugins.Device.getBatteryInfo();bat={p:Math.round(b.batteryLevel*100),c:b.isCharging};$('v_bat').textContent=bat.p+'%'+(bat.c?' ⚡':'')}catch(e){}}
 const row=(loc,speed,ign)=>({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,lat:loc.latitude,lng:loc.longitude,speed,accuracy:loc.accuracy,altitude:loc.altitude,heading:loc.bearing,ignition:ign,accel:+(lastA*3.6).toFixed(1),battery_pct:bat.p,charging:bat.c,recorded_at:new Date(loc.time||Date.now()).toISOString()});
-async function flush(){if(fl)return;fl=true;try{localStorage.q=JSON.stringify(queue);while(queue.length){const b=queue.slice(0,200);const {error}=await sb.from('positions').insert(b);if(error){$('err').textContent='Upload error: '+error.message;break}queue=queue.slice(b.length);localStorage.q=JSON.stringify(queue)}}finally{fl=false}}
-async function stop(){clearInterval(batT);clearInterval(cfgT);if(lastLoc){queue.push(row(lastLoc,0,false));flush()}await CapPlugins.BG.removeWatcher({id:watcher});$('go').classList.remove('hide');$('stp').classList.add('hide');$('st').textContent='Stopped'}
+async function flush(){if(fl)return;fl=true;try{localStorage.q=JSON.stringify(queue);while(queue.length){const b=queue.slice(0,200);const {error}=await sb.from('positions').insert(b);if(error){$('err').textContent='Upload error: '+error.message;break}queue=queue.slice(b.length);SENT+=b.length;localStorage.q=JSON.stringify(queue)}$('v_sent').textContent=SENT+(queue.length?' ('+queue.length+' waiting)':'')}finally{fl=false}}
+function upd(loc,kmh,moving){const c=$('stc');c.textContent=moving?'Moving':'Idling';c.style.background=moving?'var(--grl)':'var(--orl)';c.style.color=moving?'var(--gr)':'var(--or)';
+ $('sp').textContent=Math.round(kmh);const V=(k,v)=>$('v_'+k).textContent=v;
+ V('lat',loc.latitude.toFixed(5));V('lng',loc.longitude.toFixed(5));V('acc',loc.accuracy!=null?Math.round(loc.accuracy)+' m':'-');V('alt',loc.altitude!=null?Math.round(loc.altitude)+' m':'-');V('dir',loc.bearing!=null?Math.round(loc.bearing)+'°':'-');V('ac',(lastA*3.6).toFixed(1)+' km/h/s');V('t',new Date().toLocaleTimeString());mpos(loc,moving)}
+async function start(){
+ if(!asg?.vehicle_id){$('err').textContent='No vehicle linked to this user. Ask your admin.';return}
+ try{
+ await loadRules();pollBat();batT=setInterval(pollBat,30000);cfgT=setInterval(loadRules,300000);$('v_lim').textContent=Math.round(LIM.speed)+' km/h';
+ if(!window.CapPlugins)throw new Error('Plugin bridge missing: rebuild the APK with the latest build-apk.yml');
+ watcher=await CapPlugins.BG.addWatcher({backgroundTitle:'Trip in progress',backgroundMessage:'Sending location to fleet dashboard',requestPermissions:true,stale:false,distanceFilter:0},
+ async(loc,err)=>{
+  if(err){if(err.code==='NOT_AUTHORIZED')$('err').textContent='Allow location "All the time" in app settings (Permissions button).';return}
+  const kmh=Math.max(0,(loc.speed||0)*3.6),moving=kmh>=MIN_MOVING_KMH,every=(moving?MOV:STP)*1000;
+  upd(loc,kmh,moving);detect(loc,kmh);if(Date.now()-lastSent<every-500)return;lastSent=Date.now();
+  lastLoc=loc;queue.push(row(loc,moving?kmh:0,true));if(queue.length>=Math.ceil(5/MOV)||!moving)flush()});
+ $('go').classList.add('hide');$('stp').classList.remove('hide');$('err').textContent='';
+ }catch(e){$('err').textContent='Error: '+(e.message||e)}
+}
+async function stop(){clearInterval(batT);clearInterval(cfgT);if(lastLoc){queue.push(row(lastLoc,0,false));flush()}
+ await CapPlugins.BG.removeWatcher({id:watcher});$('go').classList.remove('hide');$('stp').classList.add('hide');const c=$('stc');c.textContent='Parking';c.style.background='var(--bll)';c.style.color='var(--bl)';$('sp').textContent='0'}
+async function openDash(){const {data:{session}}=await sb.auth.getSession();if(!session)return;
+ const u=DASH+'#access_token='+session.access_token+'&refresh_token='+session.refresh_token+'&expires_in=3600&token_type=bearer';
+ try{await CapPlugins.Browser.open({url:u})}catch(e){window.open(u,'_blank')}}
+if(localStorage.user){$('em').value=localStorage.user;$('rem').checked=true}
 init();
 </script></body></html>
