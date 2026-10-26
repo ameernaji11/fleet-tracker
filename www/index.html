@@ -21,6 +21,14 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 .err{color:var(--rd);font-weight:600;min-height:20px}.foot{font-size:11px;color:var(--mut);text-align:center;margin:14px 0}
 .eye{position:absolute;right:6px;top:10px;border:0;background:none;color:var(--mut);width:40px;height:36px}
 .step{display:flex;gap:10px;align-items:center}.step i{width:24px;color:var(--bl);text-align:center}
+#app.screen{display:flex;flex-direction:column;height:100dvh;padding:8px 12px;gap:6px}#app.hide{display:none}
+#app .card{margin:0;padding:8px 10px}.top b{font-size:17px}.top small{font-size:11px}
+.spd{display:flex;align-items:center;gap:10px}.spd b{font-size:40px}.spd .r{margin-left:auto;text-align:right;font-size:12px;color:var(--mut)}
+#map{flex:1;min-height:130px;margin:0}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.grid3 div{background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px 8px;min-width:0}.grid3 small{display:block;color:var(--mut);font-size:10px}.grid3 b{font-size:12px;white-space:nowrap}.grid3 .w2{grid-column:span 2}
+.btns{display:flex;gap:8px}.btns .btn{margin:0;height:48px}
+.mcl{position:absolute;z-index:999;right:8px;top:8px;display:flex;flex-direction:column;gap:6px}.mcl button{width:38px;height:38px;border:0;border-radius:10px;background:#fff;box-shadow:0 1px 6px #0004;color:var(--ink)}
+#err{position:fixed;bottom:66px;left:12px;right:12px;font-size:12px;pointer-events:none;margin:0;z-index:50}
 </style></head><body>
 <div id="lg" class="screen" style="text-align:center;padding-top:40px">
 <svg viewBox="0 0 48 48" width="76"><defs><linearGradient id="lgr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f28c28"/><stop offset="1" stop-color="#2f7fe6"/></linearGradient></defs><rect width="48" height="48" rx="12" fill="url(#lgr)"/><path d="M24 11c-5.5 0-9.5 4.2-9.5 9.4 0 6.7 9.5 16.6 9.5 16.6s9.5-9.9 9.5-16.6C33.5 15.2 29.5 11 24 11z" fill="#fff"/><circle cx="24" cy="20.5" r="3.6" fill="#2f7fe6"/></svg>
@@ -28,7 +36,8 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 <input id="em" placeholder="Username or email" autocomplete="username" autocapitalize="none">
 <div style="position:relative"><input id="pw" type="password" placeholder="Password" autocomplete="current-password"><button type="button" class="eye" onclick="eye()"><i class="fa-solid fa-eye" id="eyei"></i></button></div>
 <label style="display:flex;gap:8px;align-items:center;margin:8px 0;font-weight:600"><input type="checkbox" id="rem" style="width:20px;height:20px;margin:0"> Remember me</label>
-<button class="btn b" id="sib" onclick="signIn()"><i class="fa-solid fa-right-to-bracket"></i>Sign in</button></div>
+<button class="btn b" id="sib" onclick="signIn()"><i class="fa-solid fa-right-to-bracket"></i>Sign in</button>
+<div class="foot">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</div></div>
 <div id="pm" class="screen hide"><h2><i class="fa-solid fa-shield-halved" style="color:var(--bl)"></i> Permissions</h2>
 <p>The app needs these to track your trips reliably, even when the screen is off.</p>
 <div class="card step"><i class="fa-solid fa-location-dot"></i><div>Location and notifications<br><small>Tap Allow, then choose "Allow" on each question.</small></div></div>
@@ -37,20 +46,17 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 <button class="btn o" onclick="CapPlugins.BG.openSettings()"><i class="fa-solid fa-gear"></i>Open location settings</button>
 <div class="card step"><i class="fa-solid fa-battery-full"></i><div>Battery: "Unrestricted"<br><small>Opens settings. Tap Battery → Unrestricted, so Android never stops tracking.</small></div></div>
 <button class="btn o" onclick="CapPlugins.BG.openSettings()"><i class="fa-solid fa-gear"></i>Open battery settings</button>
-<button class="btn g" onclick="localStorage.perm='1';enter()"><i class="fa-solid fa-arrow-right"></i>Continue</button></div>
+<button class="btn g" onclick="localStorage.perm='1';show('lg');init()"><i class="fa-solid fa-arrow-right"></i>Continue</button></div>
 <div id="app" class="screen hide">
-<div class="top"><div><small>Welcome,</small><br><b id="wn"></b><b>!</b></div><button class="ib" onclick="signOut()" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i></button></div>
-<div class="card id"><div class="av"><i id="vi" class="fa-solid fa-car"></i></div><div><b id="vn"></b><br><small><i class="fa-solid fa-id-card"></i> <span id="dn"></span></small></div><span class="chip" id="stc">Not started</span></div>
-<div class="card spd"><b id="sp">0</b><span>km/h</span></div>
-<div class="grid" id="vals"></div>
-<div id="map"><button class="ib mapb" onclick="togMap()" id="mtb">Satellite</button></div>
-<button id="go" class="btn g" onclick="start()"><i class="fa-solid fa-play"></i>Start trip</button>
-<button id="stp" class="btn r hide" onclick="stop()"><i class="fa-solid fa-stop"></i>End trip</button>
-<button id="dash" class="btn o hide" onclick="openDash()"><i class="fa-solid fa-chart-line"></i>Open dashboard</button>
-<button class="btn gh" onclick="show('pm')"><i class="fa-solid fa-shield-halved"></i>Permissions</button></div>
-<p class="err" id="err" style="padding:0 16px"></p>
+<div class="top"><div><small>Welcome,</small> <b id="wn"></b><b>!</b></div><div style="display:flex;gap:6px"><button class="ib hide" id="dash" onclick="openDash()" title="Open dashboard"><i class="fa-solid fa-chart-line"></i></button><button class="ib" onclick="signOut()" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i></button></div></div>
+<div class="card id"><div class="av" style="width:38px;height:38px;font-size:17px"><i id="vi" class="fa-solid fa-car"></i></div><div><b id="vn"></b><br><small><i class="fa-solid fa-id-card"></i> <span id="dn"></span></small></div><span class="chip" id="stc">Not started</span></div>
+<div class="card spd"><b id="sp">0</b><span>km/h</span><div class="r" id="lt">No record yet</div></div>
+<div id="map"><div class="mcl"><button onclick="togMap()" title="Satellite / map"><i class="fa-solid fa-layer-group"></i></button><button onclick="fsMap()" title="Full screen"><i class="fa-solid fa-expand"></i></button><button onclick="pinMe()" title="Go to my vehicle"><i class="fa-solid fa-location-crosshairs"></i></button></div></div>
+<div class="grid3" id="vals"></div>
+<div class="btns"><button id="go" class="btn g" onclick="start()"><i class="fa-solid fa-play"></i>Start trip</button><button id="stp" class="btn r hide" onclick="stop()"><i class="fa-solid fa-stop"></i>End trip</button></div></div>
+<p class="err" id="err"></p>
 <div id="alert" class="hide"></div>
-<div class="foot">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</div>
+
 <script>
 const $=i=>document.getElementById(i);
 window.onerror=(m,s,l)=>{$('err').textContent='Error: '+m+' (line '+l+')'};
@@ -83,17 +89,19 @@ async function init(){
  const nm=(me.email||'').replace('@fleet.local','');$('wn').textContent=nm;
  const v=asg?.vehicles;$('vn').textContent=v?.name||'No vehicle linked';$('dn').textContent=asg?.drivers?.name||'No driver linked';$('vi').className='fa-solid '+(TI[v?.type]||'fa-car');
  $('dash').classList.toggle('hide',role!=='admin');
- [['lat','Latitude','fa-location-dot'],['lng','Longitude','fa-location-dot'],['acc','GPS accuracy','fa-bullseye'],['alt','Elevation','fa-mountain'],['dir','Direction','fa-compass'],['ac','Acceleration','fa-gauge'],['bat','Battery','fa-battery-half'],['lim','Speed limit','fa-triangle-exclamation'],['sent','Records sent','fa-cloud-arrow-up'],['t','Last record','fa-clock']].forEach(x=>{if(!$('v_'+x[0]))$('vals').insertAdjacentHTML('beforeend',`<div><small><i class="fa-solid ${x[2]}"></i> ${x[1]}</small><b id="v_${x[0]}">-</b></div>`)});
- if(localStorage.perm==='1')enter();else show('pm')}
+ [['pos','Position','fa-location-dot','w2'],['acc','Accuracy','fa-bullseye'],['alt','Elevation','fa-mountain'],['dir','Direction','fa-compass'],['ac','Accel.','fa-gauge'],['bat','Battery','fa-battery-half'],['lim','Limit','fa-triangle-exclamation'],['sent','Sent','fa-cloud-arrow-up']].forEach(x=>{if(!$('v_'+x[0]))$('vals').insertAdjacentHTML('beforeend',`<div class="${x[3]||''}"><small><i class="fa-solid ${x[2]}"></i> ${x[1]}</small><b id="v_${x[0]}">-</b></div>`)});
+ enter()}
 function enter(){show('app');initMap();$('v_lim').textContent=Math.round(LIM.speed)+' km/h'}
 // ---- map
-let map,mrk,trail,tiles,sat=false;
+let map,mrk,trail,tiles,sat=false,follow=true;
 const G=l=>'https://{s}.google.com/vt/lyrs='+l+'&x={x}&y={y}&z={z}';
-function initMap(){if(map)return;map=L.map('map',{zoomControl:false}).setView([23.6,58.5],12);
+function initMap(){if(map)return;map=L.map('map',{zoomControl:false}).setView([23.6,58.5],12);map.on('dragstart',()=>follow=false);document.addEventListener('fullscreenchange',()=>setTimeout(()=>map.invalidateSize(),250));
  tiles=L.tileLayer(G('m'),{maxZoom:20,subdomains:['mt0','mt1','mt2','mt3'],attribution:'Map data © Google'}).addTo(map);trail=L.polyline([],{color:'#2f7fe6',weight:4}).addTo(map);setTimeout(()=>map.invalidateSize(),200)}
-function togMap(){sat=!sat;tiles.setUrl(G(sat?'y':'m'));$('mtb').textContent=sat?'Map':'Satellite'}
+function togMap(){sat=!sat;tiles.setUrl(G(sat?'y':'m'))}
+function fsMap(){document.fullscreenElement?document.exitFullscreen():$('map').requestFullscreen()}
+function pinMe(){follow=true;if(mrk)map.setView(mrk.getLatLng(),Math.max(map.getZoom(),16));else $('err').textContent='No vehicle position yet. Start a trip first.'}
 function mpos(loc,moving){const ll=[loc.latitude,loc.longitude],ic=L.divIcon({className:'',html:`<div class="mk" style="background:${moving?'#27a46a':'#f28c28'}"><i class="fa-solid ${$('vi').className.split(' ')[1]}"></i></div>`,iconSize:[34,34],iconAnchor:[17,17]});
- mrk?mrk.setLatLng(ll).setIcon(ic):mrk=L.marker(ll,{icon:ic}).addTo(map);trail.addLatLng(ll);map.panTo(ll)}
+ mrk?mrk.setLatLng(ll).setIcon(ic):mrk=L.marker(ll,{icon:ic}).addTo(map);trail.addLatLng(ll);if(follow)map.panTo(ll)}
 // ---- permissions
 async function pAsk(){try{const id=await CapPlugins.BG.addWatcher({requestPermissions:true,backgroundTitle:'Fleet Tracker',backgroundMessage:'Checking permissions'},()=>{});setTimeout(()=>CapPlugins.BG.removeWatcher({id}),3000)}catch(e){$('err').textContent='Location: '+(e.message||e)}
  try{await CapPlugins.LN.requestPermissions()}catch(e){}}
@@ -126,7 +134,7 @@ const row=(loc,speed,ign)=>({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:a
 async function flush(){if(fl)return;fl=true;try{localStorage.q=JSON.stringify(queue);while(queue.length){const b=queue.slice(0,200);const {error}=await sb.from('positions').insert(b);if(error){$('err').textContent='Upload error: '+error.message;break}queue=queue.slice(b.length);SENT+=b.length;localStorage.q=JSON.stringify(queue)}$('v_sent').textContent=SENT+(queue.length?' ('+queue.length+' waiting)':'')}finally{fl=false}}
 function upd(loc,kmh,moving){const c=$('stc');c.textContent=moving?'Moving':'Idling';c.style.background=moving?'var(--grl)':'var(--orl)';c.style.color=moving?'var(--gr)':'var(--or)';
  $('sp').textContent=Math.round(kmh);const V=(k,v)=>$('v_'+k).textContent=v;
- V('lat',loc.latitude.toFixed(5));V('lng',loc.longitude.toFixed(5));V('acc',loc.accuracy!=null?Math.round(loc.accuracy)+' m':'-');V('alt',loc.altitude!=null?Math.round(loc.altitude)+' m':'-');V('dir',loc.bearing!=null?Math.round(loc.bearing)+'°':'-');V('ac',(lastA*3.6).toFixed(1)+' km/h/s');V('t',new Date().toLocaleTimeString());mpos(loc,moving)}
+ V('pos',loc.latitude.toFixed(5)+', '+loc.longitude.toFixed(5));V('acc',loc.accuracy!=null?Math.round(loc.accuracy)+' m':'-');V('alt',loc.altitude!=null?Math.round(loc.altitude)+' m':'-');V('dir',loc.bearing!=null?Math.round(loc.bearing)+'°':'-');V('ac',(lastA*3.6).toFixed(1)+' km/h/s');$('lt').textContent='Last record '+new Date().toLocaleTimeString('en-GB');mpos(loc,moving)}
 async function start(){
  if(!asg?.vehicle_id){$('err').textContent='No vehicle linked to this user. Ask your admin.';return}
  try{
@@ -147,5 +155,6 @@ async function openDash(){const {data:{session}}=await sb.auth.getSession();if(!
  const u=DASH+'#access_token='+session.access_token+'&refresh_token='+session.refresh_token+'&expires_in=3600&token_type=bearer';
  try{await CapPlugins.Browser.open({url:u})}catch(e){window.open(u,'_blank')}}
 if(localStorage.user){$('em').value=localStorage.user;$('rem').checked=true}
+if(localStorage.perm!=='1')show('pm');
 init();
 </script></body></html>
