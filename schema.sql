@@ -6,8 +6,9 @@
 -- create-or-replace / drop-policy-then-create, so it works both as a fresh
 -- install on a new project and as a repair script on an already-migrated one.
 --
--- Your current live project (jdaqacacdihkoliyeiao) is already at this state,
--- apart from the hdop clean-up at the end, which this file applies for you.
+-- Your live project (jdaqacacdihkoliyeiao) is at the v8 state. Running this file
+-- once adds only what is new: the hdop clean-up and event_rules.hold_s (the
+-- tolerance window the Configuration page now saves). Everything else is skipped.
 --
 -- After a fresh install: sign in once from the dashboard, then run the
 -- "make yourself admin" statement at the bottom of this file.
@@ -33,9 +34,9 @@ create table if not exists vehicles (
   moving_interval int, stopped_interval int, brake_limit real, accel_limit real,
   -- settings panel (v8)
   custom boolean default false,                 -- true = this vehicle overrides the fleet defaults (shows the "Custom" badge)
-  min_moving_distance numeric default 0,        -- km below which fuel figures are not calculated
-  speed_buffer numeric default 10,              -- km/h of margin above the limit before an overspeed alert
-  max_accel_warning numeric default 3);         -- km/h per second, warning threshold shown on the phone
+  min_moving_distance numeric default 0,        -- metres the vehicle must travel in a trip before events are detected
+  speed_buffer numeric default 10,              -- km/h of margin above the limit before the overspeed alert starts
+  max_accel_warning numeric default 3);         -- km/h per second: warns the driver without recording an event
 
 create table if not exists drivers (
   id uuid primary key default gen_random_uuid(),
@@ -99,7 +100,9 @@ create table if not exists event_rules (
   threshold double precision, alert boolean default true, beep boolean default true,
   -- buzzer timing (v8)
   beep_duration int default 5,                  -- seconds the buzzer sounds
-  beep_type text default 'discontinuous');      -- 'continuous' | 'discontinuous'
+  beep_type text default 'discontinuous',       -- 'continuous' | 'discontinuous'
+  -- tolerance window (v9): how long the limit must stay broken before the event is written
+  hold_s numeric default 0);                    -- seconds; the phone alert still fires immediately
 
 -- fleet-wide sampling intervals (v6)
 create table if not exists app_settings (key text primary key, value text not null);
@@ -140,14 +143,25 @@ alter table events add column if not exists details text;
 
 alter table event_rules add column if not exists beep boolean default true,
   add column if not exists beep_duration int default 5,
-  add column if not exists beep_type text default 'discontinuous';
+  add column if not exists beep_type text default 'discontinuous',
+  add column if not exists hold_s numeric default 0;
 
 -- ------------------------------------------------------ seed the defaults ----
-insert into event_rules (type, label, enabled, threshold, alert) values
-  ('harsh_braking',     'Harsh braking',     true, 11,  true),   -- km/h per second (v5 units)
-  ('harsh_acceleration','Harsh acceleration', true,  9,  true),  -- km/h per second
-  ('overspeed',         'Overspeed',         true, 100,  true)   -- km/h
+insert into event_rules (type, label, enabled, threshold, alert, hold_s) values
+  ('harsh_braking',     'Harsh braking',     true, 11,  true, 2),   -- km/h per second (v5 units)
+  ('harsh_acceleration','Harsh acceleration', true,  9,  true, 2),  -- km/h per second
+  ('overspeed',         'Overspeed',         true, 100,  true, 10)  -- km/h
   on conflict (type) do nothing;
+
+-- give the tolerance window its 2 s / 10 s defaults exactly once on a project
+-- that already had event_rules rows (the ALTER above can only add it as 0).
+-- Later runs never touch it, so a tolerance you set from the dashboard survives.
+do $$ begin
+  if not exists (select 1 from app_settings where key='hold_s_seeded') then
+    update event_rules set hold_s = case type when 'overspeed' then 10 else 2 end;
+    insert into app_settings (key, value) values ('hold_s_seeded','1') on conflict (key) do nothing;
+  end if;
+end $$;
 
 insert into app_settings (key, value) values ('moving_interval','10'), ('stopped_interval','60')
   on conflict (key) do nothing;
@@ -319,6 +333,18 @@ alter table positions drop column if exists hdop;
 --   vehicles.min_moving_distance / speed_buffer / max_accel_warning    -> same, with the same defaults (0 / 10 / 3)
 --   event_rules.beep_duration int default 5                            -> same (seconds the buzzer sounds)
 --   event_rules.beep_type text default 'discontinuous'                 -> same ('continuous' | 'discontinuous')
---   NOTE: no dashboard or phone code reads these six columns yet - the settings screens that were
---   planned around them are still to be built. They are kept here so the database is never behind.
+--   NOTE: these six columns were dead when v8 was written. They are now wired up (see v9 below).
+-- new in this file (v9, dashboard Configuration rework) — nothing was removed to get here
+--   event_rules.hold_s numeric default 0                               -> tolerance window in seconds: the phone alerts the
+--        driver as soon as a limit is broken but only writes the event if it lasts longer than hold_s.
+--        Seeded 2 s for harsh braking/acceleration and 10 s for overspeed, editable per event type.
+--   event_rules.beep / beep_duration / beep_type                       -> the phone buzzer now honours them: on/off,
+--        how many seconds, and 'continuous' (one long tone) or 'discontinuous' (beep-beep-beep).
+--   vehicles.custom                                                    -> set by the dashboard when a vehicle keeps its own
+--        values; renders the "Custom" badge and the "Use fleet defaults" reset (which nulls the overrides).
+--   vehicles.speed_buffer / max_accel_warning / min_moving_distance    -> read by the phone: km/h added to the limit
+--        before the overspeed alert starts, a lower acceleration level that only warns, and the metres a trip must
+--        cover before events are detected (stops GPS jitter in a parked vehicle from making false events).
+--   app_settings key 'hold_s_seeded'                                   -> marker so the one-off tolerance defaulting
+--        above never overwrites values you set from the dashboard.
 -- ============================================================================
