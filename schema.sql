@@ -9,8 +9,9 @@
 -- Your live project (jdaqacacdihkoliyeiao) is at the v8 state. Running this file
 -- once adds only what is new: the hdop clean-up (which rebuilds the
 -- latest_positions view), event_rules.hold_s (the tolerance window the
--- Configuration page now saves) and the admin seed below. Everything else is
--- skipped.
+-- Configuration page now saves), vehicle_report.over_s (overspeed seconds for
+-- the safety score), the score_green/score_red settings and the admin seed
+-- below. Everything else is skipped.
 --
 -- The "admin seed" block makes ameer@fleettrack.com role=admin, so the separate
 -- Admin.sql saved query in Supabase is no longer needed — delete it once this
@@ -169,6 +170,12 @@ end $$;
 insert into app_settings (key, value) values ('moving_interval','10'), ('stopped_interval','60')
   on conflict (key) do nothing;
 
+-- RAG cut-offs for the Fleet Summary safety score (v10). The score is a risk
+-- index: at or below score_green it shows green, at or above score_red it shows
+-- red, in between it shows amber. Both are editable from the Configuration page.
+insert into app_settings (key, value) values ('score_green','1'), ('score_red','3')
+  on conflict (key) do nothing;
+
 -- ------------------------------------------------------------ views/procs ----
 -- hdop was added in v4 and never written by the phone or read by the dashboard.
 -- It must be removed BEFORE the view below is rebuilt, and the view must be
@@ -195,20 +202,26 @@ create or replace function is_admin() returns boolean language sql security defi
 $$ select exists(select 1 from profiles where id = auth.uid() and role = 'admin') $$;
 
 -- fleet report computed in the database (no 1000-row limit, fast)
+-- over_s: seconds spent above the vehicle's own speed_limit (100 km/h when the
+-- vehicle has none). Sample gaps over 3 minutes are ignored, as everywhere else
+-- in this function, so a parked overnight gap cannot become hours of overspeed.
 create or replace function vehicle_report(p_from timestamptz, p_to timestamptz, p_tz text default 'UTC')
-returns table(vehicle_id uuid, vehicle_name text, day date, km numeric, max_speed numeric, drive_min numeric, stop_min numeric)
+returns table(vehicle_id uuid, vehicle_name text, day date, km numeric, max_speed numeric, drive_min numeric, stop_min numeric, over_s numeric)
 language sql stable security invoker as $$
- with p as (select vehicle_id, vehicle_name, recorded_at, speed, lat, lng,
-   lag(lat) over w plat, lag(lng) over w plng, lag(recorded_at) over w pt
-   from positions where recorded_at between p_from and p_to and positions.vehicle_id is not null
-   window w as (partition by positions.vehicle_id order by recorded_at)),
+ with p as (select po.vehicle_id, po.vehicle_name, po.recorded_at, po.speed, po.lat, po.lng,
+   coalesce(v.speed_limit, 100) lim,
+   lag(po.lat) over w plat, lag(po.lng) over w plng, lag(po.recorded_at) over w pt
+   from positions po left join vehicles v on v.id = po.vehicle_id
+   where po.recorded_at between p_from and p_to and po.vehicle_id is not null
+   window w as (partition by po.vehicle_id order by po.recorded_at)),
  g as (select *, extract(epoch from recorded_at - pt) dt,
    6371*2*asin(sqrt(power(sin(radians(lat-plat)/2),2)+cos(radians(plat))*cos(radians(lat))*power(sin(radians(lng-plng)/2),2))) d from p)
  select g.vehicle_id, max(g.vehicle_name), (g.recorded_at at time zone p_tz)::date,
   round(coalesce(sum(case when dt<=180 then d end),0)::numeric,2),
   round(coalesce(max(speed),0)::numeric),
   round((coalesce(sum(case when dt<=180 and speed>0 then dt end),0)/60)::numeric,1),
-  round((coalesce(sum(case when dt<=180 and speed=0 then dt end),0)/60)::numeric,1)
+  round((coalesce(sum(case when dt<=180 and speed=0 then dt end),0)/60)::numeric,1),
+  round(coalesce(sum(case when dt<=180 and speed>lim then dt end),0)::numeric,1)
  from g group by g.vehicle_id, 3 order by 3 $$;
 
 -- ------------------------------------------------------- row level security ----
@@ -380,4 +393,10 @@ end $$;
 --   admin seed DO block (after the clean-up section)                   -> replaces the separate Admin.sql saved query in
 --        Supabase: promotes ameer@fleettrack.com to role='admin', case-insensitively, and prints a NOTICE listing the
 --        profiles it could not match instead of failing silently.
+-- new in this file (v10, safety score as an IVMS-style RAG index)
+--   vehicle_report gains an 8th output column over_s                   -> seconds above the vehicle's own speed_limit
+--        (100 km/h when it has none), counted only across sample gaps of 3 minutes or less. The dashboard's safety
+--        score is now (harsh accel events + harsh brake events + over_s) * (100 / km), so lower is safer.
+--   app_settings keys 'score_green' (1) and 'score_red' (3)             -> the RAG cut-offs, editable from the
+--        Configuration page: at or below score_green = green, at or above score_red = red, between = amber.
 -- ============================================================================
