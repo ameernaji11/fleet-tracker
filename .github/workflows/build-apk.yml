@@ -34,18 +34,31 @@ jobs:
         with:
           path: fleet.keystore
           key: fleet-keystore-v1
-      - name: Create signing key (first time only)
+      - name: Install signing key from secrets
+        env:
+          FLEET_KEYSTORE_B64: ${{ secrets.FLEET_KEYSTORE_B64 }}
         if: steps.ks.outputs.cache-hit != 'true'
-        run: keytool -genkeypair -keystore fleet.keystore -alias fleet -keyalg RSA -keysize 2048 -validity 10000 -storepass fleetpass123 -keypass fleetpass123 -dname "CN=Fleet Tracker, O=Ameer Naji"
-      - name: Build signed release APK
         run: |
+          if [ -z "$FLEET_KEYSTORE_B64" ]; then
+            echo "::error::No signing key available. The Actions cache entry was empty and the FLEET_KEYSTORE_B64 secret is missing."
+            echo "A fresh key here would change the APK signature, so every driver has to uninstall and reinstall instead of updating."
+            echo "Fix: create the key once (see README steps) and save it as the FLEET_KEYSTORE_B64 and FLEET_KEYSTORE_PASSWORD secrets."
+            exit 1
+          fi
+          printf '%s' "$FLEET_KEYSTORE_B64" | base64 -d > fleet.keystore
+      - name: Build signed release APK
+        env:
+          KS_PASS: ${{ secrets.FLEET_KEYSTORE_PASSWORD }}
+        run: |
+          [ -n "$KS_PASS" ] || { echo "::error::Missing the FLEET_KEYSTORE_PASSWORD secret."; exit 1; }
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
           cd ..
           BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
           $BT/zipalign -p 4 android/app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
-          $BT/apksigner sign --ks fleet.keystore --ks-pass pass:fleetpass123 --key-pass pass:fleetpass123 --out fleet-tracker.apk aligned.apk
+          $BT/apksigner sign --ks fleet.keystore --ks-pass pass:$KS_PASS --key-pass pass:$KS_PASS --ks-key-alias fleet --out fleet-tracker.apk aligned.apk
+          $BT/apksigner verify fleet-tracker.apk
       - uses: actions/upload-artifact@v4
         with:
           name: fleet-tracker-apk
