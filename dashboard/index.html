@@ -10,7 +10,7 @@
 :root{--bg:#fff7ee;--ink:#26323a;--mut:#6b7a85;--line:#efe3d4;--or:#f28c28;--orl:#ffe9d2;--ord:#b85d00;--gr:#27a46a;--grl:#ddf4e8;--bl:#2f7fe6;--bll:#dcebfd;--rd:#d9534f;--rdl:#fde4e2;--gy:#9aa7b0;--gyl:#eef1f3;--card:#fff;--th:#fffaf4;--t1:#2f7fe6;--t2:#27a46a;--t3:#f28c28;--t4:#d9534f;--t5:#9b59b6;--t6:#1abc9c}
 *{box-sizing:border-box}html,body{height:100%}body{margin:0;font:14px/1.45 Nunito,system-ui,sans-serif;color:var(--ink);background:var(--bg)}
 .hide{display:none!important}button{font:inherit}
-#app{display:flex;height:100%}aside{width:210px;background:var(--card);border-right:1px solid var(--line);padding:14px 12px;display:flex;flex-direction:column;gap:6px}
+#app{display:none;height:100%}aside{width:210px;background:var(--card);border-right:1px solid var(--line);padding:14px 12px;display:flex;flex-direction:column;gap:6px}
 .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:17px;padding:4px 6px 14px}.brand i{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--or),#f6b25f);color:#fff;display:grid;place-items:center}
 .nb{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;font-weight:600;color:var(--mut)}
 .nb i{width:20px;text-align:center}.nb:hover{background:var(--gyl)}.nb.on{background:var(--orl);color:var(--ord)}.nb:focus-visible{outline:2px solid var(--bl)}.nb.out{margin-top:auto;color:var(--rd)}
@@ -250,13 +250,13 @@ async function signIn(){
 function eye(){const i=$('pw');i.type=i.type==='password'?'text':'password';$('eyei').className='fa-solid '+(i.type==='password'?'fa-eye':'fa-eye-slash')}
 function pin(){const on=document.querySelector('aside').classList.toggle('pin');localStorage.pin=on?'1':'0';
  if(on){$('pinI').className='fa-solid fa-thumbtack';$('pinSpan').textContent='Keep menu open'}
- else{$('pinI').className='fa-solid fa-thumbtack fa-180deg';$('pinSpan').textContent='Show menu'}}
+ else{$('pinI').className='fa-solid fa-thumbtack fa-180deg';$('pinSpan').textContent='Show menu'}
 function themeBtn(){const d=document.documentElement.dataset.theme==='dark';$('themeB').innerHTML=d?'<i class="fa-solid fa-sun"></i><span>Light mode</span>':'<i class="fa-solid fa-moon"></i><span>Dark mode</span>'}
 async function boot(){
  const {data:{session}}=await sb.auth.getSession();if(!session)return;
  const {data:p}=await sb.from('profiles').select('role').eq('id',session.user.id).single();
  ADMIN=p?.role==='admin';UID=session.user.id;document.body.classList.toggle('usr',!ADMIN);
- $('login').classList.add('hide');$('app').classList.remove('hide');UNAME=(session.user.email||'').replace('@fleet.local','');$('me').textContent='Welcome, '+UNAME+'!';if(localStorage.pin==='1')document.querySelector('aside').classList.add('pin');themeBtn();
+ $('login').classList.add('hide');$('app').classList.remove('hide');$('app').style.display='flex';UNAME=(session.user.email||'').replace('@fleet.local','');$('me').textContent='Welcome, '+UNAME+'!';if(localStorage.pin==='1')document.querySelector('aside').classList.add('pin');themeBtn();
  mapL=mkMap('mapLive',fitAll);mapH=mkMap('mapHist');
  initDates();
  await refs();await loadLive();loadRules();
@@ -648,6 +648,8 @@ function panels(sec){const g=document.querySelector('#'+sec+' .cgrid');if(!g)ret
 if(localStorage.user){$('em').value=localStorage.user;$('rem').checked=true}
 boot();
 </script></body></html>
+
+
 
 
 
