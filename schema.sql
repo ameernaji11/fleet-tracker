@@ -7,11 +7,14 @@
 -- install on a new project and as a repair script on an already-migrated one.
 --
 -- Your live project (jdaqacacdihkoliyeiao) is at the v8 state. Running this file
--- once adds only what is new: the hdop clean-up and event_rules.hold_s (the
--- tolerance window the Configuration page now saves). Everything else is skipped.
+-- once adds only what is new: the hdop clean-up (which rebuilds the
+-- latest_positions view), event_rules.hold_s (the tolerance window the
+-- Configuration page now saves) and the admin seed below. Everything else is
+-- skipped.
 --
--- After a fresh install: sign in once from the dashboard, then run the
--- "make yourself admin" statement at the bottom of this file.
+-- The "admin seed" block makes ameer@fleettrack.com role=admin, so the separate
+-- Admin.sql saved query in Supabase is no longer needed — delete it once this
+-- file has run and you have confirmed: select email, role from profiles;
 -- ============================================================================
 
 -- ---------------------------------------------------------------- tables ----
@@ -167,6 +170,15 @@ insert into app_settings (key, value) values ('moving_interval','10'), ('stopped
   on conflict (key) do nothing;
 
 -- ------------------------------------------------------------ views/procs ----
+-- hdop was added in v4 and never written by the phone or read by the dashboard.
+-- It must be removed BEFORE the view below is rebuilt, and the view must be
+-- dropped first: latest_positions is defined with SELECT *, so Postgres bakes
+-- hdop into it and refuses the column drop (2BP01), while CREATE OR REPLACE
+-- VIEW can add columns but never remove one. Dropping and recreating the view
+-- in the same run is safe — nothing else in this file or the apps depends on it.
+drop view if exists latest_positions;
+alter table positions drop column if exists hdop;
+
 -- one row per tracking phone: its most recent position
 create or replace view latest_positions with (security_invoker = true) as
   select distinct on (user_id) * from positions order by user_id, recorded_at desc;
@@ -279,15 +291,33 @@ do $$ begin
   end if;
 end $$;
 
--- ------------------------------------------------------------- clean-up ----
--- hdop was added in v4 and never written by the phone or read by the dashboard.
-alter table positions drop column if exists hdop;
+-- ------------------------------------------------------------- admin seed ----
+-- Promote the owner account. Runs after the tables/policies exist, and is safe
+-- to re-run. If the profile does not exist yet (nobody has signed in with this
+-- address), it reports that instead of failing, and the next run of this file
+-- picks it up. Do NOT put a real password or token here — only this update.
+do $$
+declare n int;
+begin
+  update profiles set role='admin' where lower(email)=lower('ameer@fleettrack.com');
+  get diagnostics n = row_count;
+  if n = 0 then
+    raise notice 'admin seed: no profile with email ameer@fleettrack.com yet. Existing profiles: %',
+      (select coalesce(string_agg(email, ', '), 'none')
+         from (select email from profiles order by email limit 8) x);
+  else
+    raise notice 'admin seed: ameer@fleettrack.com is now role=admin';
+  end if;
+end $$;
 
 -- ============================================================================
 -- ONE-OFF STEPS (not part of the schema above)
 --
--- 1. Make your own account the first admin, after signing in once:
---      update profiles set role='admin' where email='YOUR@EMAIL.COM';
+-- 1. Admin account: handled automatically by the "admin seed" block above
+--    (ameer@fleettrack.com). On a brand-new project, sign in from the
+--    dashboard once, then run this file again so the seed finds the profile.
+--    To make the grant un-typo-able, use the stable id instead of the address:
+--      update profiles set role='admin' where id='<uuid from auth.users>';
 --
 -- 2. Supabase project settings the apps depend on:
 --      Authentication > Providers > Email: turn OFF "Confirm email"
@@ -316,7 +346,7 @@ alter table positions drop column if exists hdop;
 --   create policy "events insert own" ... (user_id = auth.uid())       -> tightened by v7
 --   create policy "events admin read" ... using (is_admin())           -> replaced by "events read" (v5)
 -- from migration-v4.sql
---   positions.hdop real                                                 -> nothing ever wrote or read it; dropped in the clean-up section below
+--   positions.hdop real                                                 -> nothing ever wrote or read it; dropped just before the latest_positions view is rebuilt
 --   event_rules seed thresholds 3.0 braking / 2.5 accel (m/s2)          -> v5 restated them as 11 / 9 km/h per second, which is what the seed above uses
 --   comment: 1-second data fills the free 500 MB fast                   -> kept as the purge note above
 -- from migration-v5.sql
@@ -347,4 +377,7 @@ alter table positions drop column if exists hdop;
 --        cover before events are detected (stops GPS jitter in a parked vehicle from making false events).
 --   app_settings key 'hold_s_seeded'                                   -> marker so the one-off tolerance defaulting
 --        above never overwrites values you set from the dashboard.
+--   admin seed DO block (after the clean-up section)                   -> replaces the separate Admin.sql saved query in
+--        Supabase: promotes ameer@fleettrack.com to role='admin', case-insensitively, and prints a NOTICE listing the
+--        profiles it could not match instead of failing silently.
 -- ============================================================================
