@@ -49,7 +49,7 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 <button class="btn g" onclick="localStorage.perm='1';show('lg');init()"><i class="fa-solid fa-arrow-right"></i>Continue</button></div>
 <div id="app" class="screen hide">
 <div class="top"><div><small>Welcome,</small> <b id="wn"></b><b>!</b></div><div style="display:flex;gap:6px"><button class="ib hide" id="dash" onclick="openDash()" title="Open dashboard"><i class="fa-solid fa-chart-line"></i></button><button class="ib" onclick="pwUi()" title="Change password"><i class="fa-solid fa-key"></i></button><button class="ib" onclick="signOut()" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i></button></div></div>
-<div class="card id"><div class="av" style="width:38px;height:38px;font-size:17px"><i id="vi" class="fa-solid fa-car"></i></div><div><b id="vn"></b><br><small><i class="fa-solid fa-id-card"></i> <span id="dn"></span></small></div><span class="chip" id="stc">Not started</span></div>
+<div class="card id"><div class="av" style="width:38px;height:38px;font-size:17px"><i id="vi" class="fa-solid fa-car"></i></div><div><b id="vn"></b><br><small><i class="fa-solid fa-id-card"></i> <span id="dn"></span></small><br><select id="pk" class="hide" onchange="pickV()" style="margin-top:6px;max-width:190px"></select></div><span class="chip" id="stc">Not started</span></div>
 <div class="card spd"><b id="sp">0</b><span>km/h</span><div class="r" id="lt">No record yet</div></div>
 <div id="map"><div class="mcl"><button onclick="togMap()" title="Satellite / map"><i class="fa-solid fa-layer-group"></i></button><button onclick="fsMap()" title="Full screen"><i class="fa-solid fa-expand"></i></button><button onclick="pinMe()" title="Go to my vehicle"><i class="fa-solid fa-location-crosshairs"></i></button></div></div>
 <div class="grid3" id="vals"></div>
@@ -74,7 +74,7 @@ window.addEventListener('unhandledrejection',e=>{$('err').textContent='Error: '+
 const DASH=(typeof DASH_URL==='string'&&/^https:\/\/.+\/$/.test(DASH_URL.trim()))?DASH_URL.trim():'https://ameernaji11.github.io/fleet-tracker/dashboard/';
 const mail=u=>u.includes('@')?u.trim():u.trim().toLowerCase()+'@fleet.local';
 const TI={Car:'fa-car',Sedan:'fa-car-side',Hatchback:'fa-car',SUV:'fa-car-rear',Pickup:'fa-truck-pickup',Van:'fa-van-shuttle',Minibus:'fa-van-shuttle',Bus:'fa-bus',Truck:'fa-truck','Heavy Truck':'fa-truck-moving',Tanker:'fa-truck-droplet',Taxi:'fa-taxi',Ambulance:'fa-truck-medical',Motorbike:'fa-motorcycle',Tractor:'fa-tractor',Trailer:'fa-trailer',Equipment:'fa-tractor'};
-let REM=localStorage.rem!=='0',sb=null,me,asg,role,watcher,lastSent=0,queue=JSON.parse(localStorage.q||'[]'),SENT=0;
+let REM=localStorage.rem!=='0',sb=null,me,asg,role,watcher,lastSent=0,queue=JSON.parse(localStorage.q||'[]'),SENT=0,ASGS=[],PICK=localStorage.pick||null;
 const mk=r=>supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storage:r?localStorage:sessionStorage}});
 try{if(!/^https:\/\/[a-z0-9]{15,30}\.supabase\.co$/.test(SUPABASE_URL)||!String(SUPABASE_KEY).startsWith('eyJ'))throw new Error('config.js has a wrong address or key');sb=mk(REM)}catch(e){$('err').textContent='Setup error: '+(e.message||e)}
 const show=s=>{['lg','pm','app'].forEach(x=>$(x).classList.toggle('hide',x!==s));if(s==='app'&&map)setTimeout(()=>map.invalidateSize(),100)};
@@ -153,9 +153,14 @@ function ev(type,loc,kmh,val){if(!ON[type])return;const n=Date.now();if(n-(lastE
  const lim=type==='overspeed'?Math.round(LIM.speed+LIM.buf):+(Math.abs(type==='harsh_braking'?LIM.brake:LIM.accel)*3.6).toFixed(1);
  const details=type==='overspeed'?`${Math.round(kmh)} km/h against a ${lim} km/h alert level${HOLD.overspeed?' held over '+HOLD.overspeed+' s':''}`:`${Math.abs(val).toFixed(1)} km/h/s ${type==='harsh_braking'?'deceleration':'acceleration'} against a ${lim} km/h/s limit`;
  sb.from('events').insert({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,type,lat:loc.latitude,lng:loc.longitude,speed:kmh,value:val,details,recorded_at:new Date(loc.time||n).toISOString()}).then(({error})=>{if(error)$('err').textContent='Event error: '+error.message})}
+function pickUi(){const s=$('pk');if(!s)return;
+ $('vn').textContent=asg?.vehicles?.name||'No vehicle linked';$('dn').textContent=asg?.drivers?.name||'No driver linked';
+ if(ASGS.length<2){s.classList.add('hide');s.replaceChildren();return}
+ s.classList.remove('hide');s.replaceChildren(...ASGS.map(x=>{const o=document.createElement('option');o.value=x.vehicle_id;o.textContent=x.vehicles?.name||'Vehicle';o.selected=x.vehicle_id===PICK;return o}))}
+function pickV(){PICK=$('pk').value;localStorage.pick=PICK;if(watcher){stop();watcher=null}loadRules()}
 async function loadRules(){
- const [a,r,t]=await Promise.all([sb.from('assignments').select('vehicle_id,driver_id,vehicles(name,type,speed_limit,moving_interval,stopped_interval,brake_limit,accel_limit,speed_buffer,max_accel_warning,min_moving_distance),drivers(name)').eq('user_id',me.id).maybeSingle(),sb.from('event_rules').select('*'),sb.from('app_settings').select('*')]);
- if(a.data)asg=a.data;const S={};(t.data||[]).forEach(x=>S[x.key]=+x.value);const v=asg?.vehicles||{};
+ const [a,r,t]=await Promise.all([sb.from('assignments').select('vehicle_id,driver_id,vehicles(name,type,speed_limit,moving_interval,stopped_interval,brake_limit,accel_limit,speed_buffer,max_accel_warning,min_moving_distance),drivers(name)').eq('user_id',me.id),sb.from('event_rules').select('*'),sb.from('app_settings').select('*')]);
+ if(a.data){ASGS=a.data.filter(x=>x.vehicle_id);if(!ASGS.some(x=>x.vehicle_id===PICK))PICK=ASGS[0]?.vehicle_id||null;asg=ASGS.find(x=>x.vehicle_id===PICK)||a.data[0]||null;pickUi()}const S={};(t.data||[]).forEach(x=>S[x.key]=+x.value);const v=asg?.vehicles||{};
  (r.data||[]).forEach(x=>{RUL[x.type]=x;ON[x.type]=x.enabled;const h=Math.max(0,+x.hold_s||0);
   if(x.type==='overspeed'){LIM.speed=v.speed_limit||x.threshold;LIM.buf=Math.max(0,+v.speed_buffer||0);HOLD.overspeed=h}
   if(x.type==='harsh_braking'){LIM.brake=-(v.brake_limit||x.threshold)/3.6;HOLD.harsh_braking=h}
