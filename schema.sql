@@ -226,6 +226,11 @@ $$ select exists(select 1 from profiles where id = auth.uid() and role = 'admin'
 -- over_s: seconds spent above the vehicle's own speed_limit (100 km/h when the
 -- vehicle has none). Sample gaps over 3 minutes are ignored, as everywhere else
 -- in this function, so a parked overnight gap cannot become hours of overspeed.
+-- vehicle_report gained a column, and Postgres refuses to change the return type
+-- of an existing function ("cannot change return type of existing function"), so
+-- the old one has to be dropped before it is recreated. Safe: nothing depends on
+-- it, the dashboard calls it by name.
+drop function if exists vehicle_report(timestamptz, timestamptz, text);
 create or replace function vehicle_report(p_from timestamptz, p_to timestamptz, p_tz text default 'UTC')
 returns table(vehicle_id uuid, vehicle_name text, day date, km numeric, max_speed numeric, drive_min numeric, stop_min numeric, over_s numeric)
 language sql stable security invoker as $$
