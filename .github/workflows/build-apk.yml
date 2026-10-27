@@ -17,6 +17,45 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+      - name: Load signing key from secret
+        id: key
+        env:
+          FLEET_KEYSTORE_B64: ${{ secrets.FLEET_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$FLEET_KEYSTORE_B64" ]; then
+            printf '%s' "$FLEET_KEYSTORE_B64" | base64 -d > fleet.keystore
+            echo "source=secret" >> "$GITHUB_OUTPUT"
+          else
+            echo "source=none" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Fall back to the cached key
+        if: steps.key.outputs.source != 'secret'
+        uses: actions/cache@v4
+        with:
+          path: fleet.keystore
+          key: fleet-keystore-v1
+      # Checked before the two-minute Gradle build so a key/password mismatch
+      # names itself instead of surfacing as "exit code 2" from apksigner.
+      - name: Check the signing key
+        env:
+          KS_PASS: ${{ secrets.FLEET_KEYSTORE_PASSWORD }}
+          SRC: ${{ steps.key.outputs.source }}
+        run: |
+          if [ ! -s fleet.keystore ]; then
+            echo "::error::No signing key available: the FLEET_KEYSTORE_B64 secret is empty and the fleet-keystore-v1 cache entry is gone."
+            echo "Generating a fresh key here would change the APK signature, so every driver has to uninstall and reinstall."
+            exit 1
+          fi
+          if [ -z "$KS_PASS" ]; then
+            echo "::error::Missing the FLEET_KEYSTORE_PASSWORD secret."
+            exit 1
+          fi
+          if ! keytool -list -keystore fleet.keystore -storepass "$KS_PASS" -alias fleet >/dev/null 2>&1; then
+            echo "::error::fleet.keystore (from the $SRC) cannot be opened with FLEET_KEYSTORE_PASSWORD, or has no 'fleet' alias."
+            echo "::error::The key and the password come from different keystores. Correct the secret - do not generate a new key, that changes the APK signature and forces every driver to reinstall."
+            exit 1
+          fi
+          echo "Signing key verified (source: $SRC)."
       - name: Create Android project
         run: |
           npm init -y
@@ -28,34 +67,16 @@ jobs:
           sed -i 's#</manifest>#<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/><uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/><uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/><uses-permission android:name="android.permission.POST_NOTIFICATIONS"/></manifest>#' android/app/src/main/AndroidManifest.xml
           sed -i 's/android:allowBackup="true"/android:allowBackup="false"/; s/<application/<application android:usesCleartextTraffic="false"/' android/app/src/main/AndroidManifest.xml
           npx cap sync android
-      - name: Restore signing key
-        id: ks
-        uses: actions/cache@v4
-        with:
-          path: fleet.keystore
-          key: fleet-keystore-v1
-      - name: Install signing key from secrets
-        env:
-          FLEET_KEYSTORE_B64: ${{ secrets.FLEET_KEYSTORE_B64 }}
-        if: steps.ks.outputs.cache-hit != 'true'
-        run: |
-          if [ -z "$FLEET_KEYSTORE_B64" ]; then
-            echo "::error::No signing key available. The Actions cache entry was empty and the FLEET_KEYSTORE_B64 secret is missing."
-            echo "A fresh key here would change the APK signature, so every driver has to uninstall and reinstall instead of updating."
-            echo "Fix: create the key once (see README steps) and save it as the FLEET_KEYSTORE_B64 and FLEET_KEYSTORE_PASSWORD secrets."
-            exit 1
-          fi
-          printf '%s' "$FLEET_KEYSTORE_B64" | base64 -d > fleet.keystore
       - name: Build signed release APK
         env:
           KS_PASS: ${{ secrets.FLEET_KEYSTORE_PASSWORD }}
         run: |
-          [ -n "$KS_PASS" ] || { echo "::error::Missing the FLEET_KEYSTORE_PASSWORD secret."; exit 1; }
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
           cd ..
           BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+          [ -x "$BT/zipalign" ] || { echo "::error::No build-tools with zipalign under $ANDROID_HOME"; exit 1; }
           $BT/zipalign -p 4 android/app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
           $BT/apksigner sign --ks fleet.keystore --ks-pass pass:$KS_PASS --key-pass pass:$KS_PASS --ks-key-alias fleet --out fleet-tracker.apk aligned.apk
           $BT/apksigner verify fleet-tracker.apk
