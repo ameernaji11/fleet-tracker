@@ -1,5 +1,5 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' https: data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'">
+﻿<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'nonce-{{NONCE}}' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'nonce-{{NONCE}}' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' https: data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="referrer" content="no-referrer">
  <meta name="referrer" content="no-referrer-when-downgrade">
 <title>Fleet Tracker</title>
@@ -194,7 +194,7 @@ function getRouteColor(index){return TRIP_COLORS[index % TRIP_COLORS.length];}
 function splitPositionsIntoTrips(positions){if(!positions||positions.length===0)return[];const trips=[];let currentTrip=[positions[0]];let lastIgnition=positions[0].ignition!==false;for(let i=1;i<positions.length;i++){const p=positions[i];const prev=positions[i-1];// Split if ignition turned false (between trips)if(p.ignition===false&&prev.ignition!==false){if(currentTrip.length>1){trips.push(currentTrip);currentTrip=[];}currentTrip.push(p);lastIgnition=true;continue;}// Also split on large time gaps (>5 min without ignition change) if needed// Split if record_at boundary indicates new trip (large gap)if(i>1){const gap=(new Date(p.recorded_at)-new Date(prev.recorded_at))/60000;if(gap>5){// Large gap, start new trip if(currentTrip.length>1){trips.push(currentTrip);currentTrip=[];}lastIgnition=false;}}currentTrip.push(p);}if(currentTrip.length>0){trips.push(currentTrip);}return trips;}
 function formatDuration(seconds){if(isNaN(seconds)||seconds===undefined)return'00:00:00';const h=Math.floor(seconds/3600);const m=Math.floor((seconds%3600)/60);const s=Math.floor(seconds%60);return `${h>0?h+'h ':''}${p2(m)}m ${p2(s)}s`;}
 const EARTH_RADIUS_KM=6371;function tripDistance(pts){let d=0;for(let i=1;i<pts.length;i++){const a=Math.PI/180;const r=Math.sin(a*(pts[i-1].lat-pts[i-2].lat)/2)**2+Math.cos(a*pts[i-2].lat)*Math.cos(a*pts[i-1].lat)*Math.sin(a*(pts[i-1].lng-pts[i-2].lng)/2)**2;d+=12742*Math.asin(Math.sqrt(r));}return d;}
-function formatTimeISO(ts,format='medium'){if(!ts)return'-';const d=new Date(ts);if(format==='short')return`${d.getHours()}:${p2(d.getMinutes())}`;if(format==='long')return`${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()} ${d.getHours()}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`;return`${p2(d.getDate())}/${p2(d.getMonth()+1)}/${d.getFullYear()} ${d.getHours()}:${p2(d.getMinutes())}`;}</script>
+function formatTimeISO(ts,format='medium'){if(!ts)return'-';const d=new Date(ts);if(format==='short')return d.getHours()+':'+p2(d.getMinutes());if(format==='long')return d.getDate()+'/'+(d.getMonth()+1)+'/'+d.getFullYear()+' '+d.getHours()+':'+p2(d.getMinutes())+':'+p2(d.getSeconds());return p2(d.getDate())+'/'+(d.getMonth()+1)+'/'+d.getFullYear()+' '+d.getHours()+':'+p2(d.getMinutes());}</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flatpickr/4.6.13/flatpickr.min.css">
@@ -327,7 +327,7 @@ function upsert(p){last[p.user_id]=p;const ll=[p.lat,p.lng];
      const dx=Math.cos(angleRad)*arrowLen;
      const dy=Math.sin(angleRad)*arrowLen;
      const points=`${lastLat},${lastLng};${p.lat+dy/111},${p.lng+dx/111}`;
-     const arrow=L.polyline([lastPos,{[lat:p.lat+dy/111,lng:p.lng+dx/111]}],{color:getRouteColor(0),weight:4,opacity:.8}).addTo(mapH);
+     const arrow=L.polyline([lastPos,{lat:p.lat+dy/111,lng:p.lng+dx/111}],{color:getRouteColor(0),weight:4,opacity:.8}).addTo(mapH);
    }
  }
  lastPositions[p.user_id]={[lat:p.lat,lng:p.lng]};
