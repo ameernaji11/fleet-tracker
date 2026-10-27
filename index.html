@@ -1,0 +1,655 @@
+﻿<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'nonce-{{NONCE}}' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'nonce-{{NONCE}}' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' https: data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="no-referrer">
+ <meta name="referrer" content="no-referrer-when-downgrade">
+<title>Fleet Tracker</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap">
+<style>
+:root{--bg:#fff7ee;--ink:#26323a;--mut:#6b7a85;--line:#efe3d4;--or:#f28c28;--orl:#ffe9d2;--ord:#b85d00;--gr:#27a46a;--grl:#ddf4e8;--bl:#2f7fe6;--bll:#dcebfd;--rd:#d9534f;--rdl:#fde4e2;--gy:#9aa7b0;--gyl:#eef1f3;--card:#fff;--th:#fffaf4;--t1:#2f7fe6;--t2:#27a46a;--t3:#f28c28;--t4:#d9534f;--t5:#9b59b6;--t6:#1abc9c}
+*{box-sizing:border-box}html,body{height:100%}body{margin:0;font:14px/1.45 Nunito,system-ui,sans-serif;color:var(--ink);background:var(--bg)}
+.hide{display:none!important}button{font:inherit}
+#app{height:100%}aside{width:210px;background:var(--card);border-right:1px solid var(--line);padding:14px 12px;display:flex;flex-direction:column;gap:6px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:17px;padding:4px 6px 14px}.brand i{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--or),#f6b25f);color:#fff;display:grid;place-items:center}
+.nb{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;font-weight:600;color:var(--mut)}
+.nb i{width:20px;text-align:center}.nb:hover{background:var(--gyl)}.nb.on{background:var(--orl);color:var(--ord)}.nb:focus-visible{outline:2px solid var(--bl)}.nb.out{margin-top:auto;color:var(--rd)}
+.wrap{flex:1;display:flex;flex-direction:column;min-width:0}
+header{display:flex;align-items:center;gap:12px;padding:12px 20px;background:var(--card);border-bottom:1px solid var(--line)}
+header h1{font-size:19px;margin:0;flex:1;font-weight:800}#me{color:var(--mut)}
+.pill{padding:4px 10px;border-radius:99px;font-weight:700;font-size:12px;background:var(--grl);color:var(--gr)}.pill.bad{background:var(--rdl);color:var(--rd)}
+main{flex:1;min-height:0;padding:16px 20px;overflow:auto}
+section{display:none;height:100%;flex-direction:column;gap:14px}section.on{display:flex}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kpi{display:flex;align-items:center;gap:12px;padding:12px 14px}.kpi .ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:18px}
+.kpi b{font-size:22px;display:block;line-height:1.1}.kpi span{color:var(--mut);font-size:12px}
+.bl .ic{background:var(--bll);color:var(--bl)}.gr .ic{background:var(--grl);color:var(--gr)}.or .ic{background:var(--orl);color:var(--or)}.gy .ic{background:var(--gyl);color:var(--gy)}.rd .ic{background:var(--rdl);color:var(--rd)}
+.split{flex:1;min-height:0;display:grid;grid-template-columns:320px 1fr;gap:14px}
+.panel{display:flex;flex-direction:column;gap:10px;min-height:0;padding:12px}.list{overflow:auto;flex:1}
+.map{border-radius:14px;border:1px solid var(--line);overflow:hidden;min-height:340px;height:100%}.mapc{flex:1;min-height:340px}
+.veh{display:flex;gap:10px;align-items:center;padding:10px;border-radius:10px;cursor:pointer}.veh:hover{background:var(--bg)}
+.veh .av{width:34px;height:34px;border-radius:50%;color:#fff;display:grid;place-items:center;flex:none}.veh .t{flex:1;min-width:0}.veh small{color:var(--mut)}
+.chip{font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}.field label{font-weight:700;font-size:12px;color:var(--mut)}
+input,select{font:inherit;height:40px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);width:100%;min-width:0}
+input:focus,select:focus{outline:2px solid var(--bl);border-color:transparent}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;align-items:end}
+.btn{height:40px;padding:0 16px;border:0;border-radius:10px;font-weight:700;color:#fff;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;white-space:nowrap}
+.btn:hover{filter:brightness(.95)}.btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.btn.b{background:var(--bl)}.btn.g{background:var(--gr)}.btn.o{background:var(--or)}.btn.r{background:var(--rdl);color:var(--rd)}.btn.sm{height:34px;padding:0 12px}
+.tw{flex:none;overflow:auto;border-radius:12px;border:1px solid var(--line);background:var(--card)}table{border-collapse:collapse;width:100%}
+th{background:var(--th);text-align:left;font-size:12px;color:var(--mut);padding:10px 14px}td{padding:10px 14px;border-top:1px solid var(--line)}
+td select{height:36px}#evt,#rep,#trip,#cfg{height:auto;min-height:100%}.cgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:14px}.cgrid .card{height:270px;position:relative}.tw a{color:var(--bl);font-weight:700;text-decoration:none}
+.seg{display:flex;background:var(--card);border-radius:10px;box-shadow:0 1px 6px #0003;padding:3px;gap:2px}.seg button{border:0;background:none;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;color:var(--mut);font-size:12px}
+.seg button.on{background:var(--bl);color:#fff}
+.mk{width:32px;height:32px;border-radius:50%;border:3px solid #fff;box-shadow:0 1px 6px #0006;display:grid;place-items:center;color:#fff;font-size:13px}
+#login{margin:auto;width:340px;padding:28px;display:flex;flex-direction:column;gap:14px;text-align:center}#login .brand{justify-content:center;padding:0}
+.err{color:var(--rd);min-height:18px;margin:0;font-weight:600}
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:10px 18px;border-radius:10px;color:#fff;font-weight:700;opacity:0;pointer-events:none;transition:opacity .2s}#toast.show{opacity:1}#toast.ok{background:var(--gr)}#toast.bad{background:var(--rd)}
+@media(max-width:820px){#app{flex-direction:column}aside{width:auto;flex-direction:row;overflow-x:auto;padding:8px}.brand,.nb span{display:none}.nb.out{margin:0}.split{grid-template-columns:1fr;grid-template-rows:230px 1fr}#me{display:none}}
+:root[data-theme=dark]{color-scheme:dark;--bg:#12181d;--card:#1b242a;--th:#202b32;--ink:#e6edf1;--mut:#9db0bb;--line:#2b363e;--orl:#3b2a16;--ord:#ffb36b;--grl:#16352a;--bll:#162c47;--rdl:#3d1f1d;--gyl:#222c33}
+input,select{color:var(--ink)}input[type=checkbox]{width:20px;height:20px}
+body.usr .adm{display:none!important}
+.pulse{width:44px;height:44px;border-radius:50%;background:#d9534f55;border:3px solid #d9534f;animation:pl 1s infinite}@keyframes pl{50%{transform:scale(1.6);opacity:.3}}
+aside{width:64px;overflow:hidden;transition:width .2s;flex:none;display:flex;flex-direction:column;gap:6px}aside:hover,aside.pin{width:210px}aside:not(:hover):not(.pin) .nb span,aside:not(:hover):not(.pin) .brand span,aside:not(:hover):not(.pin) .foot{display:none},aside:not(:hover):not(.pin) .fmsg{display:block}
+.nb.out{margin-top:0}.foot{font-size:10px;color:var(--mut);text-align:center;padding:6px 4px;line-height:1.4}
+.fmsg{display:none;text-align:center;padding:6px 4px;font-size:12px;color:var(--mut)}
+.click{cursor:pointer}.click.on{outline:2px solid var(--bl)}
+.eye{position:absolute;right:6px;top:6px;border:0;background:none;color:var(--mut);cursor:pointer;height:28px;width:30px}
+.mt{display:flex;flex-direction:column;gap:6px;align-items:flex-end}.mt button{background:var(--card);color:var(--ink);border:0;border-radius:8px;box-shadow:0 1px 6px #0003;padding:7px 10px;font-weight:700;cursor:pointer;font-size:12px}.mt .ic{width:34px}
+.mm{background:var(--card);border-radius:10px;box-shadow:0 2px 10px #0004;display:flex;flex-direction:column;padding:4px}.mm button{box-shadow:none;text-align:left}.mm.hide{display:none!important}
+@media(max-width:820px){aside{width:auto!important}.foot{display:none}}
+.tbar{display:flex;gap:6px;align-items:center;padding:8px;flex-wrap:wrap}.tbar input{width:220px;height:34px}.tbar .btn{height:34px}.tw th{cursor:pointer;user-select:none}
+.pt{position:absolute;top:6px;right:8px;display:flex;gap:4px;opacity:.45;z-index:3}.cgrid .card:hover .pt{opacity:1}.pt button{border:0;background:var(--gyl);color:var(--ink);border-radius:6px;width:24px;height:24px;cursor:pointer;font-size:11px}
+.cgrid .card.big{position:fixed!important;inset:4vh 4vw;z-index:2000;height:auto!important;box-shadow:0 0 0 100vmax #0008}
+.pbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.pbar .chip{cursor:pointer;background:var(--bll);color:var(--bl)}
+.ibtn{border:1px solid var(--line);border-radius:50%;width:18px;height:18px;font-size:11px;font-weight:800;background:var(--card);color:var(--bl);cursor:pointer;padding:0}
+.mk.sm{width:20px;height:20px;font-size:9px;border-width:2px}
+@media print{aside,header,.fgrid,.pbar,.pt,.tbar,.mt,#toast,.btn{display:none!important}body,#app,.wrap,main{display:block!important;height:auto!important;overflow:visible!important}section{display:none!important}section.on{display:flex!important;height:auto!important}.cgrid{grid-template-columns:1fr 1fr}}
+</style></head><body>
+<div id="login" class="card"><svg viewBox="0 0 48 48" width="64" style="margin:auto"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f28c28"/><stop offset="1" stop-color="#2f7fe6"/></linearGradient></defs><rect width="48" height="48" rx="12" fill="url(#lg)"/><path d="M24 11c-5.5 0-9.5 4.2-9.5 9.4 0 6.7 9.5 16.6 9.5 16.6s9.5-9.9 9.5-16.6C33.5 15.2 29.5 11 24 11z" fill="#fff"/><circle cx="24" cy="20.5" r="3.6" fill="#2f7fe6"/></svg>
+<div class="brand" style="justify-content:center;padding:0">Fleet Tracker</div>
+<div class="field"><input id="em" placeholder="Username or email" autocomplete="username"></div>
+<div class="field" style="position:relative"><input id="pw" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')signIn()"><button type="button" class="eye" onclick="eye()" title="Show / hide password"><i class="fa-solid fa-eye" id="eyei"></i></button></div>
+<label style="display:flex;gap:8px;align-items:center;font-weight:600;justify-content:flex-start"><input type="checkbox" id="rem" style="width:18px;height:18px"> Remember me</label>
+<button class="btn b" id="sib" onclick="signIn()"><i class="fa-solid fa-right-to-bracket"></i>Sign in</button><p class="err" id="lerr"></p>
+<div class="foot" style="display:block">Fleet Tracker Version 1.0.0 | Ameer Naji Â© 2026 | All Rights Reserved</div></div>
+
+<div id="modal" class="hide" style="position:fixed;inset:0;background:#0006;z-index:3000;place-items:center;display:grid"></div>
+<div id="app" class="hide"><aside><div class="brand"><i class="fa-solid fa-truck-fast"></i><span>Fleet Tracker</span></div>
+<button class="nb on" data-t="live" data-h="Live Tracking"><i class="fa-solid fa-location-crosshairs"></i><span>Live Tracking</span></button>
+<button class="nb" data-t="hist" data-h="Historical Tracking"><i class="fa-solid fa-route"></i><span>Historical Tracking</span></button>
+<button class="nb" data-t="rep" data-h="Fleet Summary Report"><i class="fa-solid fa-chart-column"></i><span>Fleet Summary Report</span></button>
+<button class="nb" data-t="evt" data-h="Events Report"><i class="fa-solid fa-triangle-exclamation"></i><span>Events Report <b id="evb" class="chip" style="background:var(--rd);color:#fff;display:none">0</b></span></button>
+<button class="nb" data-t="trip" data-h="Tacho Graph Report"><i class="fa-solid fa-stopwatch"></i><span>Tacho Graph Report</span></button>
+<button class="nb adm" data-t="veh" data-h="Vehicles"><i class="fa-solid fa-truck"></i><span>Vehicles</span></button>
+<button class="nb adm" data-t="drv" data-h="Drivers"><i class="fa-solid fa-id-card"></i><span>Drivers</span></button>
+<button class="nb adm" data-t="cfg" data-h="Configuration"><i class="fa-solid fa-gear"></i><span>Configuration</span></button>
+<button class="nb adm" data-t="usr" data-h="Users"><i class="fa-solid fa-users-gear"></i><span>Users</span></button>
+<button class="nb adm" data-t="usrA" data-h="User Activity"><i class="fa-solid fa-user-clock"></i><span>User Activity</span></button>
+<button class="nb" id="themeB" onclick="theme()" style="margin-top:auto"><i class="fa-solid fa-moon"></i><span>Dark mode</span></button>
+<button class="nb" onclick="pin()"><i class="fa-solid fa-thumbtack" id="pinI"></i><span id="pinSpan">Keep menu open</span></button>
+<button class="nb out" onclick="sb.auth.signOut().then(()=>location.reload())"><i class="fa-solid fa-right-from-bracket"></i><span>Sign out</span></button>
+<div class="foot">Fleet Tracker Version 1.0.0 | Ameer Naji Â© 2026 | All Rights Reserved</div></aside>
+<div class="wrap"><header><h1 id="title">Live Tracking</h1><span id="me"></span><span class="pill" id="conn"><i class="fa-solid fa-circle" style="font-size:8px"></i> <span id="connT">Connecting</span></span></header>
+<main>
+<section id="live" class="on"><div class="kpis">
+<div class="card kpi bl click on" data-f="all" onclick="setF('all')"><div class="ic"><i class="fa-solid fa-truck"></i></div><div><b id="k_all">0</b><span>Total Vehicles</span></div></div>
+<div class="card kpi gr click" data-f="go" onclick="setF('go')"><div class="ic"><i class="fa-solid fa-gauge-high"></i></div><div><b id="k_go">0</b><span>Moving</span></div></div>
+<div class="card kpi or click" data-f="idle" onclick="setF('idle')"><div class="ic"><i class="fa-solid fa-hourglass-half"></i></div><div><b id="k_idle">0</b><span>Idling</span></div></div>
+<div class="card kpi bl click" data-f="park" onclick="setF('park')"><div class="ic"><i class="fa-solid fa-square-parking"></i></div><div><b id="k_park">0</b><span>Parking</span></div></div></div>
+<div class="split"><div class="card panel"><div class="field"><input id="q" placeholder="Search vehicle or driver" oninput="renderList()"></div><div class="list" id="liveList"></div></div><div class="map" id="mapLive"></div></div></section>
+<section id="hist">
+<div class="card fgrid">
+<div class="field"><label>Vehicle</label><select id="hv"></select></div>
+<div class="field"><label>From</label><input id="hf" type="text"></div>
+<div class="field"><label>To</label><input id="ht" type="text"></div>
+<button class="btn b" onclick="loadHist()"><i class="fa-solid fa-route"></i>Show route</button>
+</div>
+<div class="tbar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px;background:var(--card);padding:6px 12px;border-radius:10px">
+<span style="font-weight:700;font-size:12px;color:var(--mut)">Stats:</span>
+<button class="btn gh sm" onclick="toggleHStat()" id="hStatToggle"><i class="fa-solid fa-eye"></i>Show</button>
+</div>
+<div class="kpis" id="hstat" style="display:none"></div>
+<div id="hBar" class="tbar" style="display:none;flex-wrap:wrap;gap:8px;align-items:center;padding:8px">
+<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+<span style="font-weight:700;font-size:12px;color:var(--mut)">Trips:</span>
+<div id="hTrips"></div>
+</div>
+<div style="margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+<button class="btn gh sm" onclick="hZoomAll()"><i class="fa-solid fa-expand"></i>Zoom to all</button>
+<button class="btn gh sm" onclick="hPrint()"><i class="fa-solid fa-print"></i>Print</button>
+<button class="btn gh sm" data-x="pdf"><i class="fa-solid fa-file-pdf"></i>PDF</button>
+</div>
+</div>
+<div class="map mapc" id="mapHist"></div>
+<div id="hDetail" class="card" style="display:none;margin-top:10px">
+<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+<b id="hdTitle">Trip Details</b>
+<div style="display:flex;gap:6px">
+<button class="btn gh sm" onclick="hPlayback()"><i class="fa-solid fa-play"></i>Playback</button>
+<button class="btn gh sm" onclick="hPrint()">Export PDF</button>
+</div>
+</div>
+<div class="grid" id="hDetailGrid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))"></div>
+</section>
+<section id="evt">
+<div class="card fgrid"><div class="field"><label>Vehicle</label><select id="ev_v" multiple style="height:auto"><option value="">All vehicles</option></select></div>
+<div class="field"><label>Driver</label><select id="ev_d" multiple style="height:auto"><option value="">All drivers</option></select></div>
+<div class="field"><label>Event type</label><select id="ev_t"><option value="">All events</option><option value="harsh_braking">Harsh braking</option><option value="harsh_acceleration">Harsh acceleration</option><option value="overspeed">Overspeed</option></select></div>
+<div class="field"><label>From</label><input id="ev_f" type="text"></div><div class="field"><label>To</label><input id="ev_to" type="text"></div>
+<div class="field"><label>Show</label><select id="ev_show"><option value="all">All events</option><option value="selected">Only selected type</option></select></div>
+<button class="btn b" onclick="loadEvt()"><i class="fa-solid fa-play"></i>Generate</button></div>
+<div id="evFl" style="display:flex;gap:8px;align-items:center;min-height:30px"></div><div class="kpis" id="evK"></div><div class="cgrid"><div class="card"><canvas id="c1"></canvas></div><div class="card"><canvas id="c2"></canvas></div><div class="card"><canvas id="c3"></canvas></div></div><div class="tw" id="evT"></div></section>
+<section id="cfg"><div class="card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px"><b><i class="fa-solid fa-gear"></i> Configuration</b><br><small style="color:var(--mut)">An empty box in a vehicle row means "use the default". Phones apply changes within 5 minutes, or at the next trip start.</small></div><button class="btn g" onclick="saveCfg()"><i class="fa-solid fa-floppy-disk"></i>Save all configuration</button></div>
+<div class="card"><b><i class="fa-solid fa-clock"></i> Default recording interval</b><div class="fgrid" style="margin-top:10px"><div class="field"><label>While moving (seconds)</label><input id="s_mov" type="number" min="1"></div><div class="field"><label>While stopped (seconds)</label><input id="s_stp" type="number" min="1"></div></div></div>
+<div class="card"><b><i class="fa-solid fa-triangle-exclamation"></i> Events (defaults for all vehicles)</b><div class="tw" id="ruleT" style="margin-top:10px"></div></div>
+<div class="card"><b><i class="fa-solid fa-truck"></i> Settings per vehicle</b><div class="tw" id="cfgV" style="margin-top:10px"></div></div></section>
+<section id="trip"><div class="card fgrid"><div class="field"><label>Vehicle</label><select id="tr_v"></select></div><div class="field"><label>From</label><input id="tr_f" type="text"></div><div class="field"><label>To</label><input id="tr_t" type="text"></div>
+<button class="btn b" onclick="loadTrip()"><i class="fa-solid fa-stopwatch"></i>Generate</button></div>
+<div class="kpis" id="trK"></div><div class="cgrid"><div class="card" id="gauge" style="display:grid;place-items:center"></div><div class="card"><canvas id="t1"></canvas></div><div class="card"><canvas id="t2"></canvas></div><div class="card"><canvas id="t3"></canvas></div><div class="card"><canvas id="t4"></canvas></div></div><div class="tw" id="trT"></div></section>
+<section id="rep"><div class="card fgrid"><div class="field"><label>From</label><input id="rp_f" type="text"></div><div class="field"><label>To</label><input id="rp_t" type="text"></div>
+<button class="btn b" onclick="loadRep()"><i class="fa-solid fa-chart-column"></i>Build report</button><button class="btn ex" onclick="repCsv()"><i class="fa-solid fa-file-excel"></i>Export Excel</button></div>
+<div class="kpis" id="rpK"></div><div class="cgrid"><div class="card"><canvas id="r1"></canvas></div><div class="card"><canvas id="r2"></canvas></div><div class="card"><canvas id="r3"></canvas></div><div class="card"><canvas id="r4"></canvas></div></div><div class="tw" id="rpT"></div></section>
+<section id="veh"><div class="card"><form class="fgrid" onsubmit="add(event,'vehicles',['name','type','make_model','year','vin','fuel_type','speed_limit','fuel_moving','fuel_idle','notes'])"><div class="field"><label>Vehicle name / plate *</label><input name="name" required></div>
+<div class="field"><label>Type</label><select name="type"><option value="">-</option><option>Sedan</option><option>Hatchback</option><option>SUV</option><option>Pickup</option><option>Van</option><option>Minibus</option><option>Bus</option><option>Truck</option><option>Heavy Truck</option><option>Tanker</option><option>Taxi</option><option>Ambulance</option><option>Motorbike</option><option>Tractor</option><option>Trailer</option><option>Equipment</option><option>Car</option></select></div>
+<div class="field"><label>Make / model</label><input name="make_model"></div><div class="field"><label>Year</label><input name="year" type="number" min="1980" max="2100"></div><div class="field"><label>VIN / chassis</label><input name="vin"></div>
+<div class="field"><label>Fuel</label><select name="fuel_type"><option value="">-</option><option>Petrol</option><option>Diesel</option><option>Hybrid</option><option>Electric</option></select></div>
+<div class="field"><label>Speed limit (km/h)</label><input name="speed_limit" type="number" min="10" max="250"></div><div class="field"><label>Fuel moving (L/100 km)</label><input name="fuel_moving" type="number" step="0.1" min="0"></div><div class="field"><label>Fuel idling (L/hour)</label><input name="fuel_idle" type="number" step="0.1" min="0"></div><div class="field"><label>Notes</label><input name="notes"></div><button class="btn g"><i class="fa-solid fa-plus"></i>Add vehicle</button></form></div><div class="tw" id="vehT"></div></section>
+<section id="drv"><div class="card"><form class="fgrid" onsubmit="add(event,'drivers',['name','phone','employee_id','license_no','license_expiry','nationality','notes'])"><div class="field"><label>Driver name *</label><input name="name" required></div>
+<div class="field"><label>Phone</label><input name="phone"></div><div class="field"><label>Employee ID</label><input name="employee_id"></div><div class="field"><label>Licence number</label><input name="license_no"></div>
+<div class="field"><label>Licence expiry</label><input name="license_expiry" type="text"></div><div class="field"><label>Nationality</label><input name="nationality"></div><div class="field"><label>Notes</label><input name="notes"></div><button class="btn g"><i class="fa-solid fa-plus"></i>Add driver</button></form></div><div class="tw" id="drvT"></div></section>
+<section id="usr"><div class="card"><i class="fa-solid fa-circle-info" style="color:var(--bl)"></i> <b>Vehicle + Driver</b> decide what this login is stamped with and which vehicle's data a normal user can see. <b>Role:</b> Admin sees and manages everything; User sees only their own vehicle. Passwords are reset in Supabase (Authentication â†’ Users).</div><div class="card"><form class="fgrid" onsubmit="addUser(event)"><div class="field"><label>Username (or email)</label><input name="u" required></div><div class="field"><label>Password (min 6)</label><input name="p" type="text" minlength="6" required></div><button class="btn g"><i class="fa-solid fa-user-plus"></i>Create user</button></form></div>
+<div class="tw" id="usrT"></div></section>
+<section id="usrA"><div class="card fgrid"><div class="field"><label>From</label><input id="ua_f" type="text"></div><div class="field"><label>To</label><input id="ua_t" type="text"></div>
+<button class="btn b" onclick="loadUsrA()"><i class="fa-solid fa-chart-column"></i>Build report</button> <button class="btn csv" onclick="usrACsv()"><i class="fa-solid fa-file-csv"></i>Export CSV</button> <button class="btn ex" onclick="usrAXlsx()"><i class="fa-solid fa-file-excel"></i>Export Excel</button></div>
+<div class="kpis" id="uaK"></div><div class="cgrid"><div class="card"><canvas id="u1"></canvas></div><div class="card"><canvas id="u2"></canvas></div><div class="card"><canvas id="u3"></canvas></div></div><div class="tw" id="usrAT"></div></section>
+</main></div></div><div id="toast"></div>
+<script>
+document.documentElement.dataset.theme=localStorage.theme||'light';
+const p2=n=>String(n).padStart(2,'0');
+Date.prototype.toLocaleString=function(){return isNaN(this)?'-':`${p2(this.getDate())}/${p2(this.getMonth()+1)}/${this.getFullYear()} ${p2(this.getHours())}:${p2(this.getMinutes())}:${p2(this.getSeconds())}`};
+Date.prototype.toLocaleTimeString=function(){return isNaN(this)?'-':`${p2(this.getHours())}:${p2(this.getMinutes())}:${p2(this.getSeconds())}`};
+window.onerror=(m,s,l)=>{document.getElementById('lerr').textContent='Error: '+m+' (line '+l+')'};
+window.addEventListener('unhandledrejection',e=>{document.getElementById('lerr').textContent='Error: '+(e.reason&&e.reason.message||e.reason)});
+
+// G2: XSS-safe rendering helper
+const sanitize=(s)=>String(s??'').replace(/[&<>\'\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\'':'&#39;','\"':'&quot;'}[c]||c));
+function esc(s){return sanitize(s);}
+
+// G2: Input sanitization for all forms
+function sanitizeForm(el){
+ const inputs=el.querySelectorAll('input,select,textarea');
+ inputs.forEach(i=>{
+  if(i.value)i.value=sanitize(i.value);
+ });
+ return el;
+}
+
+// Trip splitting and color helpers
+const TRIP_COLORS = ['#2f7fe6', '#27a46a', '#f28c28', '#d9534f', '#9b59b6', '#1abc9c'];
+function getRouteColor(index){return TRIP_COLORS[index % TRIP_COLORS.length];}
+function splitPositionsIntoTrips(positions){if(!positions||positions.length===0)return[];const trips=[];let currentTrip=[positions[0]];let lastIgnition=positions[0].ignition!==false;for(let i=1;i<positions.length;i++){const p=positions[i];const prev=positions[i-1];// Split if ignition turned false (between trips)if(p.ignition===false&&prev.ignition!==false){if(currentTrip.length>1){trips.push(currentTrip);currentTrip=[];}currentTrip.push(p);lastIgnition=true;continue;}// Also split on large time gaps (>5 min without ignition change) if needed// Split if record_at boundary indicates new trip (large gap)if(i>1){const gap=(new Date(p.recorded_at)-new Date(prev.recorded_at))/60000;if(gap>5){// Large gap, start new trip if(currentTrip.length>1){trips.push(currentTrip);currentTrip=[];}lastIgnition=false;}}currentTrip.push(p);}if(currentTrip.length>0){trips.push(currentTrip);}return trips;}
+function formatDuration(seconds){if(isNaN(seconds)||seconds===undefined)return'00:00:00';const h=Math.floor(seconds/3600);const m=Math.floor((seconds%3600)/60);const s=Math.floor(seconds%60);return `${h>0?h+'h ':''}${p2(m)}+'m ${p2(s)}+'s'`;}
+const EARTH_RADIUS_KM=6371;function tripDistance(pts){let d=0;for(let i=1;i<pts.length;i++){const a=Math.PI/180;const r=Math.sin(a*(pts[i-1].lat-pts[i-2].lat)/2)**2+Math.cos(a*pts[i-2].lat)*Math.cos(a*pts[i-1].lat)*Math.sin(a*(pts[i-1].lng-pts[i-2].lng)/2)**2;d+=12742*Math.asin(Math.sqrt(r));}return d;}
+function formatTimeISO(ts,format='medium'){if(!ts)return'-';const d=new Date(ts);if(format==='short')return`${d.getHours()}:${p2(d.getMinutes())}`;if(format==='long')return`${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()} ${d.getHours()}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`;return`${p2(d.getDate())}/${p2(d.getMonth()+1)}/${d.getFullYear()} ${d.getHours()}:${p2(d.getMinutes())}`;}</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flatpickr/4.6.13/flatpickr.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/flatpickr/4.6.13/flatpickr.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+const SPEED_LIMIT=100, STALE_MIN=3; // km/h over which a vehicle counts as speeding; minutes without data = no signal
+let REM=localStorage.rem!=='0';const mk=r=>supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storage:r?localStorage:sessionStorage}});let sb=mk(REM);
+const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const toast=(m,ok)=>{const t=$('toast');t.textContent=m;t.className='show '+(ok?'ok':'bad');setTimeout(()=>t.className='',3500)};
+
+// E6: Road speed limit cache + placeholder function
+const ROAD_SPEED_CACHE={};
+async function getRoadSpeedLimit(lat,lng){
+  const key=Math.round(lat*100)/100+'-'+Math.round(lng*100)/100;
+  if(ROAD_SPEED_CACHE[key])return ROAD_SPEED_CACHE[key];
+  // Placeholder: returns null meaning use vehicle's configured speed_limit
+  // In production this would call Google Roads API, HERE, or OpenStreetMap
+  return null;
+}
+let EVR=[],EVF={},ADMIN=false,UID,UNAME,evN=0,charts={},rep=[],mapL,mapH,markers={},last={},hLayer,hData=[],vehicles=[],drivers=[];
+const COL={go:'#27a46a',idle:'#f28c28',park:'#2f7fe6'},LBL={go:'Moving',idle:'Idling',park:'Parking'};
+const st=p=>(p.ignition===false||Date.now()-new Date(p.recorded_at)>STALE_MIN*6e4)?'park':(p.speed>0?'go':'idle');
+function mkMap(id,fit){
+ const m=L.map(id).setView([23.6,58.5],8);
+ const T=(u,a,o={})=>L.tileLayer(u,{attribution:a,maxZoom:20,...o});
+ const G=l=>T('https://{s}.google.com/vt/lyrs='+l+'&x={x}&y={y}&z={z}','Map data Â© Google',{subdomains:['mt0','mt1','mt2','mt3']});
+ const base={'Street Map':T('https://tile.openstreetmap.org/{z}/{x}/{y}.png','Â© OpenStreetMap',{maxZoom:19}),'Google Map':G('m'),'Google Satellite':G('s'),'Google Hybrid':G('y'),'Esri Satellite':T('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}','Tiles Â© Esri')};
+ let cur=localStorage.base;if(!base[cur])cur='Google Map';let layer=base[cur].addTo(m);
+ const c=L.control({position:'topright'});
+ c.onAdd=()=>{const d=L.DomUtil.create('div','mt');L.DomEvent.disableClickPropagation(d);
+  const lb=L.DomUtil.create('button','',d),lab=n=>'<i class="fa-solid fa-layer-group"></i> '+n+' â–¾',menu=L.DomUtil.create('div','mm hide',d);lb.innerHTML=lab(cur);lb.title='Map style';
+  for(const n in base){const b=L.DomUtil.create('button','',menu);b.textContent=n;b.onclick=()=>{m.removeLayer(layer);layer=base[n].addTo(m);localStorage.base=n;lb.innerHTML=lab(n);menu.classList.add('hide')}}
+  lb.onclick=()=>menu.classList.toggle('hide');
+  const tb=(ic,t,f)=>{const b=L.DomUtil.create('button','ic',d);b.innerHTML='<i class="fa-solid '+ic+'"></i>';b.title=t;b.onclick=f};
+  tb('fa-expand','Full screen',()=>document.fullscreenElement?document.exitFullscreen():m.getContainer().requestFullscreen());
+  tb('fa-crosshairs','Zoom to all',()=>fit&&fit());tb('fa-ruler','Measure distance',()=>measure(m));return d};
+ c.addTo(m);L.control.scale({imperial:false}).addTo(m);document.addEventListener('fullscreenchange',()=>setTimeout(()=>m.invalidateSize(),250));return m}
+function measure(m){if(m._meas){m.off('click',m._meas.h);m._meas.g.remove();m._meas=null;m.getContainer().style.cursor='';return}
+ const g=L.layerGroup().addTo(m),pts=[];let line=null;
+ const h=e=>{pts.push(e.latlng);L.circleMarker(e.latlng,{radius:4,color:'#2f7fe6'}).addTo(g);if(line)line.remove();line=L.polyline(pts,{color:'#2f7fe6',dashArray:'6 4'}).addTo(g);let d=0;for(let i=1;i<pts.length;i++)d+=pts[i-1].distanceTo(pts[i]);line.bindTooltip((d/1000).toFixed(2)+' km',{permanent:true,direction:'top'}).openTooltip()};
+ m.on('click',h);m._meas={h,g};m.getContainer().style.cursor='crosshair';toast('Click points on the map to measure. Press the ruler again to clear.',1)}
+async function signIn(){
+ const want=$('rem').checked;if(want!==REM){REM=want;localStorage.rem=want?'1':'0';sb=mk(REM)}
+ const b=$('sib');b.disabled=true;b.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i>Signing in...';$('lerr').textContent='';
+ try{const {error}=await sb.auth.signInWithPassword({email:mail($('em').value),password:$('pw').value});if(error)throw error;
+  want?localStorage.user=$('em').value.trim():localStorage.removeItem('user');await boot();toast('Welcome, '+UNAME+'!',1)}
+ catch(e){$('lerr').textContent='Error: '+(e.message||e)}
+ b.disabled=false;b.innerHTML='<i class="fa-solid fa-right-to-bracket"></i>Sign in'}
+function eye(){const i=$('pw');i.type=i.type==='password'?'text':'password';$('eyei').className='fa-solid '+(i.type==='password'?'fa-eye':'fa-eye-slash')}
+function pin(){const on=document.querySelector('aside').classList.toggle('pin');localStorage.pin=on?'1':'0';
+ if(on){$('pinI').className='fa-solid fa-thumbtack';$('pinSpan').textContent='Keep menu open'}
+ else{$('pinI').className='fa-solid fa-thumbtack fa-180deg';$('pinSpan').textContent='Show menu'}
+function themeBtn(){const d=document.documentElement.dataset.theme==='dark';$('themeB').innerHTML=d?'<i class="fa-solid fa-sun"></i><span>Light mode</span>':'<i class="fa-solid fa-moon"></i><span>Dark mode</span>'}
+async function boot(){
+ const {data:{session}}=await sb.auth.getSession();if(!session)return;
+ const {data:p}=await sb.from('profiles').select('role').eq('id',session.user.id).single();
+ ADMIN=p?.role==='admin';UID=session.user.id;document.body.classList.toggle('usr',!ADMIN);
+ $('login').classList.add('hide');$('app').classList.remove('hide');$('app').style.display='flex';UNAME=(session.user.email||'').replace('@fleet.local','');$('me').textContent='Welcome, '+UNAME+'!';if(localStorage.pin==='1')document.querySelector('aside').classList.add('pin');themeBtn();
+ mapL=mkMap('mapLive',fitAll);mapH=mkMap('mapHist');
+ initDates();
+ await refs();await loadLive();loadRules();
+ sb.channel('pos').on('postgres_changes',{event:'INSERT',schema:'public',table:'positions'},e=>upsert(e.new)).subscribe(s=>{const ok=s==='SUBSCRIBED';$('conn').className='pill'+(ok?'':' bad');$('connT').textContent=ok?'Live':'Reconnecting'});
+ sb.channel('ev').on('postgres_changes',{event:'INSERT',schema:'public',table:'events'},e=>{const x=e.new;alertEv(x);evN++;$('evb').style.display='';$('evb').textContent=evN}).subscribe();
+ setInterval(renderList,15000);
+}
+document.querySelectorAll('.nb[data-t]').forEach(b=>b.onclick=()=>{
+ document.querySelectorAll('.nb').forEach(x=>x.classList.remove('on'));b.classList.add('on');$('title').textContent=b.dataset.h;
+ document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===b.dataset.t));
+ setTimeout(()=>{mapL.invalidateSize();mapH.invalidateSize()},50);
+ if(b.dataset.t==='evt'){evN=0;$('evb').style.display='none';loadEvt()}if(b.dataset.t==='cfg')loadCfg();if(b.dataset.t==='usr')users();if(b.dataset.t==='usrA')loadUsrA();if(b.dataset.t==='veh'||b.dataset.t==='drv')refs()});
+async function refs(){
+ vehicles=(await sb.from('vehicles').select('*').order('name')).data||[];drivers=(await sb.from('drivers').select('*').order('name')).data||[];
+ $('hv').innerHTML=vehicles.map(v=>`<option value="${v.id}">${esc(v.name)}</option>`).join('');
+ $('ev_v').innerHTML='<option value="">All vehicles</option>'+vehicles.map(v=>`<option value="${v.id}">${esc(v.name)}</option>`).join('');
+ $('tr_v').innerHTML=$('hv').innerHTML;$('ev_d').innerHTML='<option value="">All drivers</option>'+drivers.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');$('vehT').innerHTML=tbl(vehicles,['name','type','make_model','year','speed_limit','fuel_moving','fuel_idle'],'vehicles');$('drvT').innerHTML=tbl(drivers,['name','phone','license_no','license_expiry'],'drivers');tools($('vehT'));tools($('drvT'))}
+const tbl=(rows,cols,t)=>`<table><tr>${cols.map(c=>`<th>${c.replace(/_/g,' ')}</th>`).join('')}<th></th></tr>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(r[c])}</td>`).join('')}<td style="text-align:right;white-space:nowrap"><button class="btn b sm" onclick="edit('${t}','${r.id}')"><i class="fa-solid fa-pen"></i>Edit</button> <button class="btn r sm" onclick="del('${t}','${r.id}')"><i class="fa-solid fa-trash"></i>Delete</button></td></tr>`).join('')||'<tr><td colspan="9">Nothing here yet. Add one above.</td></tr>'}</table>`;
+async function add(e,t,cols){e.preventDefault();if(!ADMIN)return;const f=e.target,id=f.dataset.id,o={};cols.forEach(c=>o[c]=f[c].value||null);
+ const {error}=id?await sb.from(t).update(o).eq('id',id):await sb.from(t).insert(o);if(error)return toast(error.message);
+ toast(id?'Changes saved':'Added',1);if(id){delete f.dataset.id;f.querySelector('button').innerHTML=f.dataset.lbl}f.reset();f.querySelectorAll('input').forEach(i=>i._flatpickr&&i._flatpickr.clear());refs()}
+function edit(t,id){const r=(t==='vehicles'?vehicles:drivers).find(x=>x.id===id),f=document.querySelector(t==='vehicles'?'#veh form':'#drv form');
+ [...f.elements].forEach(el=>{if(el.name){el.value=r[el.name]??'';if(el._flatpickr)el._flatpickr.setDate(el.value||null)}});f.dataset.id=id;f.dataset.lbl||=f.querySelector('button').innerHTML;
+ f.querySelector('button').innerHTML='<i class="fa-solid fa-floppy-disk"></i>Save changes';f.scrollIntoView({behavior:'smooth'});f.elements[0].focus()}
+async function del(t,id){if(confirm('Delete this item?')){await sb.from(t).delete().eq('id',id);refs()}}
+async function users(){
+ const {data:ps}=await sb.from('profiles').select('*').order('email');const {data:as}=await sb.from('assignments').select('*');
+ const opt=(l,s)=>`<option value="">â€” none â€”</option>`+l.map(x=>`<option value="${x.id}" ${x.id===s?'selected':''}>${esc(x.name)}</option>`).join('');
+ $('usrT').innerHTML=`<table><tr><th>User</th><th>Vehicle</th><th>Driver</th><th>Role</th><th></th></tr>${(ps||[]).map(p=>{const a=(as||[]).find(x=>x.user_id===p.id)||{};
+ return `<tr><td><i class="fa-solid fa-user"></i> ${esc((p.email||'').replace('@fleet.local',''))}${p.role==='admin'?' <span class="chip" style="background:var(--bll);color:var(--bl)">admin</span>':''}</td><td><select id="v_${p.id}">${opt(vehicles,a.vehicle_id)}</select></td><td><select id="d_${p.id}">${opt(drivers,a.driver_id)}</select></td><td><select id="r_${p.id}"><option value="user" ${p.role!=='admin'?'selected':''}>User</option><option value="admin" ${p.role==='admin'?'selected':''}>Admin</option></select></td><td style="text-align:right"><button class="btn g sm" onclick="link('${p.id}')"><i class="fa-solid fa-floppy-disk"></i>Save</button></td></tr>`}).join('')}</table>`;tools($('usrT'))}
+async function link(id){const role=$('r_'+id).value;if(id===UID&&role!=='admin')return toast('You cannot remove your own admin role');const [x,y]=await Promise.all([sb.from('assignments').upsert({user_id:id,vehicle_id:$('v_'+id).value||null,driver_id:$('d_'+id).value||null}),sb.from('profiles').update({role}).eq('id',id)]);const e=x.error||y.error;e?toast(e.message):toast('Saved',1)}
+// ---- live
+const TI={Car:'fa-car',Sedan:'fa-car-side',Hatchback:'fa-car',SUV:'fa-car-rear',Pickup:'fa-truck-pickup',Van:'fa-van-shuttle',Minibus:'fa-van-shuttle',Bus:'fa-bus',Truck:'fa-truck','Heavy Truck':'fa-truck-moving',Tanker:'fa-truck-droplet',Taxi:'fa-taxi',Ambulance:'fa-truck-medical',Motorbike:'fa-motorcycle',Tractor:'fa-tractor',Trailer:'fa-trailer',Equipment:'fa-tractor'};
+const vt=p=>TI[(vehicles.find(v=>v.id===p.vehicle_id)||{}).type]||'fa-location-dot';
+let FILT='all';
+const spd=p=>st(p)==='park'?0:Math.round(p.speed||0);
+const icon=p=>L.divIcon({className:'',html:`<div class="mk arrow" style="background:${COL[st(p)]};transform:rotate(${p.heading||0}deg)"><i class="fa-solid ${vt(p)}"></i></div>`,iconSize:[32,32],iconAnchor:[16,16]});
+const pop=p=>{const s=st(p),v=vehicles.find(x=>x.id===p.vehicle_id)||{};return `<div style="min-width:220px"><b style="font-size:15px">${esc(p.vehicle_name||'Unassigned')}</b> <span class="chip" style="background:${COL[s]}22;color:${COL[s]}">${LBL[s]}</span><br><small>${esc(v.type||'')} ${esc(v.make_model||'')}</small><hr style="border:0;border-top:1px solid #8883">
+ <i class="fa-solid fa-id-card"></i> ${esc(p.driver_name||'-')}<br><i class="fa-solid fa-gauge-high"></i> <b>${spd(p)} km/h</b><br><i class="fa-regular fa-clock"></i> ${new Date(p.recorded_at).toLocaleString()}<br><i class="fa-solid fa-location-dot"></i> ${(+p.lat).toFixed(5)}, ${(+p.lng).toFixed(5)}<br>
+ Accuracy ${p.accuracy??'-'} m Â· Elev. ${p.altitude!=null?Math.round(p.altitude):'-'} m Â· Dir ${p.heading!=null?Math.round(p.heading)+'Â°':'-'}<br>Accel ${p.accel??'-'} km/h/s<br><i class="fa-solid fa-battery-half"></i> ${p.battery_pct!=null?Math.round(p.battery_pct)+'%':'-'}${p.charging?' âš¡':''}</div>`};
+const shown=p=>FILT==='all'||st(p)===FILT;
+function setF(f){FILT=f;document.querySelectorAll('.kpi.click').forEach(k=>k.classList.toggle('on',k.dataset.f===f));renderList();fitAll()}
+function fitAll(){const a=Object.values(last).filter(shown);if(a.length)mapL.fitBounds(a.map(p=>[p.lat,p.lng]),{maxZoom:15,padding:[40,40]})}
+async function loadLive(){const {data}=await sb.from('latest_positions').select('*');(data||[]).forEach(upsert);fitAll()}
+function upsert(p){last[p.user_id]=p;const ll=[p.lat,p.lng];
+ // Determine heading for arrow: use heading from position or last known heading
+ const heading=p.heading!=null?p.heading:lastHeading[p.user_id];
+ lastHeading[p.user_id]=heading;
+ // Create polyline arrow for movement direction
+ if(p.ignition!==false&&p.speed>0){
+   const lastPos=lastPositions[p.user_id];
+   if(lastPos){
+     const lastLat=lastPos.lat,lastLng=lastPos.lng;
+     const d=(new Date(p.recorded_at)-new Date(lastPos.recorded_at))/1000;
+     const speedKmh=p.speed||0;
+     // Calculate bearing between last position and current
+     const toRad=d=>d*Math.PI/180;
+     const lat1=toRad(lastLat),lat2=toRad(p.lat);
+     const dLng=toRad(p.lng-lastLng);
+     const y=Math.sin(dLng)*Math.cos(lat2);
+     const x=Math.cos(lat1)*Math.sin(lat2)-Math.sin(lat1)*Math.cos(lat2)*Math.cos(dLng);
+     let bearing=Math.atan2(y,x)*(180/Math.PI);
+     if(bearing<0)bearing+=360;
+     // Create arrow polyline
+     const arrowLen=Math.min(speedKmh/10,50);
+     const angleRad=toRad(bearing);
+     const dx=Math.cos(angleRad)*arrowLen;
+     const dy=Math.sin(angleRad)*arrowLen;
+     const points=`${lastLat},${lastLng};${p.lat+dy/111},${p.lng+dx/111}`;
+     const arrow=L.polyline([lastPos,{[lat:p.lat+dy/111,lng:p.lng+dx/111]}],{color:getRouteColor(0),weight:4,opacity:.8}).addTo(mapH);
+   }
+ }
+ lastPositions[p.user_id]={[lat:p.lat,lng:p.lng]};
+ if(markers[p.user_id])markers[p.user_id].setLatLng(ll);else markers[p.user_id]=L.marker(ll,{icon:icon(p)}).addTo(mapL).bindPopup(()=>pop(last[p.user_id]));renderList()}
+function renderList(){
+ const all=Object.values(last),n={go:0,idle:0,park:0},rp=new Set(all.map(p=>p.vehicle_id));
+ all.forEach(p=>{n[st(p)]++;const m=markers[p.user_id];if(!m)return;m.setIcon(icon(p));shown(p)?m.addTo(mapL):m.remove()});
+ vehicles.forEach(v=>{if(!rp.has(v.id))n.park++});
+ $('k_all').textContent=vehicles.length||all.length;$('k_go').textContent=n.go;$('k_idle').textContent=n.idle;$('k_park').textContent=n.park;
+ const q=$('q').value.toLowerCase();
+ $('liveList').innerHTML=all.filter(p=>shown(p)&&((p.vehicle_name||'')+(p.driver_name||'')).toLowerCase().includes(q)).sort((a,b)=>(a.vehicle_name||'').localeCompare(b.vehicle_name||'')).map(p=>{const s=st(p);
+ return `<div class="veh" onclick="mapL.setView([${p.lat},${p.lng}],16);markers['${p.user_id}'].openPopup()"><div class="av" style="background:${COL[s]}"><i class="fa-solid ${vt(p)}"></i></div><div class="t"><b>${esc(p.vehicle_name||'Unassigned')}</b><br><small>${esc(p.driver_name||'-')} Â· ${new Date(p.recorded_at).toLocaleTimeString()}</small></div><div style="text-align:right"><b>${spd(p)}</b> <small>km/h</small><br><span class="chip" style="background:${COL[s]}22;color:${COL[s]}">${LBL[s]}</span></div></div>`}).join('')||'<p style="color:var(--mut);padding:8px">No vehicles to show.</p>'}
+// ---- history
+const km=(a,b)=>{const r=x=>x*Math.PI/180,h=Math.sin(r(b.lat-a.lat)/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(r(b.lng-a.lng)/2)**2;return 12742*Math.asin(Math.sqrt(h))};
+const tile=(c,i,v,l)=>`<div class="card kpi ${c}"><div class="ic"><i class="fa-solid ${i}"></i></div><div><b>${v}</b><span>${l}</span></div></div>`;
+async function loadHist(){
+ const hf=new Date($('hf').value).toISOString(),ht=new Date($('ht').value).toISOString();
+ const data=await fetchAll(()=>sb.from('positions').select('*').eq('vehicle_id',$('hv').value).gte('recorded_at',hf).lte('recorded_at',ht).order('recorded_at'));
+ if(hLayer)hLayer.remove();hData=data;if(!data.length){$('hstat').innerHTML='';return toast('No data in this period.')}
+ hLayer=L.layerGroup().addTo(mapH);const pts=data.map(p=>[p.lat,p.lng]);L.polyline(pts,{color:'#2f7fe6',weight:5,opacity:.85}).addTo(hLayer);
+ L.circleMarker(pts[0],{color:'#27a46a',fillOpacity:1,radius:9}).addTo(hLayer).bindPopup('Start Trip');
+ const e=data.at(-1);L.circleMarker(pts.at(-1),{color:'#d9534f',fillOpacity:1,radius:9}).addTo(hLayer).bindPopup('End Trip');
+ const Vh=vehicles.find(x=>x.id===$('hv').value)||{},fm=Vh.fuel_moving||0,fi=Vh.fuel_idle||0,k2=Math.ceil(data.length/400);let cum=0;
+ data.forEach((p,i)=>{let l=0,r='';if(i){const q=data[i-1],dt=(new Date(p.recorded_at)-new Date(q.recorded_at))/1000;if(dt<=180){const dk=km(q,p);l=p.speed>0?dk*fm/100:dt/3600*fi;r=p.speed>0&&dk>0.005?(l/dk*100).toFixed(1)+' L/100km':fi+' L/h idling'}}cum+=l;
+  if(i%k2)return;L.circleMarker([p.lat,p.lng],{radius:3,color:'#f28c28',weight:1,fillOpacity:.9}).addTo(hLayer).bindPopup(`<b>${new Date(p.recorded_at).toLocaleString()}</b><br><i class="fa-solid fa-gauge-high"></i> ${Math.round(p.speed)} km/h Â· ${stt(p)}<br><i class="fa-solid fa-gas-pump"></i> Fuel ${l.toFixed(3)} L${r?' ('+r+')':''}<br>Trip fuel so far: ${cum.toFixed(2)} L<br><i class="fa-solid fa-location-dot"></i> ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}<br>Accuracy ${p.accuracy??'-'} m Â· Elev. ${p.altitude!=null?Math.round(p.altitude):'-'} m Â· Dir ${p.heading!=null?Math.round(p.heading):'-'}Â°<br>Accel ${p.accel??'-'} km/h/s<br><i class="fa-solid fa-battery-half"></i> ${p.battery_pct!=null?p.battery_pct+'%':'-'}${p.charging?' âš¡':''}`)});
+ if(!fm&&!fi)toast('Set the fuel rates on the Vehicles page to see fuel figures');
+ const evs=await fetchAll(()=>sb.from('events').select('*').eq('vehicle_id',$('hv').value).gte('recorded_at',hf).lte('recorded_at',ht));evs.forEach(x=>L.marker([x.lat,x.lng],{icon:evIcon(x.type)}).addTo(hLayer).bindPopup(`<b>${EV[x.type][0]}</b><br>${esc(x.vehicle_name||'')} / ${esc(x.driver_name||'')}<br>${Math.round(x.speed)} km/h<br>${new Date(x.recorded_at).toLocaleString()}`));
+ let d=0,dr=0,id=0;for(let i=1;i<data.length;i++){const dt=(new Date(data[i].recorded_at)-new Date(data[i-1].recorded_at))/1000;if(dt>180)continue;d+=km(data[i-1],data[i]);data[i].speed>0?dr+=dt:id+=dt}
+ const mv=data.filter(p=>p.speed>0),tot=(new Date(e.recorded_at)-new Date(data[0].recorded_at))/1000,hm=x=>Math.floor(x/3600)+'h '+p2(Math.floor(x%3600/60))+'m '+p2(Math.round(x%60))+'s';
+ $('hstat').innerHTML=tile('bl','fa-location-dot',data.length,'Points')+tile('gr','fa-road',d.toFixed(1)+' km','Distance')+tile('or','fa-gauge-high',Math.round(Math.max(...data.map(p=>p.speed)))+' km/h','Max speed')+tile('gy','fa-gauge',Math.round(mv.length?mv.reduce((a,p)=>a+p.speed,0)/mv.length:0)+' km/h','Average moving speed')+tile('gr','fa-road-circle-check',hm(dr),'Driving Period')+tile('or','fa-hourglass-half',hm(id),'Idling Period')+tile('bl','fa-clock',hm(tot),'Total Duration')+tile('rd','fa-triangle-exclamation',evs.length,'Recorded events')+tile('or','fa-gas-pump',cum.toFixed(1)+' L','Estimated fuel');
+ mapH.fitBounds(pts,{padding:[40,40]})}
+function csv(){if(!hData.length)return toast('Show a route first');
+ const r=['time,lat,lng,speed_kmh,driver',...hData.map(p=>[p.recorded_at,p.lat,p.lng,Math.round(p.speed),'"'+(p.driver_name||'')+'"'].join(','))];
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([r.join('\n')],{type:'text/csv'}));a.download='route.csv';a.click()}
+function hZoomAll(){const pts=hData.map(p=>[p.lat,p.lng]);if(pts.length)mapH.fitBounds(pts,{padding:[40,40],maxZoom:15})}
+function toggleHStat(){const s=$('hstat');const b=$('hStatToggle');const hidden=s.style.display==='none';s.style.display=hidden?'':'none';b.innerHTML=hidden?'<i class="fa-solid fa-eye"></i>Hide':'<i class="fa-solid fa-eye"></i>Show';b.title=hidden?'Hide stats bar':'Show stats bar'}
+// ---- events + reports + charts
+const EV={harsh_braking:['Harsh braking','fa-hand','#d9534f','rd'],harsh_acceleration:['Harsh acceleration','fa-bolt','#f28c28','or'],overspeed:['Overspeed','fa-gauge-high','#2f7fe6','bl']};
+const evIcon=t=>L.divIcon({className:'',html:`<div class="mk sm" style="background:${EV[t][2]}"><i class="fa-solid ${EV[t][1]}"></i></div>`,iconSize:[20,20],iconAnchor:[10,10]});
+
+// E3: beep function with configurable duration and type
+let BEEP_DURATION=5, BEEP_TYPE='discontinuous';
+function beep(){
+ const duration=BEEP_DURATION||5;
+ const type=BEEP_TYPE||'discontinuous';
+ try{
+  const a=new (window.AudioContext||window.webkitAudioContext)(),t=a.currentTime;
+  if(type==='continuous'){
+   // Continuous beep for duration
+   const o=a.createOscillator(),g=a.createGain();
+   o.frequency.value=880;g.gain.value=.15;o.connect(g);g.connect(a.destination);
+   o.start(t);o.stop(t+duration);
+  } else {
+   // Discontinuous (traditional) - single beep
+   for(let i=0;i<10;i++){
+    const o=a.createOscillator(),g=a.createGain();
+    o.frequency.value=880;g.gain.value=.15;o.connect(g);g.connect(a.destination);
+    o.start(t+i*.5);o.stop(t+i*.5+.25)
+   }
+  }
+ }catch(e){}
+}
+
+// E4: Overspeed tolerance tracking
+let overspeedTracker={};
+
+async function detect(p){
+ const v=vehicles.find(x=>x.id===p.vehicle_id)||{};
+ const limit=v?.speed_limit||RULES.overspeed?.threshold||100;
+ const above=p.speed>limit;
+ const vid=p.vehicle_id;
+
+ if(above){
+  overspeedTracker[vid]={...(overspeedTracker[vid]||{}),count:(overspeedTracker[vid]?.count||0)+1};
+ } else {
+  delete overspeedTracker[vid];
+ }
+
+ const count=overspeedTracker[vid]?.count||0;
+
+ // 6+ seconds: alert + event
+ // 2-5 seconds: alert only (no event)
+ // 0-1 second: no alert, no event
+ if(count>=6){
+  if(count===6){
+   // First time crossing threshold - create event
+   await createOverspeedEvent(p,limit);
+  }
+ } else if(count>=2){
+  // Alert only
+  // Handled by alertEv function
+ }
+}
+
+async function createOverspeedEvent(p,limit){
+ await sb.from('events').insert({
+  type: 'overspeed',
+  vehicle_id: p.vehicle_id,
+  driver_id: p.driver_id,
+  lat: p.lat,
+  lng: p.lng,
+  speed: p.speed,
+  value: p.speed - limit,
+  vehicle_name: p.vehicle_name,
+  driver_name: p.driver_name,
+  recorded_at: p.recorded_at
+ });
+}
+async function fetchAll(q){let a=[];for(let i=0;i<30;i++){const {data,error}=await q().range(i*1000,i*1000+999);if(error){toast(error.message);break}a=a.concat(data);if(data.length<1000)break}return a}
+function chart(id,type,labels,sets,o={}){const cs=getComputedStyle(document.documentElement);Chart.defaults.color=cs.getPropertyValue('--mut');Chart.defaults.borderColor=cs.getPropertyValue('--line');charts[id]?.destroy();charts[id]=new Chart($(id),{type,data:{labels,datasets:sets},options:{maintainAspectRatio:false,onClick:o.click,indexAxis:o.h?'y':'x',plugins:{title:{display:true,text:o.t},legend:{display:sets.length>1||type==='doughnut'}},scales:type==='doughnut'?{}:{x:{stacked:!!o.s},y:{stacked:!!o.s,beginAtZero:true}}}})}
+const cnt=(rows,f)=>rows.reduce((o,r)=>{const k=f(r)||'-';o[k]=(o[k]||0)+1;return o},{});
+async function loadEvt(){
+ const vVals=$('ev_v').value||[],dVals=$('ev_d').value||[],t=$('ev_t').value,f=new Date($('ev_f').value).toISOString(),to=new Date($('ev_to').value).toISOString();
+ EVR=await fetchAll(()=>{let q=sb.from('events').select('*').gte('recorded_at',f).lte('recorded_at',to).order('recorded_at',{ascending:false});if(vVals.length){const ids=vVals.map(Number);q=q.gte('vehicle_id',Math.min(...ids)).lte('vehicle_id',Math.max(...ids))} // Simplified: if any vehicle selected, filter OR
+ if(dVals.length){const ids=dVals.map(Number);q=q.gte('driver_id',Math.min(...ids)).lte('driver_id',Math.max(...ids))}
+ if(t)q=q.eq('type',t);return q});EVF={};renderEvt()}
+function evReset(){EVF={};renderEvt()}
+function evSet(k,val){EVF[k]=EVF[k]===val?undefined:val;renderEvt()}
+const dayOf=r=>new Date(r.recorded_at).toLocaleDateString('en-CA');
+function renderEvt(){
+ const rows=EVR.filter(r=>(!EVF.type||r.type===EVF.type)&&(!EVF.driver||(r.driver_name||'-')===EVF.driver)&&(!EVF.day||dayOf(r)===EVF.day)),ty=cnt(rows,r=>r.type),K=Object.keys(EV);
+ // Build filter chips from EVF
+ const filterChips=Object.entries(EVF).filter(x=>x[1]).map(x=>{
+   if(x[0]==='type')return`<span class="chip" style="background:${EV[x[1]][2]}22;color:${EV[x[1]][2]}"><i class="fa-solid ${EV[x[1]][1]}"></i> ${EV[x[1]][0]}</span>`;
+   return`<span class="chip" style="background:var(--bll);color:var(--bl)">${x[0]}: ${esc(x[1])}</span>`;
+ }).join(' ');
+ // Build checkboxes for vehicles and drivers
+ const vehicleOptions=vehicles.map(v=>`<label class="nb" style="padding:6px 10px;font-size:11px;background:var(--card);border:1px solid var(--line);border-radius:6px;cursor:pointer"><input type="${vVals.includes(String(v.id))?'checkbox':'radio'}" value="${v.id}" ${vVals.includes(String(v.id))?'checked':''}> ${esc(v.name)}</label>`).join(' ');
+ const driverOptions=drivers.map(d=>`<label class="nb" style="padding:6px 10px;font-size:11px;background:var(--card);border:1px solid var(--line);border-radius:6px;cursor:pointer"><input type="${dVals.includes(String(d.id))?'checkbox':'radio'}" value="${d.id}" ${dVals.includes(String(d.id))?'checked':''}> ${esc(d.name)}</label>`).join(' ');
+ $('evFl').innerHTML=`<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${filterChips}</div><div style="margin-top:8px"><b>Vehicles:</b> ${vehicleOptions}</div><div style="margin-top:8px"><b>Drivers:</b> ${driverOptions}</div>${Object.values(EVF).some(Boolean)?' <button class="btn gh sm" onclick="evReset()"><i class="fa-solid fa-rotate-left"></i>Reset filter</button>':'<small style="color:var(--mut)">Click any chart to filter the table. Click again or press Reset to show everything.</small>'}`;
+ $('evK').innerHTML=tile('gy','fa-bell',rows.length,'Total events')+K.map(k=>tile(EV[k][3],EV[k][1],ty[k]||0,EV[k][0])).join('');
+ chart('c1','doughnut',K.map(k=>EV[k][0]),[{data:K.map(k=>ty[k]||0),backgroundColor:K.map(k=>EV[k][2])}],{t:'Events by Type',click:(e,el)=>el.length&&evSet('type',K[el[0].index])});
+ const days=[...new Set(rows.map(dayOf))].sort();
+ chart('c2','bar',days,K.map(k=>({label:EV[k][0],backgroundColor:EV[k][2],data:days.map(d=>rows.filter(r=>r.type===k&&dayOf(r)===d).length)})),{t:'Events per Day',s:1,click:(e,el)=>el.length&&evSet('day',days[el[0].index])});
+ const dr=Object.entries(cnt(rows,r=>r.driver_name)).sort((a,b)=>b[1]-a[1]).slice(0,8).map(x=>x[0]);
+ chart('c3','bar',dr,K.map(k=>({label:EV[k][0],backgroundColor:EV[k][2],data:dr.map(n=>rows.filter(r=>(r.driver_name||'-')===n&&r.type===k).length)})),{t:'Violator Drivers',s:1,h:1,click:(e,el)=>{if(!el.length)return;EVF.driver=dr[el[0].index];EVF.type=K[el[0].datasetIndex];renderEvt()}});
+ $('evT').innerHTML=`<table><tr><th>Event Start</th><th>Event End</th><th>Duration (hh:mm:ss)</th><th>Vehicle</th><th>Driver</th><th>Event</th><th>Speed (km/h)</th><th>Acceleration / Deceleration (km/h/s)</th><th>Location</th></tr>${rows.slice(0,1000).map(r=>{const nextEv=rows.find(x=>x.type===r.type&&new Date(x.recorded_at)>new Date(r.recorded_at));const dur=nextEv?formatDuration((new Date(nextEv.recorded_at)-new Date(r.recorded_at))/1000):'-';return `<tr><td>${new Date(r.recorded_at).toLocaleString()}</td><td>${nextEv?new Date(nextEv.recorded_at).toLocaleString():'-'}</td><td>${dur}</td><td>${esc(r.vehicle_name)}</td><td>${esc(r.driver_name)}</td><td><span class="chip" style="background:${EV[r.type][2]}22;color:${EV[r.type][2]}"><i class="fa-solid ${EV[r.type][1]}"></i> ${EV[r.type][0]}</span></td><td>${Math.round(r.speed)}</td><td>${r.type==='overspeed'?'-':(+r.value).toFixed(1)}</td><td><a href="#" onclick="goHist('${r.vehicle_id}','${r.recorded_at}',${r.lat},${r.lng});return false"><i class="fa-solid fa-map-location-dot"></i> ${(+r.lat).toFixed(5)}, ${(+r.lng).toFixed(5)}</a></td></tr>`}).join('')||'<tr><td colspan="9">No events in this period.</td></tr>'}</table>`;tools($('evT'))}
+async function goHist(vid,iso,lat,lng){document.querySelector('.nb[data-t=hist]').click();$('hv').value=vid;const t=new Date(iso).getTime();$('hf')._flatpickr.setDate(new Date(t-9e5),true);$('ht')._flatpickr.setDate(new Date(t+9e5),true);await loadHist();mapH.setView([lat,lng],17)}
+async function loadRep(){
+ const f=new Date($('rp_f').value+'T00:00:00').toISOString(),t=new Date($('rp_t').value+'T23:59:59').toISOString();
+ let data=null,error=null;
+
+ // D1: Try RPC first, fallback to client-side aggregation
+ try{
+  const {data:r,error:err}=await sb.rpc('vehicle_report',{p_from:f,p_to:t,p_tz:Intl.DateTimeFormat().resolvedOptions().timeZone});
+  if(!err && r && r.length){
+   data=r;
+  } else {
+   data=await fallbackVehicleReport(f,t);
+  }
+ }catch(e){
+  data=await fallbackVehicleReport(f,t);
+ }
+
+ if(!data||!data.length){
+  $('rpK').innerHTML='';
+  $('rpT').innerHTML='<tr><td colspan="13">No data in this period.</td></tr>';
+  return toast('No data in this period.');
+ }
+
+ const evs=await fetchAll(()=>sb.from('events').select('vehicle_id,type').gte('recorded_at',f).lte('recorded_at',t));
+ const V={},D={},K={harsh_braking:'b',harsh_acceleration:'a',overspeed:'o'};
+ data.forEach(r=>{const o=V[r.vehicle_id]??={id:r.vehicle_id,name:r.vehicle_name,km:0,max:0,dr:0,sp:0,b:0,a:0,o:0};o.km+=+r.km;o.max=Math.max(o.max,+r.max_speed);o.dr+=+r.drive_min;o.sp+=+r.stop_min;D[r.day]=(D[r.day]||0)+ +r.km});
+ evs.forEach(e=>{if(V[e.vehicle_id])V[e.vehicle_id][K[e.type]]++});
+ rep=Object.values(V).map(o=>{const q=vehicles.find(x=>x.id===o.id)||{},fm=o.km*(q?.fuel_moving||0)/100,fi=o.sp/60*(q?.fuel_idle||0);return {...o,fm,fi,ft:fm+fi,l100:o.km>0?(fm+fi)/o.km*100:0,score:Math.max(0,Math.round(100-2*(o.b+o.a+o.o)/Math.max(o.km,10)*100))}});
+ const sum=k=>rep.reduce((a,o)=>a+o[k],0),n=rep.map(o=>o.name);
+ $('rpK').innerHTML=tile('bl','fa-road',sum('km').toFixed(0)+' km','Total distance')+tile('gr','fa-clock',(sum('dr')/60).toFixed(1)+' h','Driving time')+tile('or','fa-triangle-exclamation',sum('b')+sum('a')+sum('o'),'Driving events')+tile('gr','fa-shield-halved',rep.length?Math.round(sum('score')/rep.length):0,'Average safety score')+tile('or','fa-gas-pump',sum('ft').toFixed(1)+' L','Estimated fuel');
+ chart('r1','bar',n,[{label:'km',backgroundColor:'#2f7fe6',data:rep.map(o=>+o.km.toFixed(1))}],{t:'Distance per vehicle (km)'});
+ chart('r2','line',Object.keys(D),[{label:'km',borderColor:'#27a46a',backgroundColor:'#27a46a33',fill:true,tension:.3,data:Object.values(D).map(x=>+x.toFixed(1))}],{t:'Fleet distance per day (km)'});
+ chart('r3','bar',n,[{label:'Driving (h)',backgroundColor:'#27a46a',data:rep.map(o=>+(o.dr/60).toFixed(1))},{label:'Idling (h)',backgroundColor:'#f28c28',data:rep.map(o=>+(o.sp/60).toFixed(1))}],{t:'Driving vs Idling time',s:1});
+ chart('r4','bar',n,[{label:'Moving (L)',backgroundColor:'#2f7fe6',data:rep.map(o=>+o.fm.toFixed(1))},{label:'Idling (L)',backgroundColor:'#f28c28',data:rep.map(o=>+o.fi.toFixed(1))}],{t:'Estimated fuel (litres)',s:1});
+ const sc=s=>s>=80?'gr':s>=60?'or':'rd';
+ $('rpT').innerHTML=`<table><tr><th>Vehicle</th><th>Distance</th><th>Max speed</th><th>Driving</th><th>Idling</th><th>Braking</th><th>Accel.</th><th>Overspeed</th><th>Fuel moving</th><th>Fuel idling</th><th>Total fuel</th><th>L/100 km</th><th>Safety score <button class="ibtn" onclick="event.stopPropagation();msg('Safety score formula',SCF)" title="How is it calculated?">!</button></th></tr>${rep.sort((a,b)=>b.score-a.score).map(o=>`<tr><td><b>${esc(o.name)}</b></td><td>${o.km.toFixed(1)} km</td><td>${o.max} km/h</td><td>${(o.dr/60).toFixed(1)} h</td><td>${(o.sp/60).toFixed(1)} h</td><td>${o.b}</td><td>${o.a}</td><td>${o.o}</td><td>${o.fm.toFixed(1)} L</td><td>${o.fi.toFixed(1)} L</td><td><b>${o.ft.toFixed(1)} L</b></td><td>${o.l100.toFixed(1)}</td><td><span class="chip" style="background:var(--${sc(o.score)}l);color:var(--${sc(o.score)})">${o.score}</span></td></tr>`).join('')}</table>`;tools($('rpT'))}
+
+// D1: Fallback vehicle report function - client-side aggregation
+async function fallbackVehicleReport(f,t){
+ const vlist=await fetchAll(()=>sb.from('vehicles').select('*'));
+ const positions=await fetchAll(()=>sb.from('positions').select('*').gte('recorded_at',f).lte('recorded_at',t).order('recorded_at'));
+ if(!positions.length)return[];
+
+ const V={};
+ positions.forEach(p=>{
+  const vid=p.vehicle_id;
+  if(!V[vid])V[vid]={id:vid,vehicle_name:'',km:0,max_speed:0,drive_min:0,stop_min:0,daily:{}};
+  const v=vlist.find(x=>x.id===vid)||{};
+  V[vid].vehicle_name=v.name||'Unknown';
+
+  // Calculate distance between consecutive positions
+  let prevPos=positions.find(pt=>pt.vehicle_id===vid && pt.recorded_at<p.recorded_at);
+  if(prevPos){
+   const d=km(prevPos,p);
+   V[vid].km+=d;
+   const day=new Date(p.recorded_at).toISOString().slice(0,10);
+   V[vid].daily[day]=(V[vid].daily[day]||0)+d;
+  }
+
+  V[vid].max_speed=Math.max(V[vid].max_speed,p.speed||0);
+  if(p.speed>0)V[vid].drive_min+=1; else V[vid].stop_min+=1;
+ });
+
+ // Calculate events per vehicle
+ const evs=await fetchAll(()=>sb.from('events').select('vehicle_id,type').gte('recorded_at',f).lte('recorded_at',t));
+ const K={harsh_braking:'b',harsh_acceleration:'a',overspeed:'o'};
+ evs.forEach(e=>{if(V[e.vehicle_id]){V[e.vehicle_id][K[e.type]]=V[e.vehicle_id][K[e.type]]||0;V[e.vehicle_id][K[e.type]]++}});
+
+ return Object.values(V);
+}
+function repCsv(){if(!rep.length)return toast('Build a report first');
+ const r=['vehicle,km,max_speed,driving_h,stopped_h,harsh_braking,harsh_accel,overspeed,fuel_moving_L,fuel_idle_L,fuel_total_L,L_per_100km,score',...rep.map(o=>['"'+o.name+'"',o.km.toFixed(1),o.max,(o.dr/60).toFixed(1),(o.sp/60).toFixed(1),o.b,o.a,o.o,o.fm.toFixed(1),o.fi.toFixed(1),o.ft.toFixed(1),o.l100.toFixed(1),o.score].join(','))];
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([r.join('\n')],{type:'text/csv'}));a.download='fleet-report.csv';a.click()}
+// ---- theme, users, event rules, alerts
+function theme(){const d=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=d;localStorage.theme=d;themeBtn()}
+const mail=u=>u.includes('@')?u.trim():u.trim().toLowerCase()+'@fleet.local';
+async function addUser(e){e.preventDefault();
+ const c=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:false,autoRefreshToken:false,storageKey:'tmp-signup'}});
+ const {data,error}=await c.auth.signUp({email:mail(e.target.u.value),password:e.target.p.value});
+ if(error)return toast(error.message);
+ if(!data.session)toast('User created but cannot sign in yet: turn OFF "Confirm email" in Supabase (see steps)');else toast('User created',1);
+ e.target.reset();users()}
+let RULES={},SET={};const UNIT={harsh_braking:'km/h per second',harsh_acceleration:'km/h per second',overspeed:'km/h'};
+async function loadRules(){const {data}=await sb.from('event_rules').select('*').order('type');RULES={};(data||[]).forEach(r=>RULES[r.type]=r);
+ $('ruleT').innerHTML=`<table><tr><th>Event</th><th>Enabled</th><th>Default limit</th><th>Visual alert</th><th>Beep (5 s)</th></tr>${(data||[]).map(r=>`<tr><td><b>${esc(r.label)}</b></td><td><input type="checkbox" id="re_${r.type}" ${r.enabled?'checked':''}></td><td><input type="number" step="0.1" id="rt_${r.type}" value="${r.threshold??''}" style="width:90px"> ${UNIT[r.type]||''}</td><td><input type="checkbox" id="ra_${r.type}" ${r.alert?'checked':''}></td><td><input type="checkbox" id="rb_${r.type}" ${r.beep!==false?'checked':''}></td></tr>`).join('')}</table>`}
+async function loadCfg(){await loadRules();const {data}=await sb.from('app_settings').select('*');SET={};(data||[]).forEach(x=>SET[x.key]=x.value);
+ $('s_mov').value=SET.moving_interval||10;$('s_stp').value=SET.stopped_interval||60;
+ const cols=[['speed_limit','Overspeed','km/h',RULES.overspeed?.threshold],['brake_limit','Harsh braking','km/h/s',RULES.harsh_braking?.threshold],['accel_limit','Harsh accel.','km/h/s',RULES.harsh_acceleration?.threshold],['moving_interval','Record moving','seconds',SET.moving_interval||10],['stopped_interval','Record stopped','seconds',SET.stopped_interval||60],['fuel_moving','Fuel moving','L/100 km',''],['fuel_idle','Fuel idling','L/hour','']];
+ $('cfgV').innerHTML=`<table><tr><th>Vehicle</th>${cols.map(c=>`<th>${c[1]}<br><small>${c[2]}</small></th>`).join('')}</tr>${vehicles.map(v=>`<tr><td><b>${esc(v.name)}</b></td>${cols.map(c=>`<td><input type="number" step="any" min="0" data-v="${v.id}" data-k="${c[0]}" value="${v[c[0]]??''}" placeholder="${c[3]??''}" style="width:96px"></td>`).join('')}</tr>`).join('')||'<tr><td>Add vehicles first.</td></tr>'}</table>`;tools($('cfgV'))}
+async function saveCfg(){if(!ADMIN)return;
+ const rules=Object.values(RULES).map(r=>({type:r.type,label:r.label,enabled:$('re_'+r.type).checked,threshold:+$('rt_'+r.type).value||null,alert:$('ra_'+r.type).checked,beep:$('rb_'+r.type).checked}));
+ const byV={};document.querySelectorAll('#cfgV input').forEach(i=>{(byV[i.dataset.v]??={})[i.dataset.k]=i.value===''?null:+i.value});
+ const res=await Promise.all([sb.from('event_rules').upsert(rules),sb.from('app_settings').upsert([{key:'moving_interval',value:String(Math.max(1,+$('s_mov').value||10))},{key:'stopped_interval',value:String(Math.max(1,+$('s_stp').value||60))}]),...Object.entries(byV).map(([id,o])=>sb.from('vehicles').update(o).eq('id',id))]);
+ const e=res.find(r=>r.error);if(e)return toast(e.error.message);toast('Configuration saved. Phones apply it within 5 minutes or at the next trip start.',1);await refs();loadCfg()}
+function beep(){try{const a=new (window.AudioContext||window.webkitAudioContext)(),t=a.currentTime;for(let i=0;i<10;i++){const o=a.createOscillator(),g=a.createGain();o.frequency.value=880;g.gain.value=.15;o.connect(g);g.connect(a.destination);o.start(t+i*.5);o.stop(t+i*.5+.25)}}catch(e){}}
+function alertEv(x){const R=RULES[x.type]||{},n=(EV[x.type]||[x.type])[0];
+ if(R.alert!==false){toast('âš  '+n+': '+(x.vehicle_name||'')+' / '+(x.driver_name||''));
+  const m=L.marker([x.lat,x.lng],{icon:L.divIcon({className:'',html:'<div class="pulse"></div>',iconSize:[44,44],iconAnchor:[22,22]}),zIndexOffset:1000}).addTo(mapL).bindPopup(`<b>${esc(n)}</b><br><b>Vehicle:</b> ${esc(x.vehicle_name||'-')}<br><b>Driver:</b> ${esc(x.driver_name||'-')}<br>${Math.round(x.speed)} km/h<br>${new Date(x.recorded_at).toLocaleString()}`).openPopup();setTimeout(()=>m.remove(),20000)}
+ if(R.beep!==false)beep()}
+// ---- trip report (tacho + second-by-second)
+let tr=[],tp=0;
+const gauge=v=>{const m=240,a=Math.PI*(1-Math.min(v,m)/m),x=100+80*Math.cos(a),y=100-80*Math.sin(a);return `<svg viewBox="0 0 200 120" width="230"><path d="M20 100A80 80 0 0 1 180 100" fill="none" stroke="#9aa7b055" stroke-width="14"/><path d="M20 100A80 80 0 0 1 ${x} ${y}" fill="none" stroke="#f28c28" stroke-width="14"/><text x="100" y="96" text-anchor="middle" font-size="28" font-weight="800" fill="currentColor">${Math.round(v)}</text><text x="100" y="114" text-anchor="middle" font-size="10" fill="#9aa7b0">km/h max speed</text></svg>`};
+const stt=r=>r.ignition===false?'Parking':(r.speed>0?'Moving':'Idle');
+async function loadTrip(){
+ const v=$('tr_v').value,f=new Date($('tr_f').value).toISOString(),t=new Date($('tr_t').value).toISOString();
+ tr=await fetchAll(()=>sb.from('positions').select('*').eq('vehicle_id',v).gte('recorded_at',f).lte('recorded_at',t).order('recorded_at'));tp=0;
+ if(!tr.length)return toast('No data in this period');
+ const sp=tr.map(r=>r.speed||0),mx=Math.max(...sp),mv=sp.filter(x=>x>0),av=mv.length?mv.reduce((a,b)=>a+b)/mv.length:0,lim=(vehicles.find(x=>x.id===v)||{}).speed_limit||RULES.overspeed?.threshold||100;
+ $('trK').innerHTML=tile('bl','fa-database',tr.length,'Records')+tile('or','fa-gauge-high',Math.round(mx)+' km/h','Max speed')+tile('gr','fa-gauge',Math.round(av)+' km/h','Avg moving speed')+tile('gy','fa-mountain',Math.round(Math.max(...tr.map(r=>r.altitude||0)))+' m','Max elevation');
+ $('gauge').innerHTML='';
+ const k=Math.ceil(tr.length/1500),s=tr.filter((_,i)=>i%k===0),lb=s.map(r=>new Date(r.recorded_at).toLocaleTimeString()),ln=(l,d,c)=>({label:l,data:d,borderColor:c,backgroundColor:c+'22',fill:true,pointRadius:0,borderWidth:1.5,tension:.2});
+ const maxSpeedIdx=s.findIndex((_,i)=>tr[i%k]&&tr[i%k].speed===mx);
+ const maxSpeedDataset=[{label:'Max Speed',data:s.map((_,i)=>i===maxSpeedIdx?mx:null),borderColor:'#d9534f',pointRadius:6,pointBackgroundColor:'#d9534f',pointHoverRadius:8,borderWidth:0,fill:false}];
+ chart('t1','line',lb,[ln('Speed km/h',s.map(r=>r.speed),'#2f7fe6'),{label:'Limit',data:s.map(_=>lim),borderColor:'#d9534f',borderDash:[6,4],pointRadius:0,borderWidth:1},...maxSpeedDataset],{t:'Speed (tacho graph)'});
+ chart('t2','line',lb,[ln('km/h per s',s.map(r=>r.accel),'#f28c28')],{t:'Acceleration / deceleration'});
+ chart('t3','line',lb,[ln('metres',s.map(r=>r.altitude),'#27a46a')],{t:'Elevation'});
+ chart('t4','line',lb,[{label:'Ignition',data:s.map(r=>r.ignition===false?0:1),borderColor:'#2f7fe6',backgroundColor:'#2f7fe622',fill:true,stepped:true,pointRadius:0,borderWidth:1.5}],{t:'Ignition'});
+ trTable()}
+const DD=d=>`${p2(d.getDate())}/${p2(d.getMonth()+1)}/${d.getFullYear()}`;
+function trTable(){
+ const H=['Date','Time','Vehicle Name','Driver Name','Vehicle Status','Location','Position','Accuracy (m)','Elevation (m)','Direction (Â°)','Ignition','Speed (km/h)','Accel (km/h/s)','Battery (%)'];
+ const vehMap={};vehicles.forEach(v=>vehMap[v.id]=v.name);
+ const drvMap={};drivers.forEach(d=>drvMap[d.id]=d.name);
+ const cache={};
+ function getLoc(lat,lng){
+   const key=Math.round(lat*1e4)+','+Math.round(lng*1e4);
+   if(cache[key])return cache[key];
+   const fallback=lat.toFixed(4)+', '+lng.toFixed(4);
+   cache[key]=fallback;
+   return fallback;
+ }
+ const R=r=>{
+   const d=new Date(r.recorded_at);
+   const vName=vehMap[r.vehicle_id]||r.vehicle_name||'-';
+   const dName=drvMap[r.driver_id]||r.driver_name||'-';
+   const loc=getLoc(r.lat,r.lng);
+   return [DD(d),d.toLocaleTimeString(),vName,dName,stt(r),loc,r.lat.toFixed(5)+', '+r.lng.toFixed(5),r.accuracy??'',r.altitude!=null?Math.round(r.altitude):'',r.heading!=null?Math.round(r.heading):'',r.ignition===false?0:1,Math.round(r.speed),r.accel??'',r.battery_pct!=null?Math.round(r.battery_pct)+(r.charging?' âš¡':''):''];
+ };
+ $('trT').innerHTML=`<table><tr>${H.map(h=>`<th>${h}</th>`).join('')}</tr>${tr.slice(0,2000).map(r=>`<tr>${R(r).map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</table>`+(tr.length>2000?`<p style="padding:8px">Showing the first 2000 of ${tr.length} rows. Exports include all rows.</p>`:'');
+ tools($('trT'),{full:()=>({head:H,rows:tr.map(R)})})}
+function trCsv(){if(!tr.length)return toast('Load a trip first');
+ const r=['time,lat,lng,speed_kmh,accuracy_m,elevation_m,heading_deg,hdop,status,accel_kmh_per_s,battery_pct,charging',...tr.map(x=>[x.recorded_at,x.lat,x.lng,Math.round(x.speed),x.accuracy,x.altitude,x.heading,x.hdop,stt(x),x.accel,x.battery_pct,x.charging].map(v=>v??'').join(','))];
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([r.join('\n')],{type:'text/csv'}));a.download='trip-second-by-second.csv';a.click()}
+// ---- shared tools: date ranges, tables, panels
+const PRE=[['today','Today'],['yest','Yesterday'],['24h','Last 24 hrs'],['lw','Last Week (previous Mon-Sun)'],['w','A week ago (last 7 days)'],['lm','Last Month (previous month)'],['m','A month ago (last 30 days)'],['ly','Last Year (previous year)'],['y','A year ago (last 365 days)'],['custom','Custom']];
+function range(k){const n=new Date(),y=n.getFullYear(),m=n.getMonth(),d=n.getDate(),D=(a,b,c,h=0,mi=0,se=0)=>new Date(a,b,c,h,mi,se);
+ return {today:[D(y,m,d),n],yest:[D(y,m,d-1),D(y,m,d-1,23,59,59)],'24h':[new Date(n-864e5),n],lw:(()=>{const o=(D(y,m,d).getDay()+6)%7;return [D(y,m,d-o-7),D(y,m,d-o-1,23,59,59)]})(),w:[new Date(n-7*864e5),n],lm:[D(y,m-1,1),D(y,m,0,23,59,59)],m:[new Date(n-30*864e5),n],ly:[D(y-1,0,1),D(y-1,11,31,23,59,59)],y:[new Date(n-365*864e5),n]}[k]}
+function setR(a,b,k){if(k==='custom')return;const r=range(k);$(a)._flatpickr.setDate(r[0],true);$(b)._flatpickr.setDate(r[1],true)}
+function initDates(){[['hf','ht','24h'],['ev_f','ev_to','w'],['tr_f','tr_t','custom'],['rp_f','rp_t','w']].forEach(([a,b,k])=>{
+ const o={enableTime:true,enableSeconds:true,time_24hr:true,dateFormat:'Y-m-d\\TH:i:S',altInput:true,altFormat:'d/m/Y H:i:S',disableMobile:true};flatpickr('#'+a,o);flatpickr('#'+b,o);
+ $(a).closest('.field').insertAdjacentHTML('beforebegin',`<div class="field"><label>Period</label><select onchange="setR('${a}','${b}',this.value)">${PRE.map(p=>`<option value="${p[0]}" ${p[0]===k?'selected':''}>${p[1]}</option>`).join('')}</select></div>`);
+ if(k==='custom'){const n=new Date();$(a)._flatpickr.setDate(new Date(n-36e5));$(b)._flatpickr.setDate(n)}else setR(a,b,k)});
+ const l=document.querySelector('[name=license_expiry]');if(l)flatpickr(l,{dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',disableMobile:true});
+ ['evt','trip','rep'].forEach(panels)}
+const SCF='<b>Score = 100 âˆ’ 2 Ã— (harsh braking + harsh acceleration + overspeed events) per 100 km</b><br>Never below 0. Distances under 10 km count as 10 km. 80 and above is good, 60 to 79 needs attention, below 60 is poor.';
+function msg(t,h){const m=$('modal');m.innerHTML=`<div class="card" style="max-width:420px"><b>${t}</b><p>${h}</p><button class="btn b sm" onclick="$('modal').classList.add('hide')">OK</button></div>`;m.classList.remove('hide')}
+const cv=c=>{const i=c.querySelector('input,select');return i?(i.type==='checkbox'?(i.checked?'Yes':'No'):i.tagName==='SELECT'?(i.options[i.selectedIndex]||{}).text||'':i.value):c.innerText.trim()};
+const ky=v=>{const m=/^(\d\d)\/(\d\d)\/(\d{4})\s*(\d\d:\d\d:\d\d)?/.exec(v);if(m)return m[3]+m[2]+m[1]+(m[4]||'');const n=parseFloat(v);return isNaN(n)?String(v).toLowerCase():n};
+function tools(el,opt={}){const t=el.querySelector('table');if(!t)return;
+ const hs=[...t.rows[0].cells],rows=()=>[...t.rows].slice(1),title=opt.title||$('title').textContent,bar=document.createElement('div');bar.className='tbar';
+ bar.innerHTML='<input class="ts" placeholder="Search..."><button class="btn gh sm" data-x="csv"><i class="fa-solid fa-file-csv"></i>CSV</button><button class="btn gh sm" data-x="xlsx"><i class="fa-solid fa-file-excel"></i>Excel</button><button class="btn gh sm" data-x="pdf"><i class="fa-solid fa-file-pdf"></i>PDF</button><button class="btn gh sm" data-x="print"><i class="fa-solid fa-print"></i>Print</button>';
+ el.prepend(bar);
+ bar.querySelector('.ts').oninput=e=>{const q=e.target.value.toLowerCase();rows().forEach(r=>r.style.display=[...r.cells].map(cv).join(' ').toLowerCase().includes(q)?'':'none')};
+ hs.forEach((h,i)=>{if(!h.innerText.trim())return;h.title='Click to sort';h.onclick=()=>{const dir=h._d=-(h._d||-1);rows().sort((a,b)=>{const x=ky(cv(a.cells[i])),y=ky(cv(b.cells[i]));return (typeof x==='number'&&typeof y==='number'?x-y:String(x).localeCompare(String(y)))*dir}).forEach(r=>t.tBodies[0].appendChild(r))}});
+ const data=()=>{if(opt.full)return opt.full();const c=hs.map((h,i)=>[h.innerText.replace(/\s*!$/,'').trim(),i]).filter(x=>x[0]);return {head:c.map(x=>x[0]),rows:rows().filter(r=>r.style.display!=='none').map(r=>c.map(x=>cv(r.cells[x[1]])))}};
+ bar.onclick=e=>{const b=e.target.closest('[data-x]');if(!b)return;const {head,rows:R}=data(),nm=title.replace(/\W+/g,'_')+'_'+new Date().toISOString().slice(0,10);
+  if(b.dataset.x==='csv'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+[head,...R].map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n')],{type:'text/csv'}));a.download=nm+'.csv';a.click()}
+  if(b.dataset.x==='xlsx'){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([head,...R]),'Report');XLSX.writeFile(wb,nm+'.xlsx')}
+  if(b.dataset.x==='pdf'){const d=new jspdf.jsPDF({orientation:'landscape'});d.text(title,14,12);d.autoTable({head:[head],body:R,startY:18,styles:{fontSize:7}});d.save(nm+'.pdf')}
+  if(b.dataset.x==='print'){const w=window.open('','_blank');w.document.write('<html><head><title>'+esc(title)+'</title><style>body{font-family:sans-serif}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:4px;font-size:11px}</style></head><body><h3>'+esc(title)+'</h3><table><tr>'+head.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr>'+R.map(r=>'<tr>'+r.map(c=>'<td>'+esc(c)+'</td>').join('')+'</tr>').join('')+'</table></body></html>');w.document.close();w.print()}}}
+const PN={c1:'Events by Type',c2:'Events per Day',c3:'Violator Drivers',t1:'Speed (tacho graph)',t2:'Acceleration',t3:'Elevation',t4:'Ignition',r1:'Distance per vehicle',r2:'Fleet distance per day',r3:'Driving vs Idling',r4:'Fuel'};
+function panels(sec){const g=document.querySelector('#'+sec+' .cgrid');if(!g)return;const key='lay_'+sec,bar=document.createElement('div');bar.className='pbar';g.before(bar);
+ [...g.children].forEach(c=>{c.dataset.id=(c.querySelector('canvas')||c).id;c.insertAdjacentHTML('afterbegin','<div class="pt"><button data-a="big" title="Enlarge"><i class="fa-solid fa-expand"></i></button><button data-a="l" title="Move left"><i class="fa-solid fa-arrow-left"></i></button><button data-a="r" title="Move right"><i class="fa-solid fa-arrow-right"></i></button><button data-a="h" title="Hide"><i class="fa-solid fa-eye-slash"></i></button></div>');
+  c.querySelector('.pt').onclick=e=>{const a=(e.target.closest('button')||{dataset:{}}).dataset.a;if(!a)return;
+   if(a==='big'){c.classList.toggle('big');setTimeout(()=>Object.values(charts).forEach(x=>x.resize()),60)}
+   if(a==='l'&&c.previousElementSibling)g.insertBefore(c,c.previousElementSibling);if(a==='r'&&c.nextElementSibling)g.insertBefore(c.nextElementSibling,c);if(a==='h')c.classList.add('hide');save()}});
+ const save=()=>{localStorage[key]=JSON.stringify({o:[...g.children].map(c=>c.dataset.id),h:[...g.children].filter(c=>c.classList.contains('hide')).map(c=>c.dataset.id)});draw()};
+ const draw=()=>{bar.innerHTML=[...g.children].filter(c=>c.classList.contains('hide')).map(c=>`<span class="chip" data-s="${c.dataset.id}"><i class="fa-solid fa-plus"></i> ${PN[c.dataset.id]||c.dataset.id}</span>`).join('')+'<button class="btn gh sm" data-r="1"><i class="fa-solid fa-rotate-left"></i>Reset layout</button><button class="btn gh sm" data-p="1"><i class="fa-solid fa-file-pdf"></i>Export dashboard (print / PDF)</button>'};
+ bar.onclick=e=>{const s=e.target.closest('[data-s]');if(s){g.querySelector(`[data-id="${s.dataset.s}"]`).classList.remove('hide');save()}if(e.target.closest('[data-r]')){localStorage.removeItem(key);location.reload()}if(e.target.closest('[data-p]'))window.print()};
+ try{const L=JSON.parse(localStorage[key]||'{}');(L.o||[]).forEach(id=>{const c=g.querySelector(`[data-id="${id}"]`);c&&g.appendChild(c)});(L.h||[]).forEach(id=>g.querySelector(`[data-id="${id}"]`)?.classList.add('hide'))}catch(e){}
+ draw()}
+if(localStorage.user){$('em').value=localStorage.user;$('rem').checked=true}
+boot();
+</script></body></html>
+
+
+
+
+
