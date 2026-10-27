@@ -87,6 +87,7 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <button class="nb adm" data-t="usr" data-h="Users"><i class="fa-solid fa-users-gear"></i><span>Users</span></button>
 <button class="nb" id="themeB" onclick="theme()" style="margin-top:auto"><i class="fa-solid fa-moon"></i><span>Dark mode</span></button>
 <button class="nb" onclick="pin()"><i class="fa-solid fa-thumbtack"></i><span>Keep menu open</span></button>
+<button class="nb" onclick="pwForm()"><i class="fa-solid fa-key"></i><span>Change password</span></button>
 <button class="nb out" onclick="sb.auth.signOut().then(()=>location.reload())"><i class="fa-solid fa-right-from-bracket"></i><span>Sign out</span></button>
 <div class="foot">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</div></aside>
 <div class="wrap"><header><h1 id="title">Live Tracking</h1><span id="me"></span><span class="pill" id="conn"><i class="fa-solid fa-circle" style="font-size:8px"></i> <span id="connT">Connecting</span></span></header>
@@ -182,6 +183,18 @@ async function signIn(){
  b.disabled=false;b.innerHTML='<i class="fa-solid fa-right-to-bracket"></i>Sign in'}
 function eye(){const i=$('pw');i.type=i.type==='password'?'text':'password';$('eyei').className='fa-solid '+(i.type==='password'?'fa-eye':'fa-eye-slash')}
 function pin(){const on=document.querySelector('aside').classList.toggle('pin');localStorage.pin=on?'1':'0'}
+function pwForm(){const m=$('modal');m.innerHTML=`<div class="card" style="max-width:380px"><b>Change my password</b>
+ <div class="field"><label>New password</label><input type="password" id="np1" autocomplete="new-password"></div>
+ <div class="field"><label>Repeat new password</label><input type="password" id="np2" autocomplete="new-password"></div>
+ <p style="color:var(--mut);font-size:12px">At least 6 characters. These usernames have no real mailbox, so a forgotten password cannot be emailed — set it here while signed in, or change it in Supabase &gt; Authentication &gt; Users.</p>
+ <div style="display:flex;gap:8px"><button class="btn b sm" onclick="changePw()">Save</button><button class="btn gh sm" onclick="$('modal').classList.add('hide')">Cancel</button></div></div>`;
+ m.classList.remove('hide');$('np1').focus()}
+async function changePw(){const a=$('np1').value,b=$('np2').value;
+ if(a.length<6)return toast('The new password must be at least 6 characters');
+ if(a!==b)return toast('The two new passwords do not match');
+ const {error}=await sb.auth.updateUser({password:a});
+ if(error)return toast(error.message);
+ $('modal').classList.add('hide');toast('Password changed',1)}
 function themeBtn(){const d=document.documentElement.dataset.theme==='dark';$('themeB').innerHTML=d?'<i class="fa-solid fa-sun"></i><span>Light mode</span>':'<i class="fa-solid fa-moon"></i><span>Dark mode</span>'}
 async function boot(){
  const {data:{session}}=await sb.auth.getSession();if(!session)return;
@@ -191,7 +204,7 @@ async function boot(){
  mapL=mkMap('mapLive',fitAll);mapH=mkMap('mapHist');
  initDates();
  await refs();await loadLive();loadRules();
- sb.channel('pos').on('postgres_changes',{event:'INSERT',schema:'public',table:'positions'},e=>upsert(e.new)).subscribe(s=>{const ok=s==='SUBSCRIBED';$('conn').className='pill'+(ok?'':' bad');$('connT').textContent=ok?'Live':'Reconnecting'});
+ sb.channel('pos').on('postgres_changes',{event:'*',schema:'public',table:'positions'},e=>{if(e.new)upsert(e.new)}).subscribe(s=>{const ok=s==='SUBSCRIBED';$('conn').className='pill'+(ok?'':' bad');$('connT').textContent=ok?'Live':'Reconnecting'});
  sb.channel('ev').on('postgres_changes',{event:'INSERT',schema:'public',table:'events'},e=>{const x=e.new;alertEv(x);evN++;$('evb').style.display='';$('evb').textContent=evN}).subscribe();
  setInterval(renderList,15000);
 }
@@ -231,7 +244,7 @@ const pop=p=>{const s=st(p),v=vehicles.find(x=>x.id===p.vehicle_id)||{};return `
 const shown=p=>FILT==='all'||st(p)===FILT;
 function setF(f){FILT=f;document.querySelectorAll('.kpi.click').forEach(k=>k.classList.toggle('on',k.dataset.f===f));renderList();fitAll()}
 function fitAll(){const a=Object.values(last).filter(shown);if(a.length)mapL.fitBounds(a.map(p=>[p.lat,p.lng]),{maxZoom:15,padding:[40,40]})}
-async function loadLive(){const {data}=await sb.from('latest_positions').select('*');(data||[]).forEach(upsert);fitAll()}
+async function loadLive(){(await fetchAll(()=>sb.from('latest_positions').select('*'))).forEach(upsert);fitAll()}
 function upsert(p){last[p.user_id]=p;const ll=[p.lat,p.lng];
  if(markers[p.user_id])markers[p.user_id].setLatLng(ll);else markers[p.user_id]=L.marker(ll,{icon:icon(p)}).addTo(mapL).bindPopup(()=>pop(last[p.user_id]));renderList()}
 function renderList(){
@@ -285,7 +298,7 @@ function renderEvt(){
  chart('c2','bar',days,K.map(k=>({label:EV[k][0],backgroundColor:EV[k][2],data:days.map(d=>rows.filter(r=>r.type===k&&dayOf(r)===d).length)})),{t:'Events per day',s:1,click:(e,el)=>el.length&&evSet('day',days[el[0].index])});
  const dr=Object.entries(cnt(rows,r=>r.driver_name)).sort((a,b)=>b[1]-a[1]).slice(0,8).map(x=>x[0]);
  chart('c3','bar',dr,K.map(k=>({label:EV[k][0],backgroundColor:EV[k][2],data:dr.map(n=>rows.filter(r=>(r.driver_name||'-')===n&&r.type===k).length)})),{t:'Violator Drivers',s:1,h:1,click:(e,el)=>{if(!el.length)return;EVF.driver=dr[el[0].index];EVF.type=K[el[0].datasetIndex];renderEvt()}});
- $('evT').innerHTML=`<table><tr><th>Event Start</th><th>Vehicle</th><th>Driver</th><th>Event</th><th>Speed (km/h)</th><th>Acceleration / Deceleration (km/h/s)</th><th>Location</th></tr>${rows.slice(0,1000).map(r=>`<tr><td>${new Date(r.recorded_at).toLocaleString()}</td><td>${esc(r.vehicle_name)}</td><td>${esc(r.driver_name)}</td><td><span class="chip" style="background:${EV[r.type][2]}22;color:${EV[r.type][2]}"><i class="fa-solid ${EV[r.type][1]}"></i> ${EV[r.type][0]}</span></td><td>${Math.round(r.speed)}</td><td>${r.type==='overspeed'?'-':(+r.value).toFixed(1)}</td><td><a href="#" onclick="goHist('${r.vehicle_id}','${r.recorded_at}',${r.lat},${r.lng});return false"><i class="fa-solid fa-map-location-dot"></i> ${(+r.lat).toFixed(5)}, ${(+r.lng).toFixed(5)}</a></td></tr>`).join('')||'<tr><td colspan="7">No events in this period.</td></tr>'}</table>`;tools($('evT'))}
+ $('evT').innerHTML=`<table><tr><th>Event Start</th><th>Vehicle</th><th>Driver</th><th>Event</th><th>Speed (km/h)</th><th>Acceleration / Deceleration (km/h/s)</th><th>Details</th><th>Location</th></tr>${rows.slice(0,1000).map(r=>`<tr><td>${new Date(r.recorded_at).toLocaleString()}</td><td>${esc(r.vehicle_name)}</td><td>${esc(r.driver_name)}</td><td><span class="chip" style="background:${EV[r.type][2]}22;color:${EV[r.type][2]}"><i class="fa-solid ${EV[r.type][1]}"></i> ${EV[r.type][0]}</span></td><td>${Math.round(r.speed)}</td><td>${r.type==='overspeed'?'-':(+r.value).toFixed(1)}</td><td>${esc(r.details||'-')}</td><td><a href="#" onclick="goHist('${r.vehicle_id}','${r.recorded_at}',${r.lat},${r.lng});return false"><i class="fa-solid fa-map-location-dot"></i> ${(+r.lat).toFixed(5)}, ${(+r.lng).toFixed(5)}</a></td></tr>`).join('')||'<tr><td colspan="8">No events in this period.</td></tr>'}</table>`;tools($('evT'))}
 async function goHist(vid,iso,lat,lng){document.querySelector('.nb[data-t=hist]').click();$('hv').value=vid;const t=new Date(iso).getTime();$('hf')._flatpickr.setDate(new Date(t-9e5),true);$('ht')._flatpickr.setDate(new Date(t+9e5),true);await loadHist();mapH.setView([lat,lng],17)}
 async function loadRep(){
  const f=new Date($('rp_f').value+'T00:00:00').toISOString(),t=new Date($('rp_t').value+'T23:59:59').toISOString();
@@ -355,7 +368,7 @@ function trTable(){const H=['Date','Time','Latitude','Longitude','Speed (km/h)',
  $('trT').innerHTML=`<table><tr>${H.map(h=>`<th>${h}</th>`).join('')}</tr>${tr.slice(0,2000).map(r=>`<tr>${R(r).map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</table>`+(tr.length>2000?`<p style="padding:8px">Showing the first 2000 of ${tr.length} rows. Exports include all rows.</p>`:'');
  tools($('trT'),{full:()=>({head:H,rows:tr.map(R)})})}
 function trCsv(){if(!tr.length)return toast('Load a trip first');
- const r=['time,lat,lng,speed_kmh,accuracy_m,elevation_m,heading_deg,hdop,status,accel_kmh_per_s,battery_pct,charging',...tr.map(x=>[x.recorded_at,x.lat,x.lng,Math.round(x.speed),x.accuracy,x.altitude,x.heading,x.hdop,stt(x),x.accel,x.battery_pct,x.charging].map(v=>v??'').join(','))];
+ const r=['time,lat,lng,speed_kmh,accuracy_m,elevation_m,heading_deg,status,accel_kmh_per_s,battery_pct,charging',...tr.map(x=>[x.recorded_at,x.lat,x.lng,Math.round(x.speed),x.accuracy,x.altitude,x.heading,stt(x),x.accel,x.battery_pct,x.charging].map(v=>v??'').join(','))];
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([r.join('\n')],{type:'text/csv'}));a.download='trip-second-by-second.csv';a.click()}
 // ---- shared tools: date ranges, tables, panels
 const PRE=[['today','Today'],['yest','Yesterday'],['24h','Last 24 hrs'],['lw','Last Week (previous Mon-Sun)'],['w','A week ago (last 7 days)'],['lm','Last Month (previous month)'],['m','A month ago (last 30 days)'],['ly','Last Year (previous year)'],['y','A year ago (last 365 days)'],['custom','Custom']];
@@ -397,4 +410,6 @@ function panels(sec){const g=document.querySelector('#'+sec+' .cgrid');if(!g)ret
  draw()}
 if(localStorage.user){$('em').value=localStorage.user;$('rem').checked=true}
 boot();
+// the driver app hands a session over in the URL fragment; once Supabase has read it, keep it out of the address bar and browser history
+setTimeout(()=>{if(/access_token=/.test(location.hash))history.replaceState(null,'',location.pathname+location.search)},2500);
 </script></body></html>
