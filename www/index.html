@@ -18,7 +18,7 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 #map{height:260px;border-radius:14px;border:1px solid var(--line);margin:10px 0;position:relative}.mapb{position:absolute;z-index:999;right:8px;top:8px;width:auto;padding:0 10px;font-weight:700;font-size:12px}
 .mk{width:34px;height:34px;border-radius:50%;border:3px solid #fff;box-shadow:0 1px 6px #0006;display:grid;place-items:center;color:#fff}
 #alert{position:fixed;top:env(safe-area-inset-top);left:8px;right:8px;background:var(--rd);color:#fff;padding:14px;border-radius:12px;font-weight:700;z-index:9999;text-align:center}
-.err{color:var(--rd);font-weight:600;min-height:20px}.foot{font-size:11px;color:var(--mut);text-align:center;margin:14px 0}
+.err{color:var(--rd);font-weight:600;min-height:20px}.foot{font-size:11px;color:var(--mut);text-align:center;margin:14px 0}#appFooter{position:absolute;bottom:0;left:12px;right:12px;padding:8px 16px;background:#fff;border-top:1px solid var(--line);font-size:12px;color:var(--mut);text-align:center;flex-shrink:0}
 .eye{position:absolute;right:6px;top:10px;border:0;background:none;color:var(--mut);width:40px;height:36px}
 .step{display:flex;gap:10px;align-items:center}.step i{width:24px;color:var(--bl);text-align:center}
 #app.screen{display:flex;flex-direction:column;height:100dvh;padding:8px 12px;gap:6px}#app.hide{display:none}
@@ -28,8 +28,7 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.grid3 div{background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px 8px;min-width:0}.grid3 small{display:block;color:var(--mut);font-size:10px}.grid3 b{font-size:12px;white-space:nowrap}.grid3 .w2{grid-column:span 2}
 .btns{display:flex;gap:8px}.btns .btn{margin:0;height:48px}
 .mcl{position:absolute;z-index:999;right:8px;top:8px;display:flex;flex-direction:column;gap:6px}.mcl button{width:38px;height:38px;border:0;border-radius:10px;background:#fff;box-shadow:0 1px 6px #0004;color:var(--ink)}
-#err{position:fixed;bottom:66px;left:12px;right:12px;font-size:12px;pointer-events:none;margin:0;z-index:50}
-</style></head><body>
+#err{position:fixed;bottom:66px;left:12px;right:12px;font-size:12px;pointer-events:none;margin:0;z-index:50}</style></head><body>
 <div id="lg" class="screen" style="text-align:center;padding-top:40px">
 <svg viewBox="0 0 48 48" width="76"><defs><linearGradient id="lgr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f28c28"/><stop offset="1" stop-color="#2f7fe6"/></linearGradient></defs><rect width="48" height="48" rx="12" fill="url(#lgr)"/><path d="M24 11c-5.5 0-9.5 4.2-9.5 9.4 0 6.7 9.5 16.6 9.5 16.6s9.5-9.9 9.5-16.6C33.5 15.2 29.5 11 24 11z" fill="#fff"/><circle cx="24" cy="20.5" r="3.6" fill="#2f7fe6"/></svg>
 <h2 style="margin:8px 0 18px">Fleet Tracker</h2>
@@ -48,12 +47,13 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 <button class="btn o" onclick="CapPlugins.BG.openSettings()"><i class="fa-solid fa-gear"></i>Open battery settings</button>
 <button class="btn g" onclick="localStorage.perm='1';show('lg');init()"><i class="fa-solid fa-arrow-right"></i>Continue</button></div>
 <div id="app" class="screen hide">
-<div class="top"><div><small>Welcome,</small> <b id="wn"></b><b>!</b></div><div style="display:flex;gap:6px"><button class="ib hide" id="dash" onclick="openDash()" title="Open dashboard"><i class="fa-solid fa-chart-line"></i></button><button class="ib" onclick="signOut()" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i></button></div></div>
-<div class="card id"><div class="av" style="width:38px;height:38px;font-size:17px"><i id="vi" class="fa-solid fa-car"></i></div><div><b id="vn"></b><br><small><i class="fa-solid fa-id-card"></i> <span id="dn"></span></small></div><span class="chip" id="stc">Not started</span></div>
-<div class="card spd"><b id="sp">0</b><span>km/h</span><div class="r" id="lt">No record yet</div></div>
+<div class="top"><div><small>Welcome,</small> <b id="wn"></b><b>!</b></div><div style="display:flex;gap:6px"><button class="ib" id="dash" onclick="openDash()" title="Open dashboard"><i class="fa-solid fa-chart-line"></i></button><button class="ib" onclick="signOut()" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i></button></div></div>
+<div class="card id"><div class="av" style="width:38px;height:38px;font-size:17px"><i id="vi" class="fa-solid fa-car"></i></div><div><b id="vn"></b><br><small><i class="fa-solid fa-id-card"></i> <span id="dn"></span></small></div><span class="chip" id="stc">Parking</span></div>
 <div id="map"><div class="mcl"><button onclick="togMap()" title="Satellite / map"><i class="fa-solid fa-layer-group"></i></button><button onclick="fsMap()" title="Full screen"><i class="fa-solid fa-expand"></i></button><button onclick="pinMe()" title="Go to my vehicle"><i class="fa-solid fa-location-crosshairs"></i></button></div></div>
 <div class="grid3" id="vals"></div>
-<div class="btns"><button id="go" class="btn g" onclick="start()"><i class="fa-solid fa-play"></i>Start trip</button><button id="stp" class="btn r hide" onclick="stop()"><i class="fa-solid fa-stop"></i>End trip</button></div></div>
+<div class="btns"><button id="go" class="btn g" onclick="start()"><i class="fa-solid fa-play"></i>Start trip</button><button id="stp" class="btn r hide" onclick="stop()"><i class="fa-solid fa-stop"></i>End trip</button></div>
+<div id="appFooter" class="hide">Fleet Tracker tracking your vehicle | Tap Start trip to begin</div>
+</div>
 <p class="err" id="err"></p>
 <div id="alert" class="hide"></div>
 
@@ -88,10 +88,10 @@ async function init(){
  await loadRules();
  const nm=(me.email||'').replace('@fleet.local','');$('wn').textContent=nm;
  const v=asg?.vehicles;$('vn').textContent=v?.name||'No vehicle linked';$('dn').textContent=asg?.drivers?.name||'No driver linked';$('vi').className='fa-solid '+(TI[v?.type]||'fa-car');
- $('dash').classList.toggle('hide',role!=='admin');
- [['pos','Position','fa-location-dot','w2'],['acc','Accuracy','fa-bullseye'],['alt','Elevation','fa-mountain'],['dir','Direction','fa-compass'],['ac','Accel.','fa-gauge'],['bat','Battery','fa-battery-half'],['lim','Limit','fa-triangle-exclamation'],['sent','Sent','fa-cloud-arrow-up']].forEach(x=>{if(!$('v_'+x[0]))$('vals').insertAdjacentHTML('beforeend',`<div class="${x[3]||''}"><small><i class="fa-solid ${x[2]}"></i> ${x[1]}</small><b id="v_${x[0]}">-</b></div>`)});
+ $('dash').classList.remove('hide');
+ [['pos','Position','fa-location-dot','w2'],['spd','Speed','fa-tachometer-alt'],['acc','Accuracy','fa-bullseye'],['alt','Elevation','fa-mountain'],['dir','Direction','fa-compass'],['ac','Accel.','fa-gauge'],['bat','Battery','fa-battery-half'],['sent','Sent','fa-cloud-arrow-up']].forEach(x=>{if(!$('v_'+x[0]))$('vals').insertAdjacentHTML('beforeend',`<div class="${x[3]||''}"><small><i class="fa-solid ${x[2]}"></i> ${x[1]}</small><b id="v_${x[0]}">-</b></div>`)});
  enter()}
-function enter(){show('app');initMap();$('v_lim').textContent=Math.round(LIM.speed)+' km/h'}
+function enter(){show('app');initMap();}
 // ---- map
 let map,mrk,trail,tiles,sat=false,follow=true;
 const G=l=>'https://{s}.google.com/vt/lyrs='+l+'&x={x}&y={y}&z={z}';
@@ -123,22 +123,21 @@ function detect(loc,kmh){
  if(!prev||t-prev.t>=0.8)prev={t,v};
  if(kmh>LIM.speed){osSince=osSince||t;if(t-osSince>=5)ev('overspeed',loc,kmh,kmh)}else osSince=0}
 function ev(type,loc,kmh,val){if(!ON[type])return;const n=Date.now();if(n-(lastEv[type]||0)<30000)return;lastEv[type]=n;notify(type,kmh);
- sb.from('events').insert({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,type,lat:loc.latitude,lng:loc.longitude,speed:kmh,value:val,recorded_at:new Date(loc.time||n).toISOString()}).then(({error})=>{if(error)$('err').textContent='Event error: '+error.message})}
+ sb.from('events').insert({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id=asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,type,lat:loc.latitude,lng:loc.longitude,speed:kmh,value:val,recorded_at:new Date(loc.time||n).toISOString()}).then(({error})=>{if(error)$('err').textContent='Event error: '+error.message})}
 async function loadRules(){
  const [a,r,t]=await Promise.all([sb.from('assignments').select('vehicle_id,driver_id,vehicles(name,type,speed_limit,moving_interval,stopped_interval,brake_limit,accel_limit),drivers(name)').eq('user_id',me.id).maybeSingle(),sb.from('event_rules').select('*'),sb.from('app_settings').select('*')]);
  if(a.data)asg=a.data;const S={};(t.data||[]).forEach(x=>S[x.key]=+x.value);const v=asg?.vehicles||{};
  (r.data||[]).forEach(x=>{RUL[x.type]=x;ON[x.type]=x.enabled;if(x.type==='overspeed')LIM.speed=v.speed_limit||x.threshold;if(x.type==='harsh_braking')LIM.brake=-(v.brake_limit||x.threshold)/3.6;if(x.type==='harsh_acceleration')LIM.accel=(v.accel_limit||x.threshold)/3.6});
  MOV=Math.max(1,v.moving_interval||S.moving_interval||10);STP=Math.max(1,v.stopped_interval||S.stopped_interval||60)}
 async function pollBat(){try{const b=await CapPlugins.Device.getBatteryInfo();bat={p:Math.round(b.batteryLevel*100),c:b.isCharging};$('v_bat').textContent=bat.p+'%'+(bat.c?' ⚡':'')}catch(e){}}
-const row=(loc,speed,ign)=>({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,lat:loc.latitude,lng:loc.longitude,speed,accuracy:loc.accuracy,altitude:loc.altitude,heading:loc.bearing,ignition:ign,accel:+(lastA*3.6).toFixed(1),battery_pct:bat.p,charging:bat.c,recorded_at:new Date(loc.time||Date.now()).toISOString()});
-async function flush(){if(fl)return;fl=true;try{localStorage.q=JSON.stringify(queue);while(queue.length){const b=queue.slice(0,200);const {error}=await sb.from('positions').insert(b);if(error){$('err').textContent='Upload error: '+error.message;break}queue=queue.slice(b.length);SENT+=b.length;localStorage.q=JSON.stringify(queue)}$('v_sent').textContent=SENT+(queue.length?' ('+queue.length+' waiting)':'')}finally{fl=false}}
+const row=(loc,speed,ign)=>({user_id:me.id,vehicle_id=asg.vehicle_id,driver_id=asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,lat:loc.latitude,lng:loc.longitude,speed,accuracy:loc.accuracy,altitude:loc.altitude,heading:loc.bearing,ignition:ign,accel:+(lastA*3.6).toFixed(1),battery_pct:bat.p,charging:bat.c,recorded_at:new Date(loc.time||Date.now()).toISOString()});
+async function flush(){if(fl)return;fl=true;try{localStorage.q=JSON.stringify(queue);while(queue.length){const b=queue.slice(0,200);const {error}=await sb.from('positions').insert(b);if(error){$('err').textContent='Upload error: '+error.message;break}queue=queue.slice(b.length);SENT+=b.length;localStorage.q=JSON.stringify(queue)}$('v_sent').textContent=SENT+(queue.length?' ('+queue.length+' waiting)':'')}}finally{fl=false}}
 function upd(loc,kmh,moving){const c=$('stc');c.textContent=moving?'Moving':'Idling';c.style.background=moving?'var(--grl)':'var(--orl)';c.style.color=moving?'var(--gr)':'var(--or)';
- $('sp').textContent=Math.round(kmh);const V=(k,v)=>$('v_'+k).textContent=v;
- V('pos',loc.latitude.toFixed(5)+', '+loc.longitude.toFixed(5));V('acc',loc.accuracy!=null?Math.round(loc.accuracy)+' m':'-');V('alt',loc.altitude!=null?Math.round(loc.altitude)+' m':'-');V('dir',loc.bearing!=null?Math.round(loc.bearing)+'°':'-');V('ac',(lastA*3.6).toFixed(1)+' km/h/s');$('lt').textContent='Last record '+new Date().toLocaleTimeString('en-GB');mpos(loc,moving)}
+ $('v_sp').textContent=Math.round(kmh);$('v_pos').textContent=loc.latitude.toFixed(5)+', '+loc.longitude.toFixed(5);$('v_acc').textContent=loc.accuracy!=null?Math.round(loc.accuracy)+' m':'-';$('v_alt').textContent=loc.altitude!=null?Math.round(loc.altitude)+' m':'-';$('v_dir').textContent=loc.bearing!=null?Math.round(loc.bearing)+'°':'-';$('v_ac').textContent=(lastA*3.6).toFixed(1)+' km/h/s';$('v_sent').textContent=SENT;mpos(loc,moving)}
 async function start(){
  if(!asg?.vehicle_id){$('err').textContent='No vehicle linked to this user. Ask your admin.';return}
  try{
- await loadRules();pollBat();batT=setInterval(pollBat,30000);cfgT=setInterval(loadRules,300000);$('v_lim').textContent=Math.round(LIM.speed)+' km/h';
+ await loadRules();pollBat();batT=setInterval(pollBat,30000);cfgT=setInterval(loadRules,300000);
  if(!window.CapPlugins)throw new Error('Plugin bridge missing: rebuild the APK with the latest build-apk.yml');
  watcher=await CapPlugins.BG.addWatcher({backgroundTitle:'Trip in progress',backgroundMessage:'Sending location to fleet dashboard',requestPermissions:true,stale:false,distanceFilter:0},
  async(loc,err)=>{
@@ -150,9 +149,9 @@ async function start(){
  }catch(e){$('err').textContent='Error: '+(e.message||e)}
 }
 async function stop(){clearInterval(batT);clearInterval(cfgT);if(lastLoc){queue.push(row(lastLoc,0,false));flush()}
- await CapPlugins.BG.removeWatcher({id:watcher});$('go').classList.remove('hide');$('stp').classList.add('hide');const c=$('stc');c.textContent='Parking';c.style.background='var(--bll)';c.style.color='var(--bl)';$('sp').textContent='0'}
+ await CapPlugins.BG.removeWatcher({id:watcher});$('go').classList.remove('hide');$('stp').classList.add('hide');const c=$('stc');c.textContent='Parking';c.style.background='var(--bll)';c.style.color='var(--bl)';$('v_sp').textContent='0'}
 async function openDash(){const {data:{session}}=await sb.auth.getSession();if(!session)return;
- const u=DASH+'#access_token='+session.access_token+'&refresh_token='+session.refresh_token+'&expires_in=3600&token_type=bearer';
+ const u=DASH+'#access_token='+session.access_token+'&refresh_token='+session.refresh_token+'&token_type=bearer&expires_in=3600';
  try{await CapPlugins.Browser.open({url:u})}catch(e){window.open(u,'_blank')}}
 if(localStorage.user){$('em').value=localStorage.user;$('rem').checked=true}
 if(localStorage.perm!=='1')show('pm');
