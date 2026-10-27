@@ -102,7 +102,7 @@ async function init(){
  $('dash').classList.toggle('hide',role!=='admin');
  [['pos','Position','fa-location-dot','w2'],['acc','Accuracy','fa-bullseye'],['alt','Elevation','fa-mountain'],['dir','Direction','fa-compass'],['ac','Accel.','fa-gauge'],['bat','Battery','fa-battery-half'],['lim','Limit','fa-triangle-exclamation'],['sent','Sent','fa-cloud-arrow-up']].forEach(x=>{if(!$('v_'+x[0]))$('vals').insertAdjacentHTML('beforeend',`<div class="${x[3]||''}"><small><i class="fa-solid ${x[2]}"></i> ${x[1]}</small><b id="v_${x[0]}">-</b></div>`)});
  enter()}
-function enter(){show('app');initMap();$('v_lim').textContent=Math.round(LIM.speed)+' km/h'}
+function enter(){show('app');initMap();$('v_lim').textContent=Math.round(LIM.speed+LIM.buf)+' km/h'}
 // ---- map
 let map,mrk,trail,tiles,sat=false,follow=true;
 const G=l=>'https://{s}.google.com/vt/lyrs='+l+'&x={x}&y={y}&z={z}';
@@ -118,30 +118,51 @@ async function pAsk(){try{const id=await CapPlugins.BG.addWatcher({requestPermis
  try{await CapPlugins.LN.requestPermissions()}catch(e){}}
 // ---- alerts on the phone
 let RUL={};const EVN={harsh_braking:'Harsh braking',harsh_acceleration:'Harsh acceleration',overspeed:'Overspeed'};
-function beep(){try{const a=new (window.AudioContext||window.webkitAudioContext)(),t=a.currentTime;for(let i=0;i<10;i++){const o=a.createOscillator(),g=a.createGain();o.frequency.value=880;g.gain.value=.3;o.connect(g);g.connect(a.destination);o.start(t+i*.5);o.stop(t+i*.5+.25)}}catch(e){}}
+function beep(type){const R=RUL[type]||{},dur=Math.max(1,+R.beep_duration||5),cont=R.beep_type==='continuous';
+ try{const a=new (window.AudioContext||window.webkitAudioContext)(),t=a.currentTime;
+  if(cont){const o=a.createOscillator(),g=a.createGain();o.frequency.value=880;g.gain.value=.3;o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+dur)}
+  else{const st=.5,n=Math.max(1,Math.round(dur/st));for(let i=0;i<n;i++){const o=a.createOscillator(),g=a.createGain();o.frequency.value=880;g.gain.value=.3;o.connect(g);g.connect(a.destination);o.start(t+i*st);o.stop(t+i*st+.25)}}}catch(e){}
+ if(navigator.vibrate){const p=[];if(cont)p.push(dur*1000);else for(let i=0;i<Math.max(1,Math.round(dur*2));i++)p.push(300,200);try{navigator.vibrate(p)}catch(e){}}}
+function warnMsg(txt){const a=$('alert');a.innerHTML='<i class="fa-solid fa-gauge-simple-high"></i> '+txt;a.classList.remove('hide');setTimeout(()=>a.classList.add('hide'),4000)}
 function notify(type,kmh){const R=RUL[type]||{};
  if(R.alert!==false){const a=$('alert');a.innerHTML='<i class="fa-solid fa-triangle-exclamation"></i> '+EVN[type]+' · '+Math.round(kmh)+' km/h';a.classList.remove('hide');setTimeout(()=>a.classList.add('hide'),6000);
   try{CapPlugins.LN.schedule({notifications:[{id:Date.now()%2147483647,title:'Fleet Tracker: '+EVN[type],body:Math.round(kmh)+' km/h'}]})}catch(e){}}
- if(R.beep!==false){beep();navigator.vibrate&&navigator.vibrate([300,200,300,200,300,200,300])}}
+ if(R.beep!==false)beep(type)}
 // ---- driving events and telemetry
 const MIN_MOVING_KMH=2;
-const LIM={speed:100,brake:-3,accel:2.5},ON={harsh_braking:1,harsh_acceleration:1,overspeed:1},lastEv={};let prev=null,osSince=0,lastA=0,lastLoc=null,bat={},fl=false,batT,cfgT,MOV=10,STP=60;
+const sepm=(a,b)=>{const r=x=>x*Math.PI/180,dLa=r(b.latitude-a.latitude),dLo=r(b.longitude-a.longitude),x=Math.sin(dLa/2)**2+Math.cos(r(a.latitude))*Math.cos(r(b.latitude))*Math.sin(dLo/2)**2;return 12742000*Math.asin(Math.sqrt(x))};
+const LIM={speed:100,brake:-3,accel:2.5,buf:0,warn:0,dist:0},HOLD={harsh_braking:0,harsh_acceleration:0,overspeed:0},ON={harsh_braking:1,harsh_acceleration:1,overspeed:1},lastEv={},lastNotify={},VS={};let prev=null,lastA=0,lastLoc=null,ODOM=0,pp=null,bat={},fl=false,batT,cfgT,MOV=10,STP=60;
 function detect(loc,kmh){
  if(loc.accuracy>25)return;
+ if(pp){const d=sepm(pp,loc);if(d<200)ODOM+=d}
+ pp=loc;
+ if(ODOM<LIM.dist)return;
  const t=(loc.time||Date.now())/1000,v=kmh/3.6;
- if(prev&&t-prev.t>=0.8&&t-prev.t<=4){const a=lastA=(v-prev.v)/(t-prev.t);
-  if(a<=LIM.brake)ev('harsh_braking',loc,kmh,a*3.6);else if(a>=LIM.accel)ev('harsh_acceleration',loc,kmh,a*3.6)}
+ if(prev&&t-prev.t>=0.8&&t-prev.t<=4){const a=(v-prev.v)/(t-prev.t);lastA=a;
+  hold('harsh_braking',a<=LIM.brake,loc,kmh,a*3.6,t);hold('harsh_acceleration',a>=LIM.accel,loc,kmh,a*3.6,t);
+  if(LIM.warn>0&&Math.abs(a)>=LIM.warn&&Math.abs(a)<(a<0?-LIM.brake:LIM.accel))warnMsg('Sharp '+(a<0?'braking':'acceleration')+' · '+Math.abs(a*3.6).toFixed(1)+' km/h/s')}
  if(!prev||t-prev.t>=0.8)prev={t,v};
- if(kmh>LIM.speed){osSince=osSince||t;if(t-osSince>=5)ev('overspeed',loc,kmh,kmh)}else osSince=0}
+ hold('overspeed',kmh>LIM.speed+LIM.buf,loc,kmh,kmh,t)}
+// the alert fires the moment a limit is broken; the event is only written when it lasts longer than the tolerance
+function hold(type,bad,loc,kmh,val,t){if(!ON[type])return;
+ if(!bad){VS[type]=0;return}
+ if(!VS[type]){VS[type]=t;const n=Date.now();if(n-(lastNotify[type]||0)>60000){lastNotify[type]=n;notify(type,kmh)}}
+ if(t-VS[type]<Math.max(0,HOLD[type]||0))return;
+ VS[type]=0;ev(type,loc,kmh,val)}
 function ev(type,loc,kmh,val){if(!ON[type])return;const n=Date.now();if(n-(lastEv[type]||0)<30000)return;lastEv[type]=n;notify(type,kmh);
- const lim=type==='overspeed'?Math.round(LIM.speed):+(Math.abs(type==='harsh_braking'?LIM.brake:LIM.accel)*3.6).toFixed(1);
- const details=type==='overspeed'?`${Math.round(kmh)} km/h against a ${lim} km/h limit`:`${Math.abs(val).toFixed(1)} km/h/s ${type==='harsh_braking'?'deceleration':'acceleration'} against a ${lim} km/h/s limit`;
+ const lim=type==='overspeed'?Math.round(LIM.speed+LIM.buf):+(Math.abs(type==='harsh_braking'?LIM.brake:LIM.accel)*3.6).toFixed(1);
+ const details=type==='overspeed'?`${Math.round(kmh)} km/h against a ${lim} km/h alert level${HOLD.overspeed?' held over '+HOLD.overspeed+' s':''}`:`${Math.abs(val).toFixed(1)} km/h/s ${type==='harsh_braking'?'deceleration':'acceleration'} against a ${lim} km/h/s limit`;
  sb.from('events').insert({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,type,lat:loc.latitude,lng:loc.longitude,speed:kmh,value:val,details,recorded_at:new Date(loc.time||n).toISOString()}).then(({error})=>{if(error)$('err').textContent='Event error: '+error.message})}
 async function loadRules(){
- const [a,r,t]=await Promise.all([sb.from('assignments').select('vehicle_id,driver_id,vehicles(name,type,speed_limit,moving_interval,stopped_interval,brake_limit,accel_limit),drivers(name)').eq('user_id',me.id).maybeSingle(),sb.from('event_rules').select('*'),sb.from('app_settings').select('*')]);
+ const [a,r,t]=await Promise.all([sb.from('assignments').select('vehicle_id,driver_id,vehicles(name,type,speed_limit,moving_interval,stopped_interval,brake_limit,accel_limit,speed_buffer,max_accel_warning,min_moving_distance),drivers(name)').eq('user_id',me.id).maybeSingle(),sb.from('event_rules').select('*'),sb.from('app_settings').select('*')]);
  if(a.data)asg=a.data;const S={};(t.data||[]).forEach(x=>S[x.key]=+x.value);const v=asg?.vehicles||{};
- (r.data||[]).forEach(x=>{RUL[x.type]=x;ON[x.type]=x.enabled;if(x.type==='overspeed')LIM.speed=v.speed_limit||x.threshold;if(x.type==='harsh_braking')LIM.brake=-(v.brake_limit||x.threshold)/3.6;if(x.type==='harsh_acceleration')LIM.accel=(v.accel_limit||x.threshold)/3.6});
- MOV=Math.max(1,v.moving_interval||S.moving_interval||10);STP=Math.max(1,v.stopped_interval||S.stopped_interval||60)}
+ (r.data||[]).forEach(x=>{RUL[x.type]=x;ON[x.type]=x.enabled;const h=Math.max(0,+x.hold_s||0);
+  if(x.type==='overspeed'){LIM.speed=v.speed_limit||x.threshold;LIM.buf=Math.max(0,+v.speed_buffer||0);HOLD.overspeed=h}
+  if(x.type==='harsh_braking'){LIM.brake=-(v.brake_limit||x.threshold)/3.6;HOLD.harsh_braking=h}
+  if(x.type==='harsh_acceleration'){LIM.accel=(v.accel_limit||x.threshold)/3.6;HOLD.harsh_acceleration=h}});
+ LIM.warn=Math.max(0,+v.max_accel_warning||0);LIM.dist=Math.max(0,+v.min_moving_distance||0);
+ MOV=Math.max(1,v.moving_interval||S.moving_interval||10);STP=Math.max(1,v.stopped_interval||S.stopped_interval||60);
+ if($('v_lim'))$('v_lim').textContent=Math.round(LIM.speed+LIM.buf)+' km/h'}
 async function pollBat(){try{const b=await CapPlugins.Device.getBatteryInfo();bat={p:Math.round(b.batteryLevel*100),c:b.isCharging};$('v_bat').textContent=bat.p+'%'+(bat.c?' ⚡':'')}catch(e){}}
 const row=(loc,speed,ign)=>({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,lat:loc.latitude,lng:loc.longitude,speed,accuracy:loc.accuracy,altitude:loc.altitude,heading:loc.bearing,ignition:ign,accel:+(lastA*3.6).toFixed(1),battery_pct:bat.p,charging:bat.c,recorded_at:new Date(loc.time||Date.now()).toISOString()});
 async function flush(){if(fl)return;fl=true;try{localStorage.q=JSON.stringify(queue);while(queue.length){const b=queue.slice(0,200);const {error}=await sb.from('positions').insert(b);if(error){$('err').textContent='Upload error: '+error.message;break}queue=queue.slice(b.length);SENT+=b.length;localStorage.q=JSON.stringify(queue)}$('v_sent').textContent=SENT+(queue.length?' ('+queue.length+' waiting)':'')}finally{fl=false}}
@@ -151,7 +172,7 @@ function upd(loc,kmh,moving){const c=$('stc');c.textContent=moving?'Moving':'Idl
 async function start(){
  if(!asg?.vehicle_id){$('err').textContent='No vehicle linked to this user. Ask your admin.';return}
  try{
- await loadRules();pollBat();batT=setInterval(pollBat,30000);cfgT=setInterval(loadRules,300000);$('v_lim').textContent=Math.round(LIM.speed)+' km/h';
+ await loadRules();pollBat();batT=setInterval(pollBat,30000);cfgT=setInterval(loadRules,300000);prev=null;pp=null;ODOM=0;Object.keys(VS).forEach(k=>VS[k]=0);Object.keys(lastNotify).forEach(k=>lastNotify[k]=0);
  if(!window.CapPlugins)throw new Error('Plugin bridge missing: rebuild the APK with the latest build-apk.yml');
  watcher=await CapPlugins.BG.addWatcher({backgroundTitle:'Trip in progress',backgroundMessage:'Sending location to fleet dashboard',requestPermissions:true,stale:false,distanceFilter:0},
  async(loc,err)=>{
@@ -162,7 +183,7 @@ async function start(){
  $('go').classList.add('hide');$('stp').classList.remove('hide');$('err').textContent='';
  }catch(e){$('err').textContent='Error: '+(e.message||e)}
 }
-async function stop(){clearInterval(batT);clearInterval(cfgT);if(lastLoc){queue.push(row(lastLoc,0,false));flush()}
+async function stop(){clearInterval(batT);clearInterval(cfgT);prev=null;pp=null;Object.keys(VS).forEach(k=>VS[k]=0);if(lastLoc){queue.push(row(lastLoc,0,false));flush()}
  await CapPlugins.BG.removeWatcher({id:watcher});$('go').classList.remove('hide');$('stp').classList.add('hide');const c=$('stc');c.textContent='Parking';c.style.background='var(--bll)';c.style.color='var(--bl)';$('sp').textContent='0'}
 async function openDash(){const {data:{session}}=await sb.auth.getSession();if(!session)return;
  const u=DASH+'#access_token='+session.access_token+'&refresh_token='+session.refresh_token+'&expires_in=3600&token_type=bearer';
