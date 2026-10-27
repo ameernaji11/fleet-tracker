@@ -29,8 +29,7 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 .btns{display:flex;gap:8px}.btns .btn{margin:0;height:48px}
 .mcl{position:absolute;z-index:999;right:8px;top:8px;display:flex;flex-direction:column;gap:6px}.mcl button{width:38px;height:38px;border:0;border-radius:10px;background:#fff;box-shadow:0 1px 6px #0004;color:var(--ink)}
 #err{position:fixed;bottom:66px;left:12px;right:12px;font-size:12px;pointer-events:none;margin:0;z-index:50}
-</style><meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' https://cdnjs.cloudflare.com; img-src * data:; font-src https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta http-equiv="X-Content-Type-Options" content="nosniff"><meta http-equiv="X-XSS-Protection" content="1; mode=block">
-</head><body>
+</style></head><body>
 <div id="lg" class="screen" style="text-align:center;padding-top:40px">
 <svg viewBox="0 0 48 48" width="76"><defs><linearGradient id="lgr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f28c28"/><stop offset="1" stop-color="#2f7fe6"/></linearGradient></defs><rect width="48" height="48" rx="12" fill="url(#lgr)"/><path d="M24 11c-5.5 0-9.5 4.2-9.5 9.4 0 6.7 9.5 16.6 9.5 16.6s9.5-9.9 9.5-16.6C33.5 15.2 29.5 11 24 11z" fill="#fff"/><circle cx="24" cy="20.5" r="3.6" fill="#2f7fe6"/></svg>
 <h2 style="margin:8px 0 18px">Fleet Tracker</h2>
@@ -49,12 +48,16 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 <button class="btn o" onclick="CapPlugins.BG.openSettings()"><i class="fa-solid fa-gear"></i>Open battery settings</button>
 <button class="btn g" onclick="localStorage.perm='1';show('lg');init()"><i class="fa-solid fa-arrow-right"></i>Continue</button></div>
 <div id="app" class="screen hide">
-<div class="top"><div><small>Welcome,</small> <b id="wn"></b><b>!</b></div><div style="display:flex;gap:6px"><button class="ib hide" id="dash" onclick="openDash()" title="Open dashboard"><i class="fa-solid fa-chart-line"></i></button><button class="ib" onclick="signOut()" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i></button></div></div>
+<div class="top"><div><small>Welcome,</small> <b id="wn"></b><b>!</b></div><div style="display:flex;gap:6px"><button class="ib hide" id="dash" onclick="openDash()" title="Open dashboard"><i class="fa-solid fa-chart-line"></i></button><button class="ib" onclick="pwUi()" title="Change password"><i class="fa-solid fa-key"></i></button><button class="ib" onclick="signOut()" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i></button></div></div>
 <div class="card id"><div class="av" style="width:38px;height:38px;font-size:17px"><i id="vi" class="fa-solid fa-car"></i></div><div><b id="vn"></b><br><small><i class="fa-solid fa-id-card"></i> <span id="dn"></span></small></div><span class="chip" id="stc">Not started</span></div>
 <div class="card spd"><b id="sp">0</b><span>km/h</span><div class="r" id="lt">No record yet</div></div>
 <div id="map"><div class="mcl"><button onclick="togMap()" title="Satellite / map"><i class="fa-solid fa-layer-group"></i></button><button onclick="fsMap()" title="Full screen"><i class="fa-solid fa-expand"></i></button><button onclick="pinMe()" title="Go to my vehicle"><i class="fa-solid fa-location-crosshairs"></i></button></div></div>
 <div class="grid3" id="vals"></div>
-<div class="btns"><button id="go" class="btn g" onclick="start()"><i class="fa-solid fa-play"></i>Start trip</button><button id="stp" class="btn r hide" onclick="stop()"><i class="fa-solid fa-stop"></i>End trip</button></div></div>
+<div class="btns"><button id="go" class="btn g" onclick="start()"><i class="fa-solid fa-play"></i>Start trip</button><button id="stp" class="btn r hide" onclick="stop()"><i class="fa-solid fa-stop"></i>End trip</button></div>
+<div class="card hide" id="pwcard"><small style="display:block;color:var(--mut)">New password — at least 6 characters</small>
+<input type="password" id="np1" placeholder="New password" autocomplete="new-password">
+<input type="password" id="np2" placeholder="Repeat new password" autocomplete="new-password">
+<div class="btns"><button class="btn g" onclick="changePw()">Save</button><button class="btn o" onclick="pwUi()">Cancel</button></div></div></div>
 <p class="err" id="err"></p>
 <div id="alert" class="hide"></div>
 
@@ -68,7 +71,7 @@ window.addEventListener('unhandledrejection',e=>{$('err').textContent='Error: '+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
-const DASH='https://ameernaji11.github.io/fleet-tracker/dashboard/';
+const DASH=(typeof DASH_URL==='string'&&/^https:\/\/.+\/$/.test(DASH_URL.trim()))?DASH_URL.trim():'https://ameernaji11.github.io/fleet-tracker/dashboard/';
 const mail=u=>u.includes('@')?u.trim():u.trim().toLowerCase()+'@fleet.local';
 const TI={Car:'fa-car',Sedan:'fa-car-side',Hatchback:'fa-car',SUV:'fa-car-rear',Pickup:'fa-truck-pickup',Van:'fa-van-shuttle',Minibus:'fa-van-shuttle',Bus:'fa-bus',Truck:'fa-truck','Heavy Truck':'fa-truck-moving',Tanker:'fa-truck-droplet',Taxi:'fa-taxi',Ambulance:'fa-truck-medical',Motorbike:'fa-motorcycle',Tractor:'fa-tractor',Trailer:'fa-trailer',Equipment:'fa-tractor'};
 let REM=localStorage.rem!=='0',sb=null,me,asg,role,watcher,lastSent=0,queue=JSON.parse(localStorage.q||'[]'),SENT=0;
@@ -83,6 +86,13 @@ async function signIn(){
   want?localStorage.user=$('em').value.trim():localStorage.removeItem('user');await init()}catch(e){$('err').textContent='Error: '+(e.message||e)}
  b.disabled=false;b.innerHTML='<i class="fa-solid fa-right-to-bracket"></i>Sign in'}
 async function signOut(){await sb.auth.signOut();location.reload()}
+function pwUi(){const c=$('pwcard');c.classList.toggle('hide');if(!c.classList.contains('hide')){$('np1').focus()}else{$('np1').value=$('np2').value=''}}
+async function changePw(){if(!sb)return;const a=$('np1').value,b=$('np2').value;
+ if(a.length<6)return $('err').textContent='The new password must be at least 6 characters';
+ if(a!==b)return $('err').textContent='The two new passwords do not match';
+ const {error}=await sb.auth.updateUser({password:a});
+ if(error)return $('err').textContent='Error: '+(error.message||error);
+ pwUi();$('err').textContent='Password changed.'}
 async function init(){
  if(!sb)return;const {data:{session}}=await sb.auth.getSession();if(!session)return;me=session.user;
  const {data:p}=await sb.from('profiles').select('role').eq('id',me.id).maybeSingle();role=p?.role;
@@ -124,7 +134,9 @@ function detect(loc,kmh){
  if(!prev||t-prev.t>=0.8)prev={t,v};
  if(kmh>LIM.speed){osSince=osSince||t;if(t-osSince>=5)ev('overspeed',loc,kmh,kmh)}else osSince=0}
 function ev(type,loc,kmh,val){if(!ON[type])return;const n=Date.now();if(n-(lastEv[type]||0)<30000)return;lastEv[type]=n;notify(type,kmh);
- sb.from('events').insert({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,type,lat:loc.latitude,lng:loc.longitude,speed:kmh,value:val,recorded_at:new Date(loc.time||n).toISOString()}).then(({error})=>{if(error)$('err').textContent='Event error: '+error.message})}
+ const lim=type==='overspeed'?Math.round(LIM.speed):+(Math.abs(type==='harsh_braking'?LIM.brake:LIM.accel)*3.6).toFixed(1);
+ const details=type==='overspeed'?`${Math.round(kmh)} km/h against a ${lim} km/h limit`:`${Math.abs(val).toFixed(1)} km/h/s ${type==='harsh_braking'?'deceleration':'acceleration'} against a ${lim} km/h/s limit`;
+ sb.from('events').insert({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,type,lat:loc.latitude,lng:loc.longitude,speed:kmh,value:val,details,recorded_at:new Date(loc.time||n).toISOString()}).then(({error})=>{if(error)$('err').textContent='Event error: '+error.message})}
 async function loadRules(){
  const [a,r,t]=await Promise.all([sb.from('assignments').select('vehicle_id,driver_id,vehicles(name,type,speed_limit,moving_interval,stopped_interval,brake_limit,accel_limit),drivers(name)').eq('user_id',me.id).maybeSingle(),sb.from('event_rules').select('*'),sb.from('app_settings').select('*')]);
  if(a.data)asg=a.data;const S={};(t.data||[]).forEach(x=>S[x.key]=+x.value);const v=asg?.vehicles||{};
@@ -156,4 +168,6 @@ async function openDash(){const {data:{session}}=await sb.auth.getSession();if(!
  const u=DASH+'#access_token='+session.access_token+'&refresh_token='+session.refresh_token+'&expires_in=3600&token_type=bearer';
  try{await CapPlugins.Browser.open({url:u})}catch(e){window.open(u,'_blank')}}
 if(localStorage.user){$('em').value=localStorage.user;$('rem').checked=true}
+if(localStorage.perm!=='1')show('pm');
+init();
 </script></body></html>
