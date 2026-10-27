@@ -51,9 +51,11 @@ create table if not exists drivers (
   employee_id text, license_no text, license_expiry date, nationality text, notes text);
 
 create table if not exists assignments (
-  user_id uuid primary key references auth.users on delete cascade,
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users on delete cascade,
   vehicle_id uuid references vehicles on delete set null,
-  driver_id  uuid references drivers  on delete set null);
+  driver_id  uuid references drivers  on delete set null,
+  created_at timestamptz default now());
 
 create table if not exists positions (
   id bigint generated always as identity primary key,
@@ -149,6 +151,25 @@ alter table event_rules add column if not exists beep boolean default true,
   add column if not exists beep_duration int default 5,
   add column if not exists beep_type text default 'discontinuous',
   add column if not exists hold_s numeric default 0;
+
+-- ------------------------------------------------- assignments, many-to-one ----
+-- v11: one login can now be linked to several vehicles and several drivers, so
+-- user_id can no longer be the primary key — each grant is its own row.
+alter table assignments add column if not exists id uuid default gen_random_uuid(),
+  add column if not exists created_at timestamptz default now();
+do $$
+declare k text;
+begin
+  update assignments set id = gen_random_uuid() where id is null;
+  select string_agg(a.attname, ',' order by a.attnum) into k
+    from pg_constraint c join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any (c.conkey)
+   where c.conrelid = 'assignments'::regclass and c.contype = 'p';
+  if k is distinct from 'id' then
+    if k is not null then alter table assignments drop constraint assignments_pkey; end if;
+    alter table assignments add constraint assignments_pkey primary key (id);
+  end if;
+end $$;
+create index if not exists assignments_user on assignments (user_id);
 
 -- ------------------------------------------------------ seed the defaults ----
 insert into event_rules (type, label, enabled, threshold, alert, hold_s) values
@@ -399,4 +420,9 @@ end $$;
 --        score is now (harsh accel events + harsh brake events + over_s) * (100 / km), so lower is safer.
 --   app_settings keys 'score_green' (1) and 'score_red' (3)             -> the RAG cut-offs, editable from the
 --        Configuration page: at or below score_green = green, at or above score_red = red, between = amber.
+-- new in this file (v11, many vehicles and drivers per login)
+--   assignments.id uuid primary key                                    -> user_id was the primary key, which limited a
+--        login to one row. The DO block moves the key onto a generated id and leaves a plain index on user_id, so the
+--        Users page can store several vehicles and several drivers for the same person. Existing rows are untouched.
+--   assignments.created_at                                             -> ordering for the driver app's vehicle list.
 -- ============================================================================
