@@ -21,10 +21,10 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 .err{color:var(--rd);font-weight:600;min-height:20px}.foot{font-size:11px;color:var(--mut);text-align:center;margin:14px 0}
 .eye{position:absolute;right:6px;top:10px;border:0;background:none;color:var(--mut);width:40px;height:36px}
 .step{display:flex;gap:10px;align-items:center}.step i{width:24px;color:var(--bl);text-align:center}
-#app.screen{display:flex;flex-direction:column;height:100dvh;padding:8px 12px;gap:6px}#app.hide{display:none}
-#app .card{margin:0;padding:8px 10px}.top b{font-size:17px}.top small{font-size:11px}
-.spd{display:flex;align-items:center;gap:10px}.spd b{font-size:40px}.spd .r{margin-left:auto;text-align:right;font-size:12px;color:var(--mut)}
-#map{flex:1;min-height:130px;margin:0}
+#app.screen{display:flex;flex-direction:column;height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));padding:8px 12px;gap:6px;overflow:hidden}#app.hide{display:none}
+#app .card{margin:0;padding:8px 10px}.top b{font-size:17px}.top small{font-size:11px}#app .foot{margin:0;font-size:10px}
+.spd{display:flex;align-items:center;gap:10px}.spd b{font-size:40px}.spd .r{margin-left:auto;text-align:right;font-size:12px;color:var(--mut);min-width:0}.spd .r b{display:block;font-size:13px;color:var(--ink);white-space:nowrap}
+#map{flex:1;min-height:80px;margin:0}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.grid3 div{background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px 8px;min-width:0}.grid3 small{display:block;color:var(--mut);font-size:10px}.grid3 b{font-size:12px;white-space:nowrap}.grid3 .w2{grid-column:span 2}
 .btns{display:flex;gap:8px}.btns .btn{margin:0;height:48px}
 .mcl{position:absolute;z-index:999;right:8px;top:8px;display:flex;flex-direction:column;gap:6px}.mcl button{width:38px;height:38px;border:0;border-radius:10px;background:#fff;box-shadow:0 1px 6px #0004;color:var(--ink)}
@@ -49,11 +49,12 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 <button class="btn g" onclick="localStorage.perm='1';show('lg');init()"><i class="fa-solid fa-arrow-right"></i>Continue</button></div>
 <div id="app" class="screen hide">
 <div class="top"><div><small>Welcome,</small> <b id="wn"></b><b>!</b></div><div style="display:flex;gap:6px"><button class="ib hide" id="dash" onclick="openDash()" title="Open dashboard"><i class="fa-solid fa-chart-line"></i></button><button class="ib" onclick="pwUi()" title="Change password"><i class="fa-solid fa-key"></i></button><button class="ib" onclick="signOut()" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i></button></div></div>
-<div class="card id"><div class="av" style="width:38px;height:38px;font-size:17px"><i id="vi" class="fa-solid fa-car"></i></div><div><b id="vn"></b><br><small><i class="fa-solid fa-id-card"></i> <span id="dn"></span></small><br><select id="pk" class="hide" onchange="pickV()" style="margin-top:6px;max-width:190px"></select></div><span class="chip" id="stc">Not started</span></div>
-<div class="card spd"><b id="sp">0</b><span>km/h</span><div class="r" id="lt">No record yet</div></div>
+<div class="card id"><div class="av" style="width:38px;height:38px;font-size:17px"><i id="vi" class="fa-solid fa-car"></i></div><div><b id="vn"></b><br><small><i class="fa-solid fa-id-card"></i> <span id="dn"></span></small><br><select id="pk" class="hide" onchange="pickV()" style="margin-top:6px;max-width:190px"></select></div><span class="chip" id="stc">Parking</span></div>
+<div class="card spd"><div><b id="sp">0</b><span>km/h</span></div><div class="r"><small>Position</small><b id="v_pos">-</b><br><small id="lt">No record yet</small></div></div>
 <div id="map"><div class="mcl"><button onclick="togMap()" title="Satellite / map"><i class="fa-solid fa-layer-group"></i></button><button onclick="fsMap()" title="Full screen"><i class="fa-solid fa-expand"></i></button><button onclick="pinMe()" title="Go to my vehicle"><i class="fa-solid fa-location-crosshairs"></i></button></div></div>
 <div class="grid3" id="vals"></div>
 <div class="btns"><button id="go" class="btn g" onclick="start()"><i class="fa-solid fa-play"></i>Start trip</button><button id="stp" class="btn r hide" onclick="stop()"><i class="fa-solid fa-stop"></i>End trip</button></div>
+<div class="foot">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</div>
 <div class="card hide" id="pwcard"><small style="display:block;color:var(--mut)">New password — at least 6 characters</small>
 <input type="password" id="np1" placeholder="New password" autocomplete="new-password">
 <input type="password" id="np2" placeholder="Repeat new password" autocomplete="new-password">
@@ -74,7 +75,7 @@ window.addEventListener('unhandledrejection',e=>{$('err').textContent='Error: '+
 const DASH=(typeof DASH_URL==='string'&&/^https:\/\/.+\/$/.test(DASH_URL.trim()))?DASH_URL.trim():'https://ameernaji11.github.io/fleet-tracker/dashboard/';
 const mail=u=>u.includes('@')?u.trim():u.trim().toLowerCase()+'@fleet.local';
 const TI={Car:'fa-car',Sedan:'fa-car-side',Hatchback:'fa-car',SUV:'fa-car-rear',Pickup:'fa-truck-pickup',Van:'fa-van-shuttle',Minibus:'fa-van-shuttle',Bus:'fa-bus',Truck:'fa-truck','Heavy Truck':'fa-truck-moving',Tanker:'fa-truck-droplet',Taxi:'fa-taxi',Ambulance:'fa-truck-medical',Motorbike:'fa-motorcycle',Tractor:'fa-tractor',Trailer:'fa-trailer',Equipment:'fa-tractor'};
-let REM=localStorage.rem!=='0',sb=null,me,asg,role,watcher,lastSent=0,queue=JSON.parse(localStorage.q||'[]'),SENT=0,ASGS=[],PICK=localStorage.pick||null;
+let REM=localStorage.rem!=='0',sb=null,me,asg,watcher,lastSent=0,queue=JSON.parse(localStorage.q||'[]'),SENT=0,ASGS=[],PICK=localStorage.pick||null;
 const mk=r=>supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storage:r?localStorage:sessionStorage}});
 try{if(!/^https:\/\/[a-z0-9]{15,30}\.supabase\.co$/.test(SUPABASE_URL)||!String(SUPABASE_KEY).startsWith('eyJ'))throw new Error('config.js has a wrong address or key');sb=mk(REM)}catch(e){$('err').textContent='Setup error: '+(e.message||e)}
 const show=s=>{['lg','pm','app'].forEach(x=>$(x).classList.toggle('hide',x!==s));if(s==='app'&&map)setTimeout(()=>map.invalidateSize(),100)};
@@ -83,26 +84,35 @@ async function signIn(){
  if(!sb)return;const want=$('rem').checked;if(want!==REM){REM=want;localStorage.rem=want?'1':'0';sb=mk(REM)}
  const b=$('sib');b.disabled=true;b.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i>Signing in...';$('err').textContent='';
  try{const {error}=await sb.auth.signInWithPassword({email:mail($('em').value),password:$('pw').value});if(error)throw error;
-  want?localStorage.user=$('em').value.trim():localStorage.removeItem('user');await init()}catch(e){$('err').textContent='Error: '+(e.message||e)}
+  want?localStorage.user=$('em').value.trim():localStorage.removeItem('user');await init(1)}catch(e){$('err').textContent='Error: '+(e.message||e)}
  b.disabled=false;b.innerHTML='<i class="fa-solid fa-right-to-bracket"></i>Sign in'}
 async function signOut(){await sb.auth.signOut();location.reload()}
-function pwUi(){const c=$('pwcard');c.classList.toggle('hide');if(!c.classList.contains('hide')){$('np1').focus()}else{$('np1').value=$('np2').value=''}}
+function pwUi(){const c=$('pwcard');c.classList.toggle('hide');const open=!c.classList.contains('hide');
+ // the app screen is fixed-height, so the map gives up its space while the panel is open
+ $('map').classList.toggle('hide',open);
+ if(open){$('np1').focus();return}
+ if(map)setTimeout(()=>map.invalidateSize(),80);
+ $('np1').value=$('np2').value=''}
 async function changePw(){if(!sb)return;const a=$('np1').value,b=$('np2').value;
  if(a.length<6)return $('err').textContent='The new password must be at least 6 characters';
  if(a!==b)return $('err').textContent='The two new passwords do not match';
  const {error}=await sb.auth.updateUser({password:a});
  if(error)return $('err').textContent='Error: '+(error.message||error);
- pwUi();$('err').textContent='Password changed.'}
-async function init(){
+ pwUi();$('err').textContent='Password changed.';logAct('Changed own password')}
+// Audit trail for the admin-only Activity Log. Silently ignored if the table is
+// not there yet, because a logging failure must never stop a driver's trip.
+function logAct(action,details){if(!me)return;(async()=>{
+ try{await sb.from('user_activity').insert({user_id:me.id,user_name:(me.email||'').replace('@fleet.local',''),action,details:details==null?null:String(details).slice(0,300),device:'phone'})}catch(e){}})()}
+async function init(fresh){
  if(!sb)return;const {data:{session}}=await sb.auth.getSession();if(!session)return;me=session.user;
- const {data:p}=await sb.from('profiles').select('role').eq('id',me.id).maybeSingle();role=p?.role;
  await loadRules();
  const nm=(me.email||'').replace('@fleet.local','');$('wn').textContent=nm;
  const v=asg?.vehicles;$('vn').textContent=v?.name||'No vehicle linked';$('dn').textContent=asg?.drivers?.name||'No driver linked';$('vi').className='fa-solid '+(TI[v?.type]||'fa-car');
- $('dash').classList.toggle('hide',role!=='admin');
- [['pos','Position','fa-location-dot','w2'],['acc','Accuracy','fa-bullseye'],['alt','Elevation','fa-mountain'],['dir','Direction','fa-compass'],['ac','Accel.','fa-gauge'],['bat','Battery','fa-battery-half'],['lim','Limit','fa-triangle-exclamation'],['sent','Sent','fa-cloud-arrow-up']].forEach(x=>{if(!$('v_'+x[0]))$('vals').insertAdjacentHTML('beforeend',`<div class="${x[3]||''}"><small><i class="fa-solid ${x[2]}"></i> ${x[1]}</small><b id="v_${x[0]}">-</b></div>`)});
+ logAct(fresh?'Signed in':'Opened app',$('vn').textContent);
+ $('dash').classList.remove('hide');
+ [['acc','Accuracy','fa-bullseye'],['alt','Elevation','fa-mountain'],['dir','Direction','fa-compass'],['ac','Accel.','fa-gauge'],['bat','Battery','fa-battery-half'],['sent','Sent','fa-cloud-arrow-up']].forEach(x=>{if(!$('v_'+x[0]))$('vals').insertAdjacentHTML('beforeend',`<div class="${x[3]||''}"><small><i class="fa-solid ${x[2]}"></i> ${x[1]}</small><b id="v_${x[0]}">-</b></div>`)});
  enter()}
-function enter(){show('app');initMap();$('v_lim').textContent=Math.round(LIM.speed+LIM.buf)+' km/h'}
+function enter(){show('app');initMap()}
 // ---- map
 let map,mrk,trail,tiles,sat=false,follow=true;
 const G=l=>'https://{s}.google.com/vt/lyrs='+l+'&x={x}&y={y}&z={z}';
@@ -115,23 +125,38 @@ function mpos(loc,moving){const ll=[loc.latitude,loc.longitude],ic=L.divIcon({cl
  mrk?mrk.setLatLng(ll).setIcon(ic):mrk=L.marker(ll,{icon:ic}).addTo(map);trail.addLatLng(ll);if(follow)map.panTo(ll)}
 // ---- permissions
 async function pAsk(){try{const id=await CapPlugins.BG.addWatcher({requestPermissions:true,backgroundTitle:'Fleet Tracker',backgroundMessage:'Checking permissions'},()=>{});setTimeout(()=>CapPlugins.BG.removeWatcher({id}),3000)}catch(e){$('err').textContent='Location: '+(e.message||e)}
- try{await CapPlugins.LN.requestPermissions()}catch(e){}}
+ await askNotif()}
 // ---- alerts on the phone
 let RUL={};const EVN={harsh_braking:'Harsh braking',harsh_acceleration:'Harsh acceleration',overspeed:'Overspeed'};
+let AC=null;
+// One shared AudioContext: the WebView kills a context created outside a user gesture, so it is
+// opened by the Start trip tap and only resumed here (the alert callbacks run in the background).
+function tone(){const A=window.AudioContext||window.webkitAudioContext;if(!A)return null;
+ if(!AC)AC=new A();const r=AC.state==='suspended'&&AC.resume();if(r&&r.catch)r.catch(()=>{});return AC}
+// Alerts must be audible even when the driver never opened the Permissions screen, so every
+// trip start re-asks for notification permission and registers the loud channel it posts to.
+let CHAN=false;
+async function askNotif(){try{const p=await CapPlugins.LN.requestPermissions(),s=[p.display,p.alert,p.sound,p.badge].filter(Boolean);
+ if(s.includes('denied')&&!s.includes('granted'))$('err').textContent='Notifications are blocked, so alerts only vibrate. Enable them in Android settings.'}catch(e){}
+ if(CHAN)return;
+ try{await CapPlugins.LN.registerChannel({id:'fleet',name:'Fleet alerts',description:'Overspeed and harsh driving',notificationsAudibility:'HIGH',importance:3,visibility:1});CHAN=true}catch(e){}}
 function beep(type){const R=RUL[type]||{},dur=Math.max(1,+R.beep_duration||5),cont=R.beep_type==='continuous';
- try{const a=new (window.AudioContext||window.webkitAudioContext)(),t=a.currentTime;
+ try{const a=tone();if(!a)throw 0;const t=a.currentTime+.05;
   if(cont){const o=a.createOscillator(),g=a.createGain();o.frequency.value=880;g.gain.value=.3;o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+dur)}
   else{const st=.5,n=Math.max(1,Math.round(dur/st));for(let i=0;i<n;i++){const o=a.createOscillator(),g=a.createGain();o.frequency.value=880;g.gain.value=.3;o.connect(g);g.connect(a.destination);o.start(t+i*st);o.stop(t+i*st+.25)}}}catch(e){}
  if(navigator.vibrate){const p=[];if(cont)p.push(dur*1000);else for(let i=0;i<Math.max(1,Math.round(dur*2));i++)p.push(300,200);try{navigator.vibrate(p)}catch(e){}}}
-function warnMsg(txt){const a=$('alert');a.innerHTML='<i class="fa-solid fa-gauge-simple-high"></i> '+txt;a.classList.remove('hide');setTimeout(()=>a.classList.add('hide'),4000)}
+let aT;
+function banner(html,ms){const a=$('alert');a.innerHTML=html;a.classList.remove('hide');clearTimeout(aT);aT=setTimeout(()=>a.classList.add('hide'),ms)}
+function warnMsg(txt){banner('<i class="fa-solid fa-gauge-simple-high"></i> '+txt,4000)}
 function notify(type,kmh){const R=RUL[type]||{};
- if(R.alert!==false){const a=$('alert');a.innerHTML='<i class="fa-solid fa-triangle-exclamation"></i> '+EVN[type]+' · '+Math.round(kmh)+' km/h';a.classList.remove('hide');setTimeout(()=>a.classList.add('hide'),6000);
-  try{CapPlugins.LN.schedule({notifications:[{id:Date.now()%2147483647,title:'Fleet Tracker: '+EVN[type],body:Math.round(kmh)+' km/h'}]})}catch(e){}}
+ if(R.alert!==false){banner('<i class="fa-solid fa-triangle-exclamation"></i> '+EVN[type]+' · '+Math.round(kmh)+' km/h',6000);
+  const n={id:Date.now()%2147483647,title:'Fleet Tracker: '+EVN[type],body:Math.round(kmh)+' km/h'};if(CHAN)n.channelId='fleet';
+  try{const p=CapPlugins.LN.schedule({notifications:[n]});if(p&&p.catch)p.catch(()=>{})}catch(e){}}
  if(R.beep!==false)beep(type)}
 // ---- driving events and telemetry
 const MIN_MOVING_KMH=2;
 const sepm=(a,b)=>{const r=x=>x*Math.PI/180,dLa=r(b.latitude-a.latitude),dLo=r(b.longitude-a.longitude),x=Math.sin(dLa/2)**2+Math.cos(r(a.latitude))*Math.cos(r(b.latitude))*Math.sin(dLo/2)**2;return 12742000*Math.asin(Math.sqrt(x))};
-const LIM={speed:100,brake:-3,accel:2.5,buf:0,warn:0,dist:0},HOLD={harsh_braking:0,harsh_acceleration:0,overspeed:0},ON={harsh_braking:1,harsh_acceleration:1,overspeed:1},lastEv={},lastNotify={},VS={};let prev=null,lastA=0,lastLoc=null,ODOM=0,pp=null,bat={},fl=false,batT,cfgT,MOV=10,STP=60;
+const LIM={speed:100,brake:-3,accel:2.5,buf:0,warn:0,dist:0},HOLD={harsh_braking:0,harsh_acceleration:0,overspeed:0},ON={harsh_braking:1,harsh_acceleration:1,overspeed:1},lastEv={},lastNotify={},VS={},ANN={};let prev=null,lastA=0,lastLoc=null,ODOM=0,pp=null,bat={},fl=false,batT,cfgT,MOV=10,STP=60;
 function detect(loc,kmh){
  if(loc.accuracy>25)return;
  if(pp){const d=sepm(pp,loc);if(d<200)ODOM+=d}
@@ -146,10 +171,14 @@ function detect(loc,kmh){
 // the alert fires the moment a limit is broken; the event is only written when it lasts longer than the tolerance
 function hold(type,bad,loc,kmh,val,t){if(!ON[type])return;
  if(!bad){VS[type]=0;return}
- if(!VS[type]){VS[type]=t;const n=Date.now();if(n-(lastNotify[type]||0)>60000){lastNotify[type]=n;notify(type,kmh)}}
+ if(!VS[type]){VS[type]=t;const n=Date.now();ANN[type]=n-(lastNotify[type]||0)>60000;
+  // the 60 second guard mutes a repeat, so the driver is never buzzed twice for
+  // one breach: ev() only alerts when the breach at the start was muted
+  if(ANN[type]){lastNotify[type]=n;notify(type,kmh)}}
  if(t-VS[type]<Math.max(0,HOLD[type]||0))return;
  VS[type]=0;ev(type,loc,kmh,val)}
-function ev(type,loc,kmh,val){if(!ON[type])return;const n=Date.now();if(n-(lastEv[type]||0)<30000)return;lastEv[type]=n;notify(type,kmh);
+function ev(type,loc,kmh,val){if(!ON[type])return;const n=Date.now();if(n-(lastEv[type]||0)<30000)return;lastEv[type]=n;
+ if(!ANN[type])notify(type,kmh);ANN[type]=false;
  const lim=type==='overspeed'?Math.round(LIM.speed+LIM.buf):+(Math.abs(type==='harsh_braking'?LIM.brake:LIM.accel)*3.6).toFixed(1);
  const details=type==='overspeed'?`${Math.round(kmh)} km/h against a ${lim} km/h alert level${HOLD.overspeed?' held over '+HOLD.overspeed+' s':''}`:`${Math.abs(val).toFixed(1)} km/h/s ${type==='harsh_braking'?'deceleration':'acceleration'} against a ${lim} km/h/s limit`;
  sb.from('events').insert({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,type,lat:loc.latitude,lng:loc.longitude,speed:kmh,value:val,details,recorded_at:new Date(loc.time||n).toISOString()}).then(({error})=>{if(error)$('err').textContent='Event error: '+error.message})}
@@ -166,8 +195,7 @@ async function loadRules(){
   if(x.type==='harsh_braking'){LIM.brake=-(v.brake_limit||x.threshold)/3.6;HOLD.harsh_braking=h}
   if(x.type==='harsh_acceleration'){LIM.accel=(v.accel_limit||x.threshold)/3.6;HOLD.harsh_acceleration=h}});
  LIM.warn=Math.max(0,+v.max_accel_warning||0);LIM.dist=Math.max(0,+v.min_moving_distance||0);
- MOV=Math.max(1,v.moving_interval||S.moving_interval||10);STP=Math.max(1,v.stopped_interval||S.stopped_interval||60);
- if($('v_lim'))$('v_lim').textContent=Math.round(LIM.speed+LIM.buf)+' km/h'}
+ MOV=Math.max(1,v.moving_interval||S.moving_interval||10);STP=Math.max(1,v.stopped_interval||S.stopped_interval||60)}
 async function pollBat(){try{const b=await CapPlugins.Device.getBatteryInfo();bat={p:Math.round(b.batteryLevel*100),c:b.isCharging};$('v_bat').textContent=bat.p+'%'+(bat.c?' ⚡':'')}catch(e){}}
 const row=(loc,speed,ign)=>({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,lat:loc.latitude,lng:loc.longitude,speed,accuracy:loc.accuracy,altitude:loc.altitude,heading:loc.bearing,ignition:ign,accel:+(lastA*3.6).toFixed(1),battery_pct:bat.p,charging:bat.c,recorded_at:new Date(loc.time||Date.now()).toISOString()});
 async function flush(){if(fl)return;fl=true;try{localStorage.q=JSON.stringify(queue);while(queue.length){const b=queue.slice(0,200);const {error}=await sb.from('positions').insert(b);if(error){$('err').textContent='Upload error: '+error.message;break}queue=queue.slice(b.length);SENT+=b.length;localStorage.q=JSON.stringify(queue)}$('v_sent').textContent=SENT+(queue.length?' ('+queue.length+' waiting)':'')}finally{fl=false}}
@@ -176,6 +204,7 @@ function upd(loc,kmh,moving){const c=$('stc');c.textContent=moving?'Moving':'Idl
  V('pos',loc.latitude.toFixed(5)+', '+loc.longitude.toFixed(5));V('acc',loc.accuracy!=null?Math.round(loc.accuracy)+' m':'-');V('alt',loc.altitude!=null?Math.round(loc.altitude)+' m':'-');V('dir',loc.bearing!=null?Math.round(loc.bearing)+'°':'-');V('ac',(lastA*3.6).toFixed(1)+' km/h/s');$('lt').textContent='Last record '+new Date().toLocaleTimeString('en-GB');mpos(loc,moving)}
 async function start(){
  if(!asg?.vehicle_id){$('err').textContent='No vehicle linked to this user. Ask your admin.';return}
+ tone();
  try{
  await loadRules();pollBat();batT=setInterval(pollBat,30000);cfgT=setInterval(loadRules,300000);prev=null;pp=null;ODOM=0;Object.keys(VS).forEach(k=>VS[k]=0);Object.keys(lastNotify).forEach(k=>lastNotify[k]=0);
  if(!window.CapPlugins)throw new Error('Plugin bridge missing: rebuild the APK with the latest build-apk.yml');
@@ -183,12 +212,16 @@ async function start(){
  async(loc,err)=>{
   if(err){if(err.code==='NOT_AUTHORIZED')$('err').textContent='Allow location "All the time" in app settings (Permissions button).';return}
   const kmh=Math.max(0,(loc.speed||0)*3.6),moving=kmh>=MIN_MOVING_KMH,every=(moving?MOV:STP)*1000;
-  upd(loc,kmh,moving);detect(loc,kmh);if(Date.now()-lastSent<every-500)return;lastSent=Date.now();
+  // detect first: the Accel. tile then shows the value that just triggered the alert
+  detect(loc,kmh);upd(loc,kmh,moving);if(Date.now()-lastSent<every-500)return;lastSent=Date.now();
   lastLoc=loc;queue.push(row(loc,moving?kmh:0,true));if(queue.length>=Math.ceil(5/MOV)||!moving)flush()});
  $('go').classList.add('hide');$('stp').classList.remove('hide');$('err').textContent='';
+ logAct('Started trip',(asg?.vehicles?.name||'')+' · records every '+(MOV)+' s moving, '+(STP)+' s stopped');
+ await askNotif();
  }catch(e){$('err').textContent='Error: '+(e.message||e)}
 }
 async function stop(){clearInterval(batT);clearInterval(cfgT);prev=null;pp=null;Object.keys(VS).forEach(k=>VS[k]=0);if(lastLoc){queue.push(row(lastLoc,0,false));flush()}
+ logAct('Ended trip',(asg?.vehicles?.name||'')+(lastLoc?' at '+lastLoc.latitude.toFixed(5)+', '+lastLoc.longitude.toFixed(5):''));
  await CapPlugins.BG.removeWatcher({id:watcher});$('go').classList.remove('hide');$('stp').classList.add('hide');const c=$('stc');c.textContent='Parking';c.style.background='var(--bll)';c.style.color='var(--bl)';$('sp').textContent='0'}
 async function openDash(){const {data:{session}}=await sb.auth.getSession();if(!session)return;
  const u=DASH+'#access_token='+session.access_token+'&refresh_token='+session.refresh_token+'&expires_in=3600&token_type=bearer';
