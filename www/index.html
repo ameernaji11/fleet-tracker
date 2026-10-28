@@ -1,6 +1,7 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icon.svg">
 <style>
 :root{--bg:#fff7ee;--ink:#26323a;--mut:#6b7a85;--line:#efe3d4;--or:#f28c28;--orl:#ffe9d2;--gr:#27a46a;--grl:#ddf4e8;--bl:#2f7fe6;--bll:#dcebfd;--rd:#d9534f;--rdl:#fde4e2}
 *{box-sizing:border-box}body{margin:0;font:15px/1.4 system-ui,sans-serif;color:var(--ink);background:var(--bg);padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
@@ -23,7 +24,16 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 .step{display:flex;gap:10px;align-items:center}.step i{width:24px;color:var(--bl);text-align:center}
 #app.screen{display:flex;flex-direction:column;height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));padding:8px 12px;gap:6px;overflow:hidden}#app.hide{display:none}
 #app .card{margin:0;padding:8px 10px}.top b{font-size:17px}.top small{font-size:11px}#app .foot{margin:0;font-size:10px}
-.spd{display:flex;align-items:center;gap:10px}.spd b{font-size:40px}.spd .r{margin-left:auto;text-align:right;font-size:12px;color:var(--mut);min-width:0}.spd .r b{display:block;font-size:13px;color:var(--ink);white-space:nowrap}
+.spd{display:flex;align-items:center;gap:10px}.spd b{font-size:40px}.spd .pr{margin-left:auto;text-align:right;font-size:13px;color:var(--mut);min-width:0}.spd .pr b{display:block;font-size:15px;color:var(--ink);white-space:nowrap}
+.rl{position:absolute;z-index:999;left:8px;top:8px;width:42px;height:50px;background:#fff;border:2px solid #111;border-radius:6px;box-shadow:0 1px 6px #0005}
+.rl:before{content:"";position:absolute;top:2px;left:2px;right:2px;height:10px;background:#d9534f}
+.rl b{position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:19px}
+.mcl button.on{background:var(--bl);color:#fff}
+.mk.pulse{width:52px;height:52px;border:0;background:none;box-shadow:none;animation:pl .9s infinite alternate}
+@keyframes pl{50%{transform:scale(1.5);opacity:.45}}
+#map.alrt{outline:4px solid var(--rd);outline-offset:-4px;animation:mb 1s infinite alternate}@keyframes mb{to{outline-color:#fff0}}
+.hero{width:100%;height:auto;border-radius:16px;display:block}.hero .draw{stroke-dasharray:400;stroke-dashoffset:400;animation:dr 7s ease-in-out infinite}@keyframes dr{0%{stroke-dashoffset:400}65%,100%{stroke-dashoffset:0}}.hero .blink{animation:bk 1.2s steps(2) infinite}@keyframes bk{to{opacity:.15}}
+@media (prefers-reduced-motion:reduce){.hero .draw,.hero .blink,#map.alrt,.mk.pulse{animation:none}}
 #map{flex:1;min-height:80px;margin:0}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.grid3 div{background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px 8px;min-width:0}.grid3 small{display:block;color:var(--mut);font-size:10px}.grid3 b{font-size:12px;white-space:nowrap}.grid3 .w2{grid-column:span 2}
 .btns{display:flex;gap:8px}.btns .btn{margin:0;height:48px}
@@ -31,8 +41,18 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 #err{position:fixed;bottom:66px;left:12px;right:12px;font-size:12px;pointer-events:none;margin:0;z-index:50}
 </style></head><body>
 <div id="lg" class="screen" style="text-align:center;padding-top:40px">
-<svg viewBox="0 0 48 48" width="76"><defs><linearGradient id="lgr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f28c28"/><stop offset="1" stop-color="#2f7fe6"/></linearGradient></defs><rect width="48" height="48" rx="12" fill="url(#lgr)"/><path d="M24 11c-5.5 0-9.5 4.2-9.5 9.4 0 6.7 9.5 16.6 9.5 16.6s9.5-9.9 9.5-16.6C33.5 15.2 29.5 11 24 11z" fill="#fff"/><circle cx="24" cy="20.5" r="3.6" fill="#2f7fe6"/></svg>
-<h2 style="margin:8px 0 18px">Fleet Tracker</h2>
+<svg class="hero" viewBox="0 0 320 180" role="img" aria-label="A vehicle driving along a tracked route"><defs><linearGradient id="hsky" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe9d2"/><stop offset="1" stop-color="#dcebfd"/></linearGradient><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f28c28"/><stop offset="1" stop-color="#2f7fe6"/></linearGradient></defs>
+<rect width="320" height="180" rx="18" fill="url(#hsky)"/>
+<g fill="#fff" opacity=".75"><rect x="14" y="14" width="64" height="36" rx="6"/><rect x="104" y="14" width="104" height="36" rx="6"/><rect x="234" y="72" width="72" height="46" rx="6"/><rect x="14" y="72" width="64" height="46" rx="6"/><rect x="104" y="140" width="104" height="28" rx="6"/><rect x="234" y="140" width="72" height="28" rx="6"/></g>
+<path d="M0 61H320M0 129H320M91 0V180M221 0V180" stroke="#fff" stroke-width="12"/><path d="M0 61H320M0 129H320M91 0V180M221 0V180" stroke="#efe3d4" stroke-width="1" stroke-dasharray="6 6"/>
+<path id="hrt" pathLength="400" class="draw" d="M30 150C62 150 70 129 91 118S100 70 140 64 196 82 221 64 262 40 286 36" fill="none" stroke="#2f7fe6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="30" cy="150" r="7" fill="#27a46a" stroke="#fff" stroke-width="3"/>
+<circle cx="286" cy="36" r="8" fill="#d9534f" opacity=".45"><animate attributeName="r" values="8;24;8" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values=".5;0;.5" dur="2s" repeatCount="indefinite"/></circle>
+<path d="M286 10c-8 0-14 6-14 14 0 10 14 25 14 25s14-15 14-25c0-8-6-14-14-14z" fill="#d9534f" stroke="#fff" stroke-width="2"/><circle cx="286" cy="24" r="4.5" fill="#fff"/>
+<g><circle r="12" fill="#f28c28" stroke="#fff" stroke-width="3"/><path d="M-6 -3h7v6h-7zM1 -1h3l2 2v2h-5z" fill="#fff"/><circle cx="-3.5" cy="4" r="1.6" fill="#fff"/><circle cx="3.5" cy="4" r="1.6" fill="#fff"/><animateMotion dur="7s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.65;1" calcMode="linear"><mpath href="#hrt"/></animateMotion></g>
+<g transform="translate(14 150)"><rect width="58" height="20" rx="10" fill="#fff"/><circle cx="12" cy="10" r="4" fill="#27a46a" class="blink"/><text x="21" y="14" font-size="10" font-weight="800" fill="#26323a" font-family="Nunito,system-ui,sans-serif">LIVE</text></g>
+</svg>
+</h2>
 <input id="em" placeholder="Username or email" autocomplete="username" autocapitalize="none">
 <div style="position:relative"><input id="pw" type="password" placeholder="Password" autocomplete="current-password"><button type="button" class="eye" onclick="eye()"><i class="fa-solid fa-eye" id="eyei"></i></button></div>
 <label style="display:flex;gap:8px;align-items:center;margin:8px 0;font-weight:600"><input type="checkbox" id="rem" style="width:20px;height:20px;margin:0"> Remember me</label>
@@ -50,8 +70,8 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 <div id="app" class="screen hide">
 <div class="top"><div><small>Welcome,</small> <b id="wn"></b><b>!</b></div><div style="display:flex;gap:6px"><button class="ib hide" id="dash" onclick="openDash()" title="Open dashboard"><i class="fa-solid fa-chart-line"></i></button><button class="ib" onclick="pwUi()" title="Change password"><i class="fa-solid fa-key"></i></button><button class="ib" onclick="signOut()" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i></button></div></div>
 <div class="card id"><div class="av" style="width:38px;height:38px;font-size:17px"><i id="vi" class="fa-solid fa-car"></i></div><div><b id="vn"></b><br><small><i class="fa-solid fa-id-card"></i> <span id="dn"></span></small><br><select id="pk" class="hide" onchange="pickV()" style="margin-top:6px;max-width:190px"></select></div><span class="chip" id="stc">Parking</span></div>
-<div class="card spd"><div><b id="sp">0</b><span>km/h</span></div><div class="r"><small>Position</small><b id="v_pos">-</b><br><small id="lt">No record yet</small></div></div>
-<div id="map"><div class="mcl"><button onclick="togMap()" title="Satellite / map"><i class="fa-solid fa-layer-group"></i></button><button onclick="fsMap()" title="Full screen"><i class="fa-solid fa-expand"></i></button><button onclick="pinMe()" title="Go to my vehicle"><i class="fa-solid fa-location-crosshairs"></i></button></div></div>
+<div class="card spd"><div style="position:relative"><b id="sp">0</b><span>km/h</span><div class="rl hide" id="rl" title="Speed limit of this road"><b></b></div></div><div class="pr"><small>Position</small><b id="v_pos">-</b><br><small id="lt">No record yet</small></div></div>
+<div id="map"><div class="mcl"><button onclick="togMap()" title="Satellite / map"><i class="fa-solid fa-layer-group"></i></button><button onclick="fsMap()" title="Full screen"><i class="fa-solid fa-expand"></i></button><button id="pinB" class="on" onclick="togPin()" title="Pin: keep the vehicle in the centre"><i class="fa-solid fa-thumbtack"></i></button></div></div>
 <div class="grid3" id="vals"></div>
 <div class="btns"><button id="go" class="btn g" onclick="start()"><i class="fa-solid fa-play"></i>Start trip</button><button id="stp" class="btn r hide" onclick="stop()"><i class="fa-solid fa-stop"></i>End trip</button></div>
 <div class="foot">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</div>
@@ -86,7 +106,7 @@ async function signIn(){
  try{const {error}=await sb.auth.signInWithPassword({email:mail($('em').value),password:$('pw').value});if(error)throw error;
   want?localStorage.user=$('em').value.trim():localStorage.removeItem('user');await init(1)}catch(e){$('err').textContent='Error: '+(e.message||e)}
  b.disabled=false;b.innerHTML='<i class="fa-solid fa-right-to-bracket"></i>Sign in'}
-async function signOut(){await sb.auth.signOut();location.reload()}
+async function signOut(){await logAct('Signed out','Phone');await sb.auth.signOut();location.reload()}
 function pwUi(){const c=$('pwcard');c.classList.toggle('hide');const open=!c.classList.contains('hide');
  // the app screen is fixed-height, so the map gives up its space while the panel is open
  $('map').classList.toggle('hide',open);
@@ -116,18 +136,27 @@ function enter(){show('app');initMap()}
 // ---- map
 let map,mrk,trail,tiles,sat=false,follow=true;
 const G=l=>'https://{s}.google.com/vt/lyrs='+l+'&x={x}&y={y}&z={z}';
-function initMap(){if(map)return;map=L.map('map',{zoomControl:false}).setView([23.6,58.5],12);map.on('dragstart',()=>follow=false);document.addEventListener('fullscreenchange',()=>setTimeout(()=>map.invalidateSize(),250));
+function initMap(){if(map)return;map=L.map('map',{zoomControl:false}).setView([23.6,58.5],12);map.on('dragstart',()=>{follow=false;pinUi()});document.addEventListener('fullscreenchange',()=>setTimeout(()=>map.invalidateSize(),250));
  tiles=L.tileLayer(G('m'),{maxZoom:20,subdomains:['mt0','mt1','mt2','mt3'],attribution:'Map data © Google'}).addTo(map);trail=L.polyline([],{color:'#2f7fe6',weight:4}).addTo(map);setTimeout(()=>map.invalidateSize(),200)}
 function togMap(){sat=!sat;tiles.setUrl(G(sat?'y':'m'))}
 function fsMap(){document.fullscreenElement?document.exitFullscreen():$('map').requestFullscreen()}
-function pinMe(){follow=true;if(mrk)map.setView(mrk.getLatLng(),Math.max(map.getZoom(),16));else $('err').textContent='No vehicle position yet. Start a trip first.'}
+function pinUi(){const b=$('pinB');b.classList.toggle('on',follow);
+ b.title=follow?'Pin on: the map follows the vehicle. Drag the map to unpin.':'Pin off: press to follow the vehicle'}
+function togPin(){follow=!follow;pinUi();if(follow&&mrk)map.setView(mrk.getLatLng(),Math.max(map.getZoom(),16))}
 function mpos(loc,moving){const ll=[loc.latitude,loc.longitude],ic=L.divIcon({className:'',html:`<div class="mk" style="background:${moving?'#27a46a':'#f28c28'}"><i class="fa-solid ${$('vi').className.split(' ')[1]}"></i></div>`,iconSize:[34,34],iconAnchor:[17,17]});
+ // a fix reporting no usable accuracy is not plotted, but the trip row still
+ // goes into the upload queue so the record is not lost
+ if(loc.accuracy!=null&&+loc.accuracy<=0)return;
  mrk?mrk.setLatLng(ll).setIcon(ic):mrk=L.marker(ll,{icon:ic}).addTo(map);trail.addLatLng(ll);if(follow)map.panTo(ll)}
+// the driver sees the breach on the map, not only in the banner at the top
+function alertRing(){if(!mrk)return;const i=mrk.options.icon;
+ mrk.setIcon(L.divIcon({className:'',html:'<div class="mk pulse" style="background:#d9534f"><i class="fa-solid fa-triangle-exclamation"></i></div>',iconSize:[52,52],iconAnchor:[26,26]}));
+ $('map').classList.add('alrt');setTimeout(()=>{mrk&&mrk.setIcon(i);$('map').classList.remove('alrt')},8000)}
 // ---- permissions
 async function pAsk(){try{const id=await CapPlugins.BG.addWatcher({requestPermissions:true,backgroundTitle:'Fleet Tracker',backgroundMessage:'Checking permissions'},()=>{});setTimeout(()=>CapPlugins.BG.removeWatcher({id}),3000)}catch(e){$('err').textContent='Location: '+(e.message||e)}
  await askNotif()}
 // ---- alerts on the phone
-let RUL={};const EVN={harsh_braking:'Harsh braking',harsh_acceleration:'Harsh acceleration',overspeed:'Overspeed'};
+let RUL={};const EVN={harsh_braking:'Harsh braking',harsh_acceleration:'Harsh acceleration',overspeed:'Overspeed',road_overspeed:'Road speed limit'};
 let AC=null;
 // One shared AudioContext: the WebView kills a context created outside a user gesture, so it is
 // opened by the Start trip tap and only resumed here (the alert callbacks run in the background).
@@ -136,64 +165,177 @@ function tone(){const A=window.AudioContext||window.webkitAudioContext;if(!A)ret
 // Alerts must be audible even when the driver never opened the Permissions screen, so every
 // trip start re-asks for notification permission and registers the loud channel it posts to.
 let CHAN=false;
-async function askNotif(){try{const p=await CapPlugins.LN.requestPermissions(),s=[p.display,p.alert,p.sound,p.badge].filter(Boolean);
+async function askNotif(){await logAct('Allowed permissions');
+ try{const p=await CapPlugins.LN.requestPermissions(),s=[p.display,p.alert,p.sound,p.badge].filter(Boolean);
  if(s.includes('denied')&&!s.includes('granted'))$('err').textContent='Notifications are blocked, so alerts only vibrate. Enable them in Android settings.'}catch(e){}
  if(CHAN)return;
  try{await CapPlugins.LN.registerChannel({id:'fleet',name:'Fleet alerts',description:'Overspeed and harsh driving',notificationsAudibility:'HIGH',importance:3,visibility:1});CHAN=true}catch(e){}}
-function beep(type){const R=RUL[type]||{},dur=Math.max(1,+R.beep_duration||5),cont=R.beep_type==='continuous';
- try{const a=tone();if(!a)throw 0;const t=a.currentTime+.05;
-  if(cont){const o=a.createOscillator(),g=a.createGain();o.frequency.value=880;g.gain.value=.3;o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+dur)}
-  else{const st=.5,n=Math.max(1,Math.round(dur/st));for(let i=0;i<n;i++){const o=a.createOscillator(),g=a.createGain();o.frequency.value=880;g.gain.value=.3;o.connect(g);g.connect(a.destination);o.start(t+i*st);o.stop(t+i*st+.25)}}}catch(e){}
- if(navigator.vibrate){const p=[];if(cont)p.push(dur*1000);else for(let i=0;i<Math.max(1,Math.round(dur*2));i++)p.push(300,200);try{navigator.vibrate(p)}catch(e){}}}
+// seven buzzer tones, identical to the dashboard list so the tone you preview
+// there is the tone the phone plays. Square/sawtooth waves are harsh at full
+// volume, so they are played back quieter.
+const TONES={discontinuous:'Discontinuous',continuous:'Continuous',fast:'Fast beeps',twotone:'Two-tone alarm',siren:'Siren',chime:'Chime',pulse:'Rising pulse'};
+function playTone(a,type,dur,vol){const t0=a.currentTime+.05,end=t0+dur;
+ const note=(f,s,e,w,f2)=>{if(s>=end)return;e=Math.min(e,end);const o=a.createOscillator(),g=a.createGain(),v=w==='square'||w==='sawtooth'?vol*.45:vol;
+  o.type=w||'sine';o.frequency.setValueAtTime(f,s);if(f2)o.frequency.linearRampToValueAtTime(f2,e);
+  g.gain.setValueAtTime(0,s);g.gain.linearRampToValueAtTime(v,s+.01);g.gain.setValueAtTime(v,Math.max(s+.01,e-.02));g.gain.linearRampToValueAtTime(0,e);
+  o.connect(g);g.connect(a.destination);o.start(s);o.stop(e+.01)};
+ const rep=(st,fn)=>{for(let s=t0;s<end;s+=st)fn(s)};
+ switch(type){
+  case 'continuous':note(880,t0,end);break;
+  case 'fast':rep(.2,s=>note(1000,s,s+.1));break;
+  case 'twotone':rep(.8,s=>{note(960,s,s+.4,'square');note(640,s+.4,s+.8,'square')});break;
+  case 'siren':rep(1.2,s=>{note(600,s,s+.6,'sawtooth',1200);note(1200,s+.6,s+1.2,'sawtooth',600)});break;
+  case 'chime':rep(1.4,s=>{note(1319,s,s+.5,'triangle');note(1047,s+.5,s+1.2,'triangle')});break;
+  case 'pulse':rep(.8,s=>[600,800,1000,1200].forEach((f,i)=>note(f,s+i*.16,s+i*.16+.12)));break;
+  default:rep(.5,s=>note(880,s,s+.25))}}
+// ---- spoken safety warnings. English, Arabic, Hindi and Urdu; the language and
+// the on/off switches come from the dashboard Configuration page.
+const VLANG={en:['English','en-US'],ar:['Arabic','ar-SA'],hi:['Hindi','hi-IN'],ur:['Urdu','ur-PK']};
+const VMSG={
+ en:{overspeed:'You are over the speed limit. Please slow down.',road_overspeed:'You are over the speed limit for this road. Please slow down.',harsh_braking:'Harsh braking detected. Keep a safe distance and brake gently.',harsh_acceleration:'Harsh acceleration detected. Please accelerate smoothly.'},
+ ar:{overspeed:'لقد تجاوزت حد السرعة. يرجى تخفيف السرعة.',road_overspeed:'لقد تجاوزت السرعة المحددة لهذا الطريق. يرجى تخفيف السرعة.',harsh_braking:'تم رصد فرملة قوية. حافظ على مسافة آمنة واضغط على الفرامل بهدوء.',harsh_acceleration:'تم رصد تسارع قوي. يرجى التسارع بسلاسة.'},
+ hi:{overspeed:'आप गति सीमा से ऊपर हैं। कृपया गति कम करें।',road_overspeed:'आप इस सड़क की गति सीमा से ऊपर हैं। कृपया गति कम करें।',harsh_braking:'तेज़ ब्रेक लगाया गया। सुरक्षित दूरी रखें और धीरे ब्रेक लगाएँ।',harsh_acceleration:'तेज़ रफ़्तार पकड़ी गई। कृपया धीरे-धीरे गति बढ़ाएँ।'},
+ ur:{overspeed:'آپ رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',road_overspeed:'آپ اس سڑک کی رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',harsh_braking:'سخت بریک لگائی گئی۔ محفوظ فاصلہ رکھیں اور آہستہ بریک لگائیں۔',harsh_acceleration:'تیز رفتاری پکڑی گئی۔ براہ کرم آہستہ آہستہ رفتار بڑھائیں۔'}};
+const vrMsg=(t,l)=>(VMSG[l]||VMSG.en)[t]||VMSG.en[t]||'';
+// the WebView's own speechSynthesis is unreliable on Android, so the native
+// text-to-speech plugin is tried first and the browser voice is the fallback.
+async function speak(txt,lang){if(V.voice_on===0)return;
+ const code=(VLANG[lang]||VLANG.en)[1];
+ if(CapPlugins&&CapPlugins.TTS){try{await CapPlugins.TTS.speak({text:txt,lang:code,rate:1,pitch:1,volume:1});return}
+  // no such voice installed: retry in English rather than staying silent
+  catch(e){try{await CapPlugins.TTS.speak({text:txt,lang:'en-US',rate:1,pitch:1,volume:1});return}catch(e2){}}}
+ const S=window.speechSynthesis,U=window.SpeechSynthesisUtterance;if(!S||!U)return;
+ try{const u=new U(txt);u.lang=code;S.cancel();S.speak(u)}catch(e){}}
+function beep(type){const R=RUL[type]||{},dur=Math.max(1,+R.beep_duration||5);
+ try{playTone(tone(),R.beep_type,dur,.3)}catch(e){}
+ if(navigator.vibrate){const p=[];if(R.beep_type==='continuous'||R.beep_type==='siren')p.push(dur*1000);
+  else for(let i=0;i<Math.max(1,Math.round(dur*2));i++)p.push(300,200);try{navigator.vibrate(p)}catch(e){}}}
 let aT;
 function banner(html,ms){const a=$('alert');a.innerHTML=html;a.classList.remove('hide');clearTimeout(aT);aT=setTimeout(()=>a.classList.add('hide'),ms)}
 function warnMsg(txt){banner('<i class="fa-solid fa-gauge-simple-high"></i> '+txt,4000)}
-function notify(type,kmh){const R=RUL[type]||{};
- if(R.alert!==false){banner('<i class="fa-solid fa-triangle-exclamation"></i> '+EVN[type]+' · '+Math.round(kmh)+' km/h',6000);
-  const n={id:Date.now()%2147483647,title:'Fleet Tracker: '+EVN[type],body:Math.round(kmh)+' km/h'};if(CHAN)n.channelId='fleet';
-  try{const p=CapPlugins.LN.schedule({notifications:[n]});if(p&&p.catch)p.catch(()=>{})}catch(e){}}
+function notify(type,kmh,lvl){const R=RUL[type]||{},txt=Math.round(kmh)+' km/h'+(lvl?' against '+lvl:'');
+ if(R.alert!==false){banner('<i class="fa-solid fa-triangle-exclamation"></i> '+EVN[type]+' · '+txt,6000);alertRing();
+   const n={id:Date.now()%2147483647,title:'Fleet Tracker: '+EVN[type],body:txt};if(CHAN)n.channelId='fleet';
+   try{const p=CapPlugins.LN.schedule({notifications:[n]});if(p&&p.catch)p.catch(()=>{})}catch(e){}
+   // the voice waits for the tone to finish so the two never shout over each
+   // other, and ANN=false means this breach already announced itself
+   if(ANN[type]!==false&&R.voice!==false&&V.voice_on)
+    setTimeout(()=>speak(vrMsg(type,V.lang),V.lang),Math.min(2,Math.max(1,+R.beep_duration||5)))}
  if(R.beep!==false)beep(type)}
 // ---- driving events and telemetry
 const MIN_MOVING_KMH=2;
 const sepm=(a,b)=>{const r=x=>x*Math.PI/180,dLa=r(b.latitude-a.latitude),dLo=r(b.longitude-a.longitude),x=Math.sin(dLa/2)**2+Math.cos(r(a.latitude))*Math.cos(r(b.latitude))*Math.sin(dLo/2)**2;return 12742000*Math.asin(Math.sqrt(x))};
-const LIM={speed:100,brake:-3,accel:2.5,buf:0,warn:0,dist:0},HOLD={harsh_braking:0,harsh_acceleration:0,overspeed:0},ON={harsh_braking:1,harsh_acceleration:1,overspeed:1},lastEv={},lastNotify={},VS={},ANN={};let prev=null,lastA=0,lastLoc=null,ODOM=0,pp=null,bat={},fl=false,batT,cfgT,MOV=10,STP=60;
+let V={voice_on:1,lang:'en'};const LIM={speed:100,brake:-3,accel:2.5,buf:0,warn:0,dist:0,rbuf:0},HOLD={harsh_braking:0,harsh_acceleration:0,overspeed:0,road_overspeed:0},ON={},lastEv={},lastNotify={},VS={},ANN={};let prev=null,lastA=0,lastLoc=null,ODOM=0,pp=null,bat={},fl=false,batT,cfgT,MOV=10,STP=60;
+let ROAD=null,RT=0,RS=0,ROQP=false;
+// ---- the signed limit of the road being driven on. OpenStreetMap keeps a
+// maxspeed tag on mapped roads; Overpass is free and needs no key, so the phone
+// asks it at most every 20 s and only after moving 150 m. An unmapped or
+// untagged road leaves ROAD null, which simply means no road-limit event.
+const OSM=(a,b,c,d)=>{const r=x=>x*Math.PI/180,f=r(a),g=r(c),dl=r(b-a),h=Math.sin(f)*Math.sin(g)+Math.cos(f)*Math.cos(g)*Math.cos(dl);
+ return 6371000*Math.acos(Math.min(1,h))+(d||0)};
+function toKmh(v){const m=/^(\d+(?:\.\d+)?)\s*(mph)?$/i.exec(String(v).trim());if(!m)return null;
+ return Math.round(m[2]?+m[1]*1.60934:+m[1])}
+async function roadLimit(lat,lng){
+ const q='[out:json][timeout:10];way(around:60,'+lat+','+lng+')[highway][maxspeed];out tags geom;';
+ let j=null;
+ for(const u of ['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter']){
+  try{const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(q)});
+   if(r.ok){j=await r.json();break}}catch(e){}}
+ let best=null,bd=1e9;
+ ((j&&j.elements)||[]).forEach(el=>{const km=toKmh(el.tags&&el.tags.maxspeed);if(!km||km<5||km>200)return;
+  const g=(el.geometry||[]).map(x=>[x.lat,x.lng]);
+  for(let i=1;i<g.length;i++){const d=OSM(g[i-1][0],g[i-1][1],g[i][0],g[i][1],
+   OSM(g[i-1][0],g[i-1][1],lat,lng)+OSM(g[i][0],g[i][1],lat,lng)-OSM(g[i-1][0],g[i-1][1],g[i][0],g[i][1]));
+   if(d<bd){bd=d;best=km}}})
+ // only trust a road within 30 m, otherwise a quieter side street's limit would
+ // be blamed on the motorway the vehicle is really on
+ if(ROAD!==best){ROAD=bd<=30?best:null;rlUi()}}
+function rlUi(){const s=$('rl');if(!s)return;
+ if(ROAD==null){s.classList.add('hide');return}
+ s.classList.remove('hide');s.textContent=Math.round(ROAD)}
+
+// the alert fires the moment a limit is broken; the event row is written once
+// the breach outlasts its tolerance and is then closed when the limit is
+// respected again, so the dashboard can show Event End and Duration.
+const RST={};
 function detect(loc,kmh){
  if(loc.accuracy>25)return;
  if(pp){const d=sepm(pp,loc);if(d<200)ODOM+=d}
  pp=loc;
+ // the signed limit of the road we are on, refreshed as the vehicle moves
+ if(ON.road_overspeed&&kmh>10&&!ROQP&&kmh>=MIN_MOVING_KMH){const n=Date.now();
+  if(!RT||n-RT>20000){RT=n;RS=ODOM;ROQP=roadLimit(loc.latitude,loc.longitude).then(()=>{ROQP=false})}}
  if(ODOM<LIM.dist)return;
  const t=(loc.time||Date.now())/1000,v=kmh/3.6;
  if(prev&&t-prev.t>=0.8&&t-prev.t<=4){const a=(v-prev.v)/(t-prev.t);lastA=a;
   hold('harsh_braking',a<=LIM.brake,loc,kmh,a*3.6,t);hold('harsh_acceleration',a>=LIM.accel,loc,kmh,a*3.6,t);
   if(LIM.warn>0&&Math.abs(a)>=LIM.warn&&Math.abs(a)<(a<0?-LIM.brake:LIM.accel))warnMsg('Sharp '+(a<0?'braking':'acceleration')+' · '+Math.abs(a*3.6).toFixed(1)+' km/h/s')}
  if(!prev||t-prev.t>=0.8)prev={t,v};
- hold('overspeed',kmh>LIM.speed+LIM.buf,loc,kmh,kmh,t)}
-// the alert fires the moment a limit is broken; the event is only written when it lasts longer than the tolerance
+ hold('overspeed',kmh>LIM.speed+LIM.buf,loc,kmh,kmh,t);
+ if(ROAD)hold('road_overspeed',kmh>ROAD+LIM.rbuf,loc,kmh,kmh,t);
+ // write the row once the breach has outlasted its tolerance time
+ Object.keys(VS).forEach(k=>{const b=VS[k];if(b&&RST[k]==null&&t-b.t>=(HOLD[k]||0))ev(k)})}
 function hold(type,bad,loc,kmh,val,t){if(!ON[type])return;
- if(!bad){VS[type]=0;return}
- if(!VS[type]){VS[type]=t;const n=Date.now();ANN[type]=n-(lastNotify[type]||0)>60000;
+ if(!bad){endEv(type,t);return}
+ if(!VS[type]){VS[type]={t,loc,kmh,val,peak:val};
+  const lvl=evLvl(type),n=Date.now();ANN[type]=n-(lastNotify[type]||0)>60000;
   // the 60 second guard mutes a repeat, so the driver is never buzzed twice for
   // one breach: ev() only alerts when the breach at the start was muted
-  if(ANN[type]){lastNotify[type]=n;notify(type,kmh)}}
- if(t-VS[type]<Math.max(0,HOLD[type]||0))return;
- VS[type]=0;ev(type,loc,kmh,val)}
-function ev(type,loc,kmh,val){if(!ON[type])return;const n=Date.now();if(n-(lastEv[type]||0)<30000)return;lastEv[type]=n;
- if(!ANN[type])notify(type,kmh);ANN[type]=false;
- const lim=type==='overspeed'?Math.round(LIM.speed+LIM.buf):+(Math.abs(type==='harsh_braking'?LIM.brake:LIM.accel)*3.6).toFixed(1);
- const details=type==='overspeed'?`${Math.round(kmh)} km/h against a ${lim} km/h alert level${HOLD.overspeed?' held over '+HOLD.overspeed+' s':''}`:`${Math.abs(val).toFixed(1)} km/h/s ${type==='harsh_braking'?'deceleration':'acceleration'} against a ${lim} km/h/s limit`;
- sb.from('events').insert({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,type,lat:loc.latitude,lng:loc.longitude,speed:kmh,value:val,details,recorded_at:new Date(loc.time||n).toISOString()}).then(({error})=>{if(error)$('err').textContent='Event error: '+error.message})}
+  if(ANN[type]){lastNotify[type]=n;notify(type,kmh,lvl)}
+  // the dashboard needs the fix that opened the breach on the map straight away,
+  // so it is pushed and flushed instead of waiting for the next sampling tick
+  lastLoc=loc;queue.push(row(loc,Math.round(kmh),true));flush()}
+ else if(Math.abs(val)>Math.abs(VS[type].peak))VS[type].peak=val}
+const evLvl=type=>type==='overspeed'?Math.round(LIM.speed+LIM.buf)+' km/h':
+ type==='road_overspeed'?(ROAD!=null?Math.round(ROAD+LIM.rbuf)+' km/h':'the road limit'):
+ Math.abs(+(type==='harsh_braking'?LIM.brake:LIM.accel)*3.6).toFixed(1)+' km/h/s';
+function evTxt(type,kmh,val,peak,lvl,dur){
+ if(type==='overspeed'||type==='road_overspeed')return `${Math.round(kmh)} km/h against a ${lvl} alert level${HOLD[type]?' held over '+HOLD[type]+' s':''}${dur?' · lasted '+hm(dur):''}${peak&&peak>kmh?' · peak '+Math.round(peak)+' km/h':''}`;
+ return `${Math.abs(val).toFixed(1)} km/h/s ${type==='harsh_braking'?'deceleration':'acceleration'} against a ${lvl} limit${HOLD[type]?' held over '+HOLD[type]+' s':''}${dur?' · lasted '+hm(dur):''}${peak&&Math.abs(peak)>Math.abs(val)?' · peak '+Math.abs(peak).toFixed(1)+' km/h/s':''}`}
+const hm=x=>Math.floor(x/3600)+'h '+String(Math.floor(x%3600/60)).padStart(2,'0')+'m '+String(Math.round(x%60)).padStart(2,'0')+'s';
+function ev(type){const b=VS[type];if(!b)return;RST[type]='';
+ const lvl=evLvl(type),loc=b.loc,road=type==='road_overspeed'?Math.round(ROAD||0):null;
+ if(!ANN[type])notify(type,b.kmh,lvl);ANN[type]=false;
+ // every reading of the fix that opened the breach is stored with the event, so
+ // the dashboard popup and report need no second query
+ sb.from('events').insert({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,
+  vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,type,lat:loc.latitude,lng:loc.longitude,
+  speed:Math.round(b.kmh),value:+(type==='road_overspeed'||type==='overspeed'?b.kmh:b.val).toFixed(1),
+  details:evTxt(type,b.kmh,b.val,b.peak,lvl),recorded_at:new Date(loc.time||b.t*1000).toISOString(),
+  accuracy:loc.accuracy,altitude:loc.altitude,heading:loc.bearing,accel:+(lastA*3.6).toFixed(1),
+  battery_pct:bat.p,charging:bat.c,ignition:true,road_limit:road}).select('id').single().then(({data,error})=>{
+  if(error){$('err').textContent='Event error: '+error.message;RST[type]=null;return}
+  if(data&&data.id!=null)RST[type]=String(data.id)});}
+function endEv(type,t){const b=VS[type];if(!b)return;VS[type]=null;
+ const dur=Math.max(0,t-b.t),id=RST[type];
+ // a dab shorter than its tolerance never reached ev(), so there is no row to close
+ if(id){const lvl=evLvl(type),peak=b.peak;
+  sb.from('events').update({ended_at:new Date(t*1000).toISOString(),
+   value:+(type==='overspeed'||type==='road_overspeed'?Math.max(b.kmh,peak||0).toFixed(1):peak.toFixed(1)),
+   details:evTxt(type,b.kmh,b.val,peak,lvl,dur)}).eq('id',id).then(({error})=>{if(error&&RST[type]===id)RST[type]=null})}
+ RST[type]=null;
+ // and the fix that closed it, so the breach has an end point on the map too
+ if(b.loc)lastLoc=b.loc,queue.push(row(b.loc,Math.round(b.kmh),true)),flush()}
+
+// called when a trip ends: every open breach gets its end time and closing readings
+function closeAll(t){Object.keys(VS).forEach(k=>endEv(k,t))}
 function pickUi(){const s=$('pk');if(!s)return;
  $('vn').textContent=asg?.vehicles?.name||'No vehicle linked';$('dn').textContent=asg?.drivers?.name||'No driver linked';
  if(ASGS.length<2){s.classList.add('hide');s.replaceChildren();return}
  s.classList.remove('hide');s.replaceChildren(...ASGS.map(x=>{const o=document.createElement('option');o.value=x.vehicle_id;o.textContent=x.vehicles?.name||'Vehicle';o.selected=x.vehicle_id===PICK;return o}))}
-function pickV(){PICK=$('pk').value;localStorage.pick=PICK;if(watcher){stop();watcher=null}loadRules()}
+function pickV(){PICK=$('pk').value;localStorage.pick=PICK;if(watcher){stop();watcher=null}
+ $('err').textContent='';logAct('Switched vehicle',$('pk').selectedOptions[0]?.textContent||PICK);loadRules()}
 async function loadRules(){
  const [a,r,t]=await Promise.all([sb.from('assignments').select('vehicle_id,driver_id,vehicles(name,type,speed_limit,moving_interval,stopped_interval,brake_limit,accel_limit,speed_buffer,max_accel_warning,min_moving_distance),drivers(name)').eq('user_id',me.id),sb.from('event_rules').select('*'),sb.from('app_settings').select('*')]);
- if(a.data){ASGS=a.data.filter(x=>x.vehicle_id);if(!ASGS.some(x=>x.vehicle_id===PICK))PICK=ASGS[0]?.vehicle_id||null;asg=ASGS.find(x=>x.vehicle_id===PICK)||a.data[0]||null;pickUi()}const S={};(t.data||[]).forEach(x=>S[x.key]=+x.value);const v=asg?.vehicles||{};
- (r.data||[]).forEach(x=>{RUL[x.type]=x;ON[x.type]=x.enabled;const h=Math.max(0,+x.hold_s||0);
+ if(a.data){ASGS=a.data.filter(x=>x.vehicle_id);if(!ASGS.some(x=>x.vehicle_id===PICK))PICK=ASGS[0]?.vehicle_id||null;asg=ASGS.find(x=>x.vehicle_id===PICK)||a.data[0]||null;pickUi()}const S={},VC={};Object.keys(ON).forEach(k=>delete ON[k]);(t.data||[]).forEach(x=>VC[x.key]=x.value);(t.data||[]).forEach(x=>S[x.key]=+x.value);const v=asg?.vehicles||{};
+ // voice_on is only 0 when the dashboard switches it off; voice_lang stays text
+ // because app_settings stores every value as a string
+ V={voice_on:VC.voice_on==='0'?0:1,lang:VLANG[VC.voice_lang]?VC.voice_lang:'en'};
+ (r.data||[]).forEach(x=>{RUL[x.type]=x;if('voice'in x)x.voice=x.voice!==false;ON[x.type]=x.enabled;const h=Math.max(0,+x.hold_s||0);
   if(x.type==='overspeed'){LIM.speed=v.speed_limit||x.threshold;LIM.buf=Math.max(0,+v.speed_buffer||0);HOLD.overspeed=h}
   if(x.type==='harsh_braking'){LIM.brake=-(v.brake_limit||x.threshold)/3.6;HOLD.harsh_braking=h}
-  if(x.type==='harsh_acceleration'){LIM.accel=(v.accel_limit||x.threshold)/3.6;HOLD.harsh_acceleration=h}});
+  if(x.type==='harsh_acceleration'){LIM.accel=(v.accel_limit||x.threshold)/3.6;HOLD.harsh_acceleration=h}
+   if(x.type==='road_overspeed'){LIM.rbuf=Math.max(0,+x.threshold||0);HOLD.road_overspeed=h}});
  LIM.warn=Math.max(0,+v.max_accel_warning||0);LIM.dist=Math.max(0,+v.min_moving_distance||0);
  MOV=Math.max(1,v.moving_interval||S.moving_interval||10);STP=Math.max(1,v.stopped_interval||S.stopped_interval||60)}
 async function pollBat(){try{const b=await CapPlugins.Device.getBatteryInfo();bat={p:Math.round(b.batteryLevel*100),c:b.isCharging};$('v_bat').textContent=bat.p+'%'+(bat.c?' ⚡':'')}catch(e){}}
@@ -206,7 +348,9 @@ async function start(){
  if(!asg?.vehicle_id){$('err').textContent='No vehicle linked to this user. Ask your admin.';return}
  tone();
  try{
- await loadRules();pollBat();batT=setInterval(pollBat,30000);cfgT=setInterval(loadRules,300000);prev=null;pp=null;ODOM=0;Object.keys(VS).forEach(k=>VS[k]=0);Object.keys(lastNotify).forEach(k=>lastNotify[k]=0);
+ await loadRules();pollBat();batT=setInterval(pollBat,30000);cfgT=setInterval(loadRules,300000);prev=null;pp=null;ODOM=0;Object.keys(VS).forEach(k=>VS[k]=0);Object.keys(RST).forEach(k=>RST[k]=null);
+ // a new trip starts from a clean map: no stale road limit or alert timer
+ ROAD=null;RT=RS=0;rlUi();Object.keys(lastNotify).forEach(k=>lastNotify[k]=0);
  if(!window.CapPlugins)throw new Error('Plugin bridge missing: rebuild the APK with the latest build-apk.yml');
  watcher=await CapPlugins.BG.addWatcher({backgroundTitle:'Trip in progress',backgroundMessage:'Sending location to fleet dashboard',requestPermissions:true,stale:false,distanceFilter:0},
  async(loc,err)=>{
@@ -220,10 +364,12 @@ async function start(){
  await askNotif();
  }catch(e){$('err').textContent='Error: '+(e.message||e)}
 }
-async function stop(){clearInterval(batT);clearInterval(cfgT);prev=null;pp=null;Object.keys(VS).forEach(k=>VS[k]=0);if(lastLoc){queue.push(row(lastLoc,0,false));flush()}
+async function stop(){clearInterval(batT);clearInterval(cfgT);prev=null;pp=null;closeAll(Date.now()/1000);
+ Object.keys(VS).forEach(k=>VS[k]=0);ROAD=null;RT=RS=0;rlUi();if(lastLoc){queue.push(row(lastLoc,0,false));flush()}
  logAct('Ended trip',(asg?.vehicles?.name||'')+(lastLoc?' at '+lastLoc.latitude.toFixed(5)+', '+lastLoc.longitude.toFixed(5):''));
  await CapPlugins.BG.removeWatcher({id:watcher});$('go').classList.remove('hide');$('stp').classList.add('hide');const c=$('stc');c.textContent='Parking';c.style.background='var(--bll)';c.style.color='var(--bl)';$('sp').textContent='0'}
 async function openDash(){const {data:{session}}=await sb.auth.getSession();if(!session)return;
+ logAct('Opened dashboard from app',(asg?.vehicles?.name||''));
  const u=DASH+'#access_token='+session.access_token+'&refresh_token='+session.refresh_token+'&expires_in=3600&token_type=bearer';
  try{await CapPlugins.Browser.open({url:u})}catch(e){window.open(u,'_blank')}}
 if(localStorage.user){$('em').value=localStorage.user;$('rem').checked=true}
