@@ -33,26 +33,31 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 @keyframes pl{50%{transform:scale(1.5);opacity:.45}}
 #map.alrt{outline:4px solid var(--rd);outline-offset:-4px;animation:mb 1s infinite alternate}@keyframes mb{to{outline-color:#fff0}}
 .hero{width:100%;height:auto;border-radius:16px;display:block}.hero .draw{stroke-dasharray:400;stroke-dashoffset:400;animation:dr 7s ease-in-out infinite}@keyframes dr{0%{stroke-dashoffset:400}65%,100%{stroke-dashoffset:0}}.hero .blink{animation:bk 1.2s steps(2) infinite}@keyframes bk{to{opacity:.15}}
-@media (prefers-reduced-motion:reduce){.hero .draw,.hero .blink,#map.alrt,.mk.pulse{animation:none}}
+.lgname{font-weight:900;font-size:22px;letter-spacing:.2px;margin:0 0 4px}@media (prefers-reduced-motion:reduce){.hero .draw,.hero .blink,#map.alrt,.mk.pulse{animation:none}}
 #map{flex:1;min-height:80px;margin:0}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.grid3 div{background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px 8px;min-width:0}.grid3 small{display:block;color:var(--mut);font-size:10px}.grid3 b{font-size:12px;white-space:nowrap}.grid3 .w2{grid-column:span 2}
 .btns{display:flex;gap:8px}.btns .btn{margin:0;height:48px}
 .mcl{position:absolute;z-index:999;right:8px;top:8px;display:flex;flex-direction:column;gap:6px}.mcl button{width:38px;height:38px;border:0;border-radius:10px;background:#fff;box-shadow:0 1px 6px #0004;color:var(--ink)}
 #err{position:fixed;bottom:66px;left:12px;right:12px;font-size:12px;pointer-events:none;margin:0;z-index:50}
+/* Short screens (a phone held sideways, a small window): every screen has to fit
+   without scrolling, so the login artwork and the step spacing give way first. */
+@media(max-height:660px){.hero{max-height:112px;width:auto;margin:2px auto}#lg{padding:8px 16px!important}.lgname{font-size:19px}#pm{padding:8px 16px}#pm h2{margin:0 0 4px}#pm p{margin:0 0 6px}#pm .card.step{padding:6px 8px}#pm .btn{height:42px;margin:4px 0}.spd b{font-size:28px}}
 </style></head><body>
 <div id="lg" class="screen" style="text-align:center;padding-top:40px">
-<svg class="hero" viewBox="0 0 320 180" role="img" aria-label="A vehicle driving along a tracked route"><defs><linearGradient id="hsky" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe9d2"/><stop offset="1" stop-color="#dcebfd"/></linearGradient><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f28c28"/><stop offset="1" stop-color="#2f7fe6"/></linearGradient></defs>
+<div class="lgname">Fleet Tracker</div>
+<svg class="hero" viewBox="0 0 320 180" role="img" aria-label="A vehicle monitored along a safe, controlled route"><defs><linearGradient id="hsky" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e9f2fd"/><stop offset="1" stop-color="#e6f7ee"/></linearGradient><linearGradient id="hsh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3d8bf0"/><stop offset="1" stop-color="#1f5cbd"/></linearGradient></defs>
 <rect width="320" height="180" rx="18" fill="url(#hsky)"/>
-<g fill="#fff" opacity=".75"><rect x="14" y="14" width="64" height="36" rx="6"/><rect x="104" y="14" width="104" height="36" rx="6"/><rect x="234" y="72" width="72" height="46" rx="6"/><rect x="14" y="72" width="64" height="46" rx="6"/><rect x="104" y="140" width="104" height="28" rx="6"/><rect x="234" y="140" width="72" height="28" rx="6"/></g>
-<path d="M0 61H320M0 129H320M91 0V180M221 0V180" stroke="#fff" stroke-width="12"/><path d="M0 61H320M0 129H320M91 0V180M221 0V180" stroke="#efe3d4" stroke-width="1" stroke-dasharray="6 6"/>
-<path id="hrt" pathLength="400" class="draw" d="M30 150C62 150 70 129 91 118S100 70 140 64 196 82 221 64 262 40 286 36" fill="none" stroke="#2f7fe6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-<circle cx="30" cy="150" r="7" fill="#27a46a" stroke="#fff" stroke-width="3"/>
-<circle cx="286" cy="36" r="8" fill="#d9534f" opacity=".45"><animate attributeName="r" values="8;24;8" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values=".5;0;.5" dur="2s" repeatCount="indefinite"/></circle>
-<path d="M286 10c-8 0-14 6-14 14 0 10 14 25 14 25s14-15 14-25c0-8-6-14-14-14z" fill="#d9534f" stroke="#fff" stroke-width="2"/><circle cx="286" cy="24" r="4.5" fill="#fff"/>
-<g><circle r="12" fill="#f28c28" stroke="#fff" stroke-width="3"/><path d="M-6 -3h7v6h-7zM1 -1h3l2 2v2h-5z" fill="#fff"/><circle cx="-3.5" cy="4" r="1.6" fill="#fff"/><circle cx="3.5" cy="4" r="1.6" fill="#fff"/><animateMotion dur="7s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.65;1" calcMode="linear"><mpath href="#hrt"/></animateMotion></g>
-<g transform="translate(14 150)"><rect width="58" height="20" rx="10" fill="#fff"/><circle cx="12" cy="10" r="4" fill="#27a46a" class="blink"/><text x="21" y="14" font-size="10" font-weight="800" fill="#26323a" font-family="Nunito,system-ui,sans-serif">LIVE</text></g>
+<g fill="#fff" opacity=".8"><rect x="14" y="14" width="64" height="38" rx="7"/><rect x="104" y="14" width="104" height="38" rx="7"/><rect x="234" y="70" width="72" height="46" rx="7"/><rect x="14" y="70" width="64" height="46" rx="7"/><rect x="104" y="136" width="104" height="30" rx="7"/><rect x="234" y="136" width="72" height="30" rx="7"/></g>
+<path d="M0 61H320M0 129H320M91 0V180M221 0V180" stroke="#fff" stroke-width="13"/><path d="M0 61H320M0 129H320M91 0V180M221 0V180" stroke="#cfe0f5" stroke-width="1" stroke-dasharray="6 6"/>
+<path id="hrt" pathLength="400" class="draw" d="M40 122C72 122 80 100 104 92S124 62 156 58 200 76 224 62 252 56 276 60" fill="none" stroke="#2f7fe6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="40" cy="122" r="6.5" fill="#27a46a" stroke="#fff" stroke-width="3"/>
+<circle cx="276" cy="40" r="9" fill="#2f7fe6" opacity=".35"><animate attributeName="r" values="9;24;9" dur="2.4s" repeatCount="indefinite"/><animate attributeName="opacity" values=".4;0;.4" dur="2.4s" repeatCount="indefinite"/></circle>
+<path d="M276 26c-8 0-14 6-14 14 0 10 14 20 14 20s14-10 14-20c0-8-6-14-14-14z" fill="#2f7fe6" stroke="#fff" stroke-width="2"/><circle cx="276" cy="40" r="4.5" fill="#fff"/>
+<g><circle r="11" fill="#f28c28" stroke="#fff" stroke-width="3"/><path d="M-5 -3h6v5h-6zM1 -1h3l2 2v2h-5z" fill="#fff"/><circle cx="-3" cy="3.6" r="1.5" fill="#fff"/><circle cx="3" cy="3.6" r="1.5" fill="#fff"/><animateMotion dur="7s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.65;1" calcMode="linear"><mpath href="#hrt"/></animateMotion></g>
+<g transform="translate(16 16)"><path d="M16 0l15 5v11c0 9-6 16-15 19C7 32 1 25 1 16V5z" fill="url(#hsh)" stroke="#fff" stroke-width="2.5"/><path d="M8 16l6 6 10-11" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(14 148)"><rect width="66" height="22" rx="11" fill="#16222c" opacity=".88"/><circle cx="14" cy="11" r="4" fill="#3ddc97" class="blink"/><text x="24" y="15" font-size="10" font-weight="800" fill="#fff" font-family="Nunito,system-ui,sans-serif">LIVE</text></g>
+<g transform="translate(88 148)"><rect width="94" height="22" rx="11" fill="#27a46a" opacity=".92"/><path d="M12 11l3 3 5-6" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><text x="26" y="15" font-size="10" font-weight="800" fill="#fff" font-family="Nunito,system-ui,sans-serif">IN CONTROL</text></g>
 </svg>
-</h2>
 <input id="em" placeholder="Username or email" autocomplete="username" autocapitalize="none">
 <div style="position:relative"><input id="pw" type="password" placeholder="Password" autocomplete="current-password"><button type="button" class="eye" onclick="eye()"><i class="fa-solid fa-eye" id="eyei"></i></button></div>
 <label style="display:flex;gap:8px;align-items:center;margin:8px 0;font-weight:600"><input type="checkbox" id="rem" style="width:20px;height:20px;margin:0"> Remember me</label>
@@ -106,7 +111,7 @@ async function signIn(){
  try{const {error}=await sb.auth.signInWithPassword({email:mail($('em').value),password:$('pw').value});if(error)throw error;
   want?localStorage.user=$('em').value.trim():localStorage.removeItem('user');await init(1)}catch(e){$('err').textContent='Error: '+(e.message||e)}
  b.disabled=false;b.innerHTML='<i class="fa-solid fa-right-to-bracket"></i>Sign in'}
-async function signOut(){await logAct('Signed out','Phone');await sb.auth.signOut();location.reload()}
+async function signOut(){sessStop();await logAct('Signed out','Phone');await sb.auth.signOut();location.reload()}
 function pwUi(){const c=$('pwcard');c.classList.toggle('hide');const open=!c.classList.contains('hide');
  // the app screen is fixed-height, so the map gives up its space while the panel is open
  $('map').classList.toggle('hide',open);
@@ -121,14 +126,22 @@ async function changePw(){if(!sb)return;const a=$('np1').value,b=$('np2').value;
  pwUi();$('err').textContent='Password changed.';logAct('Changed own password')}
 // Audit trail for the admin-only Activity Log. Silently ignored if the table is
 // not there yet, because a logging failure must never stop a driver's trip.
-function logAct(action,details){if(!me)return;(async()=>{
- try{await sb.from('user_activity').insert({user_id:me.id,user_name:(me.email||'').replace('@fleet.local',''),action,details:details==null?null:String(details).slice(0,300),device:'phone'})}catch(e){}})()}
+function logAct(action,details,duration_s){if(!me)return;(async()=>{
+ try{await sb.from('user_activity').insert({user_id:me.id,user_name:(me.email||'').replace('@fleet.local',''),action,details:details==null?null:String(details).slice(0,300),device:'phone',...(duration_s==null?{}:{duration_s:Math.max(0,Math.round(duration_s))})})}catch(e){}})()}
+// Time on screen: Android hides this page when the app goes to the background, and
+// that flush is what lets the dashboard's Activity Log add up how long a driver
+// actually spent in the app. Under ten seconds is a glance at a notification.
+let SST=0;
+function sessStop(){if(!SST||!me)return;const s=Math.round((Date.now()-SST)/1000);SST=0;if(s>=10)logAct('Session time','App',s)}
+function sessStart(){if(me)SST=Date.now()}
+document.addEventListener('visibilitychange',()=>{document.hidden?sessStop():sessStart()});
+addEventListener('pagehide',sessStop);
 async function init(fresh){
  if(!sb)return;const {data:{session}}=await sb.auth.getSession();if(!session)return;me=session.user;
  await loadRules();
  const nm=(me.email||'').replace('@fleet.local','');$('wn').textContent=nm;
  const v=asg?.vehicles;$('vn').textContent=v?.name||'No vehicle linked';$('dn').textContent=asg?.drivers?.name||'No driver linked';$('vi').className='fa-solid '+(TI[v?.type]||'fa-car');
- logAct(fresh?'Signed in':'Opened app',$('vn').textContent);
+ logAct(fresh?'Signed in':'Opened app',$('vn').textContent);sessStart();
  $('dash').classList.remove('hide');
  [['acc','Accuracy','fa-bullseye'],['alt','Elevation','fa-mountain'],['dir','Direction','fa-compass'],['ac','Accel.','fa-gauge'],['bat','Battery','fa-battery-half'],['sent','Sent','fa-cloud-arrow-up']].forEach(x=>{if(!$('v_'+x[0]))$('vals').insertAdjacentHTML('beforeend',`<div class="${x[3]||''}"><small><i class="fa-solid ${x[2]}"></i> ${x[1]}</small><b id="v_${x[0]}">-</b></div>`)});
  enter()}
@@ -173,12 +186,14 @@ async function askNotif(){await logAct('Allowed permissions');
 // seven buzzer tones, identical to the dashboard list so the tone you preview
 // there is the tone the phone plays. Square/sawtooth waves are harsh at full
 // volume, so they are played back quieter.
-const TONES={discontinuous:'Discontinuous',continuous:'Continuous',fast:'Fast beeps',twotone:'Two-tone alarm',siren:'Siren',chime:'Chime',pulse:'Rising pulse'};
-function playTone(a,type,dur,vol){const t0=a.currentTime+.05,end=t0+dur;
+const TONES={off:'Off',discontinuous:'Discontinuous',continuous:'Continuous',fast:'Fast beeps',twotone:'Two-tone alarm',siren:'Siren',chime:'Chime',pulse:'Rising pulse'};
+let TOSC=[];
+function stopTone(){if(!AC)return;const n=AC.currentTime;TOSC.forEach(x=>{try{x.g.gain.cancelScheduledValues(n);x.g.gain.setValueAtTime(0,n);x.o.stop(n+.02)}catch(e){}});TOSC=[]}
+function playTone(a,type,dur,vol){if(!a||type==='off')return;stopTone();const t0=a.currentTime+.05,end=t0+dur;
  const note=(f,s,e,w,f2)=>{if(s>=end)return;e=Math.min(e,end);const o=a.createOscillator(),g=a.createGain(),v=w==='square'||w==='sawtooth'?vol*.45:vol;
   o.type=w||'sine';o.frequency.setValueAtTime(f,s);if(f2)o.frequency.linearRampToValueAtTime(f2,e);
   g.gain.setValueAtTime(0,s);g.gain.linearRampToValueAtTime(v,s+.01);g.gain.setValueAtTime(v,Math.max(s+.01,e-.02));g.gain.linearRampToValueAtTime(0,e);
-  o.connect(g);g.connect(a.destination);o.start(s);o.stop(e+.01)};
+  o.connect(g);g.connect(a.destination);o.start(s);o.stop(e+.01);TOSC.push({o,g})};
  const rep=(st,fn)=>{for(let s=t0;s<end;s+=st)fn(s)};
  switch(type){
   case 'continuous':note(880,t0,end);break;
@@ -199,14 +214,14 @@ const VMSG={
 const vrMsg=(t,l)=>(VMSG[l]||VMSG.en)[t]||VMSG.en[t]||'';
 // the WebView's own speechSynthesis is unreliable on Android, so the native
 // text-to-speech plugin is tried first and the browser voice is the fallback.
-async function speak(txt,lang){if(V.voice_on===0)return;
- const code=(VLANG[lang]||VLANG.en)[1];
- if(CapPlugins&&CapPlugins.TTS){try{await CapPlugins.TTS.speak({text:txt,lang:code,rate:1,pitch:1,volume:1});return}
-  // no such voice installed: retry in English rather than staying silent
-  catch(e){try{await CapPlugins.TTS.speak({text:txt,lang:'en-US',rate:1,pitch:1,volume:1});return}catch(e2){}}}
+async function speak(txt,lang){const code=(VLANG[lang]||VLANG.en)[1],try2=[];
+ if(CapPlugins&&CapPlugins.TTS){for(const c of [code,code.split('-')[0],'en-US']){if(try2.includes(c))continue;try2.push(c);
+   try{await CapPlugins.TTS.speak({text:txt,lang:c,rate:1,pitch:1,volume:1});return}catch(e){}}return}
  const S=window.speechSynthesis,U=window.SpeechSynthesisUtterance;if(!S||!U)return;
- try{const u=new U(txt);u.lang=code;S.cancel();S.speak(u)}catch(e){}}
-function beep(type){const R=RUL[type]||{},dur=Math.max(1,+R.beep_duration||5);
+ try{let vs=[];try{vs=S.getVoices()||[]}catch(e){}
+  const v=vs.find(x=>x.lang===code)||vs.find(x=>(x.lang||'').split('-')[0]===code.split('-')[0]);
+  const u=new U(txt);u.lang=v?v.lang:code;if(v)u.voice=v;S.cancel();S.speak(u)}catch(e){}}
+function beep(type){const R=RUL[type]||{};if(R.beep===false||R.beep_type==='off')return;const dur=Math.max(1,+R.beep_duration||5);
  try{playTone(tone(),R.beep_type,dur,.3)}catch(e){}
  if(navigator.vibrate){const p=[];if(R.beep_type==='continuous'||R.beep_type==='siren')p.push(dur*1000);
   else for(let i=0;i<Math.max(1,Math.round(dur*2));i++)p.push(300,200);try{navigator.vibrate(p)}catch(e){}}}
@@ -219,9 +234,10 @@ function notify(type,kmh,lvl){const R=RUL[type]||{},txt=Math.round(kmh)+' km/h'+
    try{const p=CapPlugins.LN.schedule({notifications:[n]});if(p&&p.catch)p.catch(()=>{})}catch(e){}
    // the voice waits for the tone to finish so the two never shout over each
    // other, and ANN=false means this breach already announced itself
-   if(ANN[type]!==false&&R.voice!==false&&V.voice_on)
-    setTimeout(()=>speak(vrMsg(type,V.lang),V.lang),Math.min(2,Math.max(1,+R.beep_duration||5)))}
- if(R.beep!==false)beep(type)}
+   const vl=R.voice_lang&&VLANG[R.voice_lang]?R.voice_lang:(R.voice_lang==='off'||R.voice===false||!V.voice_on?'off':V.lang);
+   if(ANN[type]!==false&&vl!=='off')
+    setTimeout(()=>speak(vrMsg(type,vl),vl),Math.min(2,Math.max(1,+R.beep_duration||5)))}
+ beep(type)}
 // ---- driving events and telemetry
 const MIN_MOVING_KMH=2;
 const sepm=(a,b)=>{const r=x=>x*Math.PI/180,dLa=r(b.latitude-a.latitude),dLo=r(b.longitude-a.longitude),x=Math.sin(dLa/2)**2+Math.cos(r(a.latitude))*Math.cos(r(b.latitude))*Math.sin(dLo/2)**2;return 12742000*Math.asin(Math.sqrt(x))};
@@ -364,7 +380,7 @@ async function start(){
  await askNotif();
  }catch(e){$('err').textContent='Error: '+(e.message||e)}
 }
-async function stop(){clearInterval(batT);clearInterval(cfgT);prev=null;pp=null;closeAll(Date.now()/1000);
+async function stop(){stopTone();clearInterval(batT);clearInterval(cfgT);prev=null;pp=null;closeAll(Date.now()/1000);
  Object.keys(VS).forEach(k=>VS[k]=0);ROAD=null;RT=RS=0;rlUi();if(lastLoc){queue.push(row(lastLoc,0,false));flush()}
  logAct('Ended trip',(asg?.vehicles?.name||'')+(lastLoc?' at '+lastLoc.latitude.toFixed(5)+', '+lastLoc.longitude.toFixed(5):''));
  await CapPlugins.BG.removeWatcher({id:watcher});$('go').classList.remove('hide');$('stp').classList.add('hide');const c=$('stc');c.textContent='Parking';c.style.background='var(--bll)';c.style.color='var(--bl)';$('sp').textContent='0'}
