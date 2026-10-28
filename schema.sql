@@ -10,7 +10,8 @@
 -- once adds only what is new: the hdop clean-up (which rebuilds the
 -- latest_positions view), event_rules.hold_s (the tolerance window the
 -- Configuration page now saves), vehicle_report.over_s (overspeed seconds for
--- the safety score), the score_green/score_red settings and the admin seed
+-- the safety score), the score_green/score_red settings, the user_activity
+-- audit table behind the new Activity Log report and the admin seed
 -- below. Everything else is skipped.
 --
 -- The "admin seed" block makes ameer@fleettrack.com role=admin, so the separate
@@ -118,6 +119,20 @@ create table if not exists geofences (
   id uuid primary key default gen_random_uuid(),
   name text not null, shape jsonb not null, color text default '#2f7fe6',
   enabled boolean default true, created_at timestamptz default now());
+
+-- Audit trail (v10): every sign-in, configuration save, vehicle/driver/user
+-- change, trip start/end and report export. Written by the account it describes
+-- and readable only by an admin, so a driver cannot see or edit what was logged
+-- about them. Names are copied in at write time; deleting a user later must not
+-- erase the record of what that user did, so there is no foreign key here.
+create table if not exists user_activity (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null, user_name text,
+  action text not null, details text,
+  device text,
+  recorded_at timestamptz not null default now());
+create index if not exists user_activity_time on user_activity (recorded_at desc);
+create index if not exists user_activity_user on user_activity (user_id, recorded_at desc);
 
 -- --------------------------------------------------- additive columns ----
 -- The same columns, restated as idempotent ALTERs. create-table-if-not-exists
@@ -262,6 +277,7 @@ alter table events      enable row level security;
 alter table event_rules enable row level security;
 alter table app_settings enable row level security;
 alter table geofences   enable row level security;
+alter table user_activity enable row level security;
 
 drop policy if exists "profiles read"  on profiles;
 create policy "profiles read"  on profiles for select using (id = auth.uid() or is_admin());
@@ -317,6 +333,14 @@ drop policy if exists "geo read" on geofences;
 create policy "geo read" on geofences for select using (auth.uid() is not null);
 drop policy if exists "geo admin" on geofences;
 create policy "geo admin" on geofences for all using (is_admin()) with check (is_admin());
+
+-- Audit trail: an account may only write entries about itself, and only an admin
+-- can read them. There is deliberately no update or delete policy, so nobody —
+-- not even an admin — can alter or erase what was logged.
+drop policy if exists "activity insert own" on user_activity;
+create policy "activity insert own" on user_activity for insert to authenticated with check (user_id = auth.uid());
+drop policy if exists "activity admin read" on user_activity;
+create policy "activity admin read" on user_activity for select to authenticated using (is_admin());
 
 -- ------------------------------------------------------------- realtime ----
 -- the dashboard listens for position and event inserts; both must be in the
