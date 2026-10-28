@@ -14,6 +14,16 @@
 -- audit table behind the new Activity Log report and the admin seed
 -- below. Everything else is skipped.
 --
+-- New in v12 (the trip-based Historical Tracking, Events Report and phone alert
+-- update) -- running this file once adds:
+--   events.ended_at plus the readings of the fix that opened the breach
+--   (accuracy, altitude, heading, accel, battery, ignition, road_limit), so an
+--   event shows Event End and Duration instead of only a start, and
+--   event_rules.voice plus app_settings voice_on / voice_lang, which switch the
+--   spoken safety warning per event, fleet-wide and by language,
+--   the seeded road_overspeed rule (the signed limit of the road being driven),
+--   and the events update policy the phone needs to close the event it opened.
+--
 -- The "admin seed" block makes ameer@fleettrack.com role=admin, so the separate
 -- Admin.sql saved query in Supabase is no longer needed — delete it once this
 -- file has run and you have confirmed: select email, role from profiles;
@@ -76,12 +86,19 @@ create table if not exists events (
   id bigint generated always as identity primary key,
   user_id uuid not null, vehicle_id uuid, driver_id uuid,
   vehicle_name text, driver_name text,
-  type text not null,                            -- harsh_braking | harsh_acceleration | overspeed
+  type text not null,                            -- harsh_braking | harsh_acceleration | overspeed | road_overspeed
   lat double precision, lng double precision,
   speed double precision,
   value double precision,                        -- km/h per second, or km/h when overspeed
   recorded_at timestamptz not null default now(),
-  details text);                                 -- human-readable wording from the phone
+  details text,                                  -- human-readable wording from the phone
+  -- v12: the whole life of a breach. recorded_at stays the moment the limit was
+  -- first broken, ended_at is written when it stopped, so the Events Report can
+  -- show a duration. The readings belong to the breach-start fix, and
+  -- road_limit is the maxspeed signed on the road the phone was driving on.
+  ended_at timestamptz, accuracy real, altitude real, heading real,
+  accel real, battery_pct real, charging boolean, ignition boolean,
+  road_limit int);
 
 -- Indexes for the hot queries (live list, history, event reports). Guarded by
 -- definition, so re-running this file never duplicates the unnamed indexes
@@ -109,7 +126,9 @@ create table if not exists event_rules (
   beep_duration int default 5,                  -- seconds the buzzer sounds
   beep_type text default 'discontinuous',       -- 'continuous' | 'discontinuous'
   -- tolerance window (v9): how long the limit must stay broken before the event is written
-  hold_s numeric default 0);                    -- seconds; the phone alert still fires immediately
+  hold_s numeric default 0,                     -- seconds; the phone alert still fires immediately
+  -- v12: speak the safety message for this event on the phone
+  voice boolean default true);
 
 -- fleet-wide sampling intervals (v6)
 create table if not exists app_settings (key text primary key, value text not null);
@@ -161,11 +180,16 @@ alter table positions add column if not exists accuracy real, add column if not 
   add column if not exists charging boolean, add column if not exists battery_v real;
 
 alter table events add column if not exists details text;
+alter table events add column if not exists ended_at timestamptz, add column if not exists accuracy real,
+  add column if not exists altitude real, add column if not exists heading real, add column if not exists accel real,
+  add column if not exists battery_pct real, add column if not exists charging boolean,
+  add column if not exists ignition boolean, add column if not exists road_limit int;
 
 alter table event_rules add column if not exists beep boolean default true,
   add column if not exists beep_duration int default 5,
   add column if not exists beep_type text default 'discontinuous',
-  add column if not exists hold_s numeric default 0;
+  add column if not exists hold_s numeric default 0,
+  add column if not exists voice boolean default true;
 
 -- ------------------------------------------------- assignments, many-to-one ----
 -- v11: one login can now be linked to several vehicles and several drivers, so
@@ -190,7 +214,10 @@ create index if not exists assignments_user on assignments (user_id);
 insert into event_rules (type, label, enabled, threshold, alert, hold_s) values
   ('harsh_braking',     'Harsh braking',     true, 11,  true, 2),   -- km/h per second (v5 units)
   ('harsh_acceleration','Harsh acceleration', true,  9,  true, 2),  -- km/h per second
-  ('overspeed',         'Overspeed',         true, 100,  true, 10)  -- km/h
+  ('overspeed',         'Overspeed',         true, 100,  true, 10),  -- km/h
+  -- v12: the signed limit of the road being driven on, read from OpenStreetMap
+  -- data by the phone. threshold is the margin in km/h allowed over it.
+  ('road_overspeed',    'Road speed limit',  true, 10,  true, 5)     -- km/h over the road limit
   on conflict (type) do nothing;
 
 -- give the tolerance window its 2 s / 10 s defaults exactly once on a project
@@ -210,6 +237,12 @@ insert into app_settings (key, value) values ('moving_interval','10'), ('stopped
 -- index: at or below score_green it shows green, at or above score_red it shows
 -- red, in between it shows amber. Both are editable from the Configuration page.
 insert into app_settings (key, value) values ('score_green','1'), ('score_red','3')
+  on conflict (key) do nothing;
+
+-- spoken safety warnings (v12): voice_on switches them off fleet-wide and
+-- voice_lang picks the language. The phone reads both, along with the per-event
+-- event_rules.voice tick, and speaks the message with its own text-to-speech.
+insert into app_settings (key, value) values ('voice_on','1'), ('voice_lang','en')
   on conflict (key) do nothing;
 
 -- ------------------------------------------------------------ views/procs ----
@@ -318,6 +351,14 @@ create policy "events insert own" on events for insert with check (
 drop policy if exists "events read"       on events;
 create policy "events read"   on events for select using (
   is_admin() or vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()));
+
+-- v12: an event row is opened when a limit is broken and closed when it stops, so
+-- the phone must be able to update its own rows. vehicle_id is still checked, so
+-- an account can only ever close an event for a vehicle assigned to it.
+drop policy if exists "events update own" on events;
+create policy "events update own" on events for update to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid() and vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()));
 
 drop policy if exists "rules read" on event_rules;
 create policy "rules read" on event_rules for select using (auth.uid() is not null);
@@ -454,4 +495,18 @@ end $$;
 --        login to one row. The DO block moves the key onto a generated id and leaves a plain index on user_id, so the
 --        Users page can store several vehicles and several drivers for the same person. Existing rows are untouched.
 --   assignments.created_at                                             -> ordering for the driver app's vehicle list.
+-- new in this file (v12, trip history, event duration, voice warnings)
+--   events gains ended_at and a full snapshot of the fix that opened the breach
+--        (accuracy, altitude, heading, accel, battery_pct, charging, ignition, road_limit). The phone writes all of
+--        it when the limit is broken and only edits ended_at / value / details when it stops, which is what gives the
+--        Events Report its Event End and Duration columns.
+--   policy "events update own"                                       -> without it the phone could insert an event
+--        but never close it again.
+--   event_rules.voice (true)                                           -> per-event tick on the Configuration page;
+--        the driver app speaks the safety warning for that event in the chosen language.
+--   app_settings keys 'voice_on' (1) and 'voice_lang' (en)              -> the fleet-wide switch and the language
+--        (en, ar, hi or ur) for those spoken warnings.
+--   seeded event_rules row 'road_overspeed' (threshold 10 km/h, hold 5 s)  -> a new event type: the phone looks up
+--        the maxspeed signed on the road it is driving on (OpenStreetMap data) and records a breach when the vehicle
+--        passes that limit by more than the threshold.
 -- ============================================================================
