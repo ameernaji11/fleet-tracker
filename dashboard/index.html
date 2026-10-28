@@ -1,7 +1,8 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://geocode.arcgis.com https://photon.komoot.io https://nominatim.openstreetmap.org https://api.bigdatacloud.net https://overpass-api.de https://overpass.kumi.systems; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="referrer" content="no-referrer">
 <title>Fleet Tracker</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icon.svg">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap">
@@ -34,7 +35,7 @@ section{display:none;height:100%;flex-direction:column;gap:14px}section.on{displ
 .panel{display:flex;flex-direction:column;gap:10px;min-height:0;padding:12px}.list{overflow:auto;flex:1}
 .map{border-radius:14px;border:1px solid var(--line);overflow:hidden;min-height:340px;height:100%}.mapc{flex:1;min-height:340px}
 .veh{display:flex;gap:10px;align-items:center;padding:10px;border-radius:10px;cursor:pointer}.veh:hover{background:var(--bg)}
-.veh .av{width:34px;height:34px;border-radius:50%;color:#fff;display:grid;place-items:center;flex:none}.veh .t{flex:1;min-width:0}.veh small{color:var(--mut)}
+.veh.on{background:var(--bll)}.veh .av{width:34px;height:34px;border-radius:50%;color:#fff;display:grid;place-items:center;flex:none}.veh .t{flex:1;min-width:0}.veh small{color:var(--mut)}
 .chip{font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px}
 .field{display:flex;flex-direction:column;gap:4px;min-width:0}.field label{font-weight:700;font-size:12px;color:var(--mut)}
 .pick{max-height:132px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:6px 9px;min-width:180px;text-align:left;background:var(--card)}.pick label{display:flex;gap:8px;align-items:center;font-size:13px;font-weight:600;padding:3px 0;cursor:pointer}.pick input[type=checkbox]{width:17px;height:17px;flex:0 0 auto;margin:0;accent-color:var(--bl)}.pick small{color:var(--mut)}
@@ -74,10 +75,37 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 .pbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.pbar .chip{cursor:pointer;background:var(--bll);color:var(--bl)}
 .ibtn{border:1px solid var(--line);border-radius:50%;width:18px;height:18px;font-size:11px;font-weight:800;background:var(--card);color:var(--bl);cursor:pointer;padding:0}
 .mk.sm{width:20px;height:20px;font-size:9px;border-width:2px}
+.kbar{display:flex;gap:8px;align-items:center}.kbar>.btn{flex:none}.kstrip{display:flex;gap:8px;overflow-x:auto;flex:1;min-width:0;padding-bottom:2px}.kstrip .kpi{flex:1 0 auto;padding:6px 10px;gap:8px;border-radius:10px}.kstrip .kpi .ic{width:28px;height:28px;font-size:13px;border-radius:8px}.kstrip .kpi b{font-size:15px;white-space:nowrap}.kstrip .kpi span{font-size:11px;white-space:nowrap}
+.hwrap{flex:1;min-height:420px;display:grid;grid-template-columns:1fr 330px;gap:14px}.hwrap .map{min-height:420px}.hside{display:flex;flex-direction:column;gap:10px;min-height:0;overflow:auto;padding:12px}
+.trl{display:flex;flex-direction:column;gap:4px}.trr{display:flex;gap:8px;align-items:center;padding:6px 8px;border-radius:10px;cursor:pointer;border:1px solid transparent}.trr:hover{background:var(--bg)}.trr.on{border-color:var(--bl);background:var(--bll)}.trr input{width:17px;height:17px;flex:none;margin:0}.trr .sw{width:14px;height:14px;border-radius:4px;flex:none}.trr small{color:var(--mut);display:block}
+.tdet{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:13px}.tdet span{color:var(--mut)}.tdet b{text-align:right}
+.pbk{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.pbk input[type=range]{flex:1;min-width:120px;height:24px;padding:0}.pbk select{width:auto;height:34px}
+.pvals{display:grid;grid-template-columns:1fr 1fr;gap:4px}.pvals div{background:var(--bg);border-radius:8px;padding:4px 8px}.pvals small{display:block;color:var(--mut);font-size:11px}.pvals b{font-size:14px}
+.arw{width:14px;height:14px}.arw svg{display:block}
+.ms{position:relative;min-width:170px}.msb{width:100%;height:40px;display:flex;align-items:center;gap:8px;justify-content:space-between;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);cursor:pointer;text-align:left}.msb span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.msb i{font-size:10px;color:var(--mut)}td .msb{height:34px}
+.msp{position:fixed;z-index:3500;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 4px 18px #0004;padding:6px;width:260px;display:flex;flex-direction:column;gap:4px}.msp input.msq{height:32px}.msp label{display:flex;gap:8px;align-items:center;font-size:13px;font-weight:600;padding:4px 6px;border-radius:6px;cursor:pointer}.msp label:hover{background:var(--gyl)}.msp input[type=checkbox]{width:16px;height:16px;flex:none;margin:0;accent-color:var(--bl)}.msl{max-height:240px;overflow:auto}.msa{border-bottom:1px solid var(--line)}
+.mk.al{background:var(--rd)!important;animation:al .6s infinite alternate}@keyframes al{to{box-shadow:0 0 0 10px #d9534f55}}
+.mt button.on{background:var(--bl);color:#fff}
+.play{border:1px solid var(--line);background:var(--card);color:var(--gr);border-radius:8px;width:30px;height:30px;cursor:pointer;vertical-align:middle;margin-left:4px}.play:hover{background:var(--grl)}
+.kpi.click{cursor:pointer}.kpi.click:hover{border-color:var(--bl)}.kpi.click.on{border-color:var(--bl);box-shadow:inset 0 0 0 1px var(--bl)}.pu .ic{background:#efe4fb;color:#9b51e0}
+.hero{width:100%;height:auto;border-radius:16px;display:block}.hero .draw{stroke-dasharray:400;stroke-dashoffset:400;animation:dr 7s ease-in-out infinite}@keyframes dr{0%{stroke-dashoffset:400}65%,100%{stroke-dashoffset:0}}
+.hero .blink{animation:bk 1.2s infinite}@keyframes bk{50%{opacity:.25}}
+@media(prefers-reduced-motion:reduce){.hero *{animation:none!important}}
+@media(max-width:1000px){.hwrap{grid-template-columns:1fr;grid-template-rows:420px auto}}
 @media print{aside,header,.fgrid,.pbar,.pt,.tbar,.mt,#toast,.btn,.pagefoot{display:none!important}body,#app,.wrap,main{display:block!important;height:auto!important;overflow:visible!important}section{display:none!important}section.on{display:flex!important;height:auto!important}.cgrid{grid-template-columns:1fr 1fr}.printheader{display:block!important}}
 </style></head><body>
-<div id="login" class="card"><svg viewBox="0 0 48 48" width="64" style="margin:auto"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f28c28"/><stop offset="1" stop-color="#2f7fe6"/></linearGradient></defs><rect width="48" height="48" rx="12" fill="url(#lg)"/><path d="M24 11c-5.5 0-9.5 4.2-9.5 9.4 0 6.7 9.5 16.6 9.5 16.6s9.5-9.9 9.5-16.6C33.5 15.2 29.5 11 24 11z" fill="#fff"/><circle cx="24" cy="20.5" r="3.6" fill="#2f7fe6"/></svg>
-<div class="brand" style="justify-content:center;padding:0">Fleet Tracker</div>
+<div id="login" class="card"><svg class="hero" viewBox="0 0 320 180" role="img" aria-label="A vehicle driving along a tracked route"><defs><linearGradient id="hsky" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe9d2"/><stop offset="1" stop-color="#dcebfd"/></linearGradient><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f28c28"/><stop offset="1" stop-color="#2f7fe6"/></linearGradient></defs>
+<rect width="320" height="180" rx="18" fill="url(#hsky)"/>
+<g fill="#fff" opacity=".75"><rect x="14" y="14" width="64" height="36" rx="6"/><rect x="104" y="14" width="104" height="36" rx="6"/><rect x="234" y="72" width="72" height="46" rx="6"/><rect x="14" y="72" width="64" height="46" rx="6"/><rect x="104" y="140" width="104" height="28" rx="6"/><rect x="234" y="140" width="72" height="28" rx="6"/></g>
+<path d="M0 61H320M0 129H320M91 0V180M221 0V180" stroke="#fff" stroke-width="12"/><path d="M0 61H320M0 129H320M91 0V180M221 0V180" stroke="#efe3d4" stroke-width="1" stroke-dasharray="6 6"/>
+<path id="hrt" pathLength="400" class="draw" d="M30 150C62 150 70 129 91 118S100 70 140 64 196 82 221 64 262 40 286 36" fill="none" stroke="#2f7fe6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="30" cy="150" r="7" fill="#27a46a" stroke="#fff" stroke-width="3"/>
+<circle cx="286" cy="36" r="8" fill="#d9534f" opacity=".45"><animate attributeName="r" values="8;24;8" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values=".5;0;.5" dur="2s" repeatCount="indefinite"/></circle>
+<path d="M286 10c-8 0-14 6-14 14 0 10 14 25 14 25s14-15 14-25c0-8-6-14-14-14z" fill="#d9534f" stroke="#fff" stroke-width="2"/><circle cx="286" cy="24" r="4.5" fill="#fff"/>
+<g><circle r="12" fill="#f28c28" stroke="#fff" stroke-width="3"/><path d="M-6 -3h7v6h-7zM1 -1h3l2 2v2h-5z" fill="#fff"/><circle cx="-3.5" cy="4" r="1.6" fill="#fff"/><circle cx="3.5" cy="4" r="1.6" fill="#fff"/><animateMotion dur="7s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.65;1" calcMode="linear"><mpath href="#hrt"/></animateMotion></g>
+<g transform="translate(14 150)"><rect width="58" height="20" rx="10" fill="#fff"/><circle cx="12" cy="10" r="4" fill="#27a46a" class="blink"/><text x="21" y="14" font-size="10" font-weight="800" fill="#26323a" font-family="Nunito,system-ui,sans-serif">LIVE</text></g>
+</svg>
+<div class="brand" style="justify-content:center;padding:0"><svg viewBox="0 0 48 48" width="30"><rect width="48" height="48" rx="12" fill="url(#lg)"/><path d="M24 11c-5.5 0-9.5 4.2-9.5 9.4 0 6.7 9.5 16.6 9.5 16.6s9.5-9.9 9.5-16.6C33.5 15.2 29.5 11 24 11z" fill="#fff"/><circle cx="24" cy="20.5" r="3.6" fill="#2f7fe6"/></svg>Fleet Tracker</div>
 <div class="field"><input id="em" placeholder="Username or email" autocomplete="username"></div>
 <div class="field" style="position:relative"><input id="pw" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')signIn()"><button type="button" class="eye" onclick="eye()" title="Show / hide password"><i class="fa-solid fa-eye" id="eyei"></i></button></div>
 <label style="display:flex;gap:8px;align-items:center;font-weight:600;justify-content:flex-start"><input type="checkbox" id="rem" style="width:18px;height:18px"> Remember me</label>
@@ -99,7 +127,7 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <button class="pinb" id="pinB" onclick="pin()"><i class="fa-solid fa-thumbtack"></i><span>Keep menu open</span></button></aside>
 <div class="wrap"><header><h1 id="title">Live Tracking</h1><span class="pill" id="conn"><i class="fa-solid fa-circle" style="font-size:8px"></i> <span id="connT">Connecting</span></span>
 <div id="accWrap"><button id="accB" onclick="accMenu()" title="Account"><i class="fa-solid fa-circle-user" style="font-size:18px"></i><span id="me"></span><i class="fa-solid fa-chevron-down" style="font-size:10px"></i></button>
-<div class="mm hide" id="accM"><div id="accWho"></div><button id="themeB" onclick="theme()"></button><button onclick="accHide();pwForm()"><i class="fa-solid fa-key"></i><span>Change password</span></button><hr><button class="out" onclick="accHide();sb.auth.signOut().then(()=>location.reload())"><i class="fa-solid fa-right-from-bracket"></i><span>Sign out</span></button></div></div></header>
+<div class="mm hide" id="accM"><div id="accWho"></div><button id="themeB" onclick="theme()"></button><button onclick="accHide();pwForm()"><i class="fa-solid fa-key"></i><span>Change password</span></button><hr><button class="out" onclick="accHide();signOut()"><i class="fa-solid fa-right-from-bracket"></i><span>Sign out</span></button></div></div></header>
 <main>
 <section id="live" class="on"><div class="kpis">
 <div class="card kpi bl click on" data-f="all" onclick="setF('all')"><div class="ic"><i class="fa-solid fa-truck"></i></div><div><b id="k_all">0</b><span>Total Vehicles</span></div></div>
@@ -110,11 +138,12 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <section id="hist"><div class="card fgrid">
 <div class="field"><label>Vehicle</label><select id="hv"></select></div><div class="field"><label>From</label><input id="hf" type="text"></div><div class="field"><label>To</label><input id="ht" type="text"></div>
 <button class="btn b" onclick="loadHist()"><i class="fa-solid fa-route"></i>Show route</button><button class="btn gh" onclick="csv()"><i class="fa-solid fa-file-csv"></i>Export route (CSV)</button></div>
-<div class="kpis" id="hstat"></div><div class="map mapc" id="mapHist"></div></section>
+<div class="kbar"><button class="btn gh sm" id="hkB" onclick="hKpi()" title="Show or hide the summary"><i class="fa-solid fa-eye-slash"></i></button><div class="kstrip" id="hstat"></div></div>
+<div class="hwrap"><div class="map" id="mapHist"></div><div class="card hside" id="hside"><p style="color:var(--mut);margin:0">Pick a vehicle and period, then press <b>Show route</b>. Each trip gets its own colour; tick the trips to show and click one to see its details and play it back.</p></div></div></section>
 <section id="evt">
-<div class="card frow"><div class="field"><label>Vehicle</label><select id="ev_v"></select></div>
-<div class="field"><label>Driver</label><select id="ev_d"></select></div>
-<div class="field"><label>Event type</label><select id="ev_t"><option value="">All events</option><option value="harsh_braking">Harsh braking</option><option value="harsh_acceleration">Harsh acceleration</option><option value="overspeed">Overspeed</option></select></div>
+<div class="card frow"><div class="field"><label>Vehicles</label><div id="ev_v"></div></div>
+<div class="field"><label>Drivers</label><div id="ev_d"></div></div>
+<div class="field"><label>Events</label><div id="ev_t"></div></div>
 <div class="field"><label>From</label><input id="ev_f" type="text"></div><div class="field"><label>To</label><input id="ev_to" type="text"></div>
 <button class="btn b" onclick="loadEvt()"><i class="fa-solid fa-play"></i>Generate</button></div>
 <div id="evFl" style="display:flex;gap:8px;align-items:center;min-height:30px"></div><div class="kpis" id="evK"></div><div class="cgrid"><div class="card"><canvas id="c1"></canvas></div><div class="card"><canvas id="c2"></canvas></div><div class="card"><canvas id="c3"></canvas></div></div><div class="tw" id="evT"></div></section>
@@ -122,6 +151,9 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <div class="card"><b><i class="fa-solid fa-clock"></i> Default recording interval</b><div class="fgrid" style="margin-top:10px"><div class="field"><label>While moving (seconds)</label><input id="s_mov" type="number" min="1"></div><div class="field"><label>While stopped (seconds)</label><input id="s_stp" type="number" min="1"></div></div></div>
 <div class="card"><b><i class="fa-solid fa-shield-halved"></i> Safety score colour bands (RAG) <span class="hp" data-tip="Fleet Summary scores every vehicle with &lt;b&gt;(harsh acceleration events + harsh braking events + overspeed seconds) &times; (100 &divide; distance in km)&lt;/b&gt;, so a lower number is safer. Set where green stops and red starts; everything between the two is amber.">?</span></b><div class="fgrid" style="margin-top:10px"><div class="field"><label>Green at or below</label><input id="sc_g" type="number" step="0.1" min="0"></div><div class="field"><label>Red at or above</label><input id="sc_r" type="number" step="0.1" min="0"></div></div></div>
 <div class="card"><b><i class="fa-solid fa-triangle-exclamation"></i> Events (defaults for all vehicles) <span class="hp" data-tip="&lt;b&gt;Tolerance&lt;/b&gt; is how long the driver must keep breaking the rule before it is written to the database. The buzzer and the on-screen alert fire immediately; the event is only recorded once the violation lasts longer than the tolerance. Use 2 s for harsh braking/acceleration and 10 s for overspeed. &lt;b&gt;Trigger limit&lt;/b&gt; is the fleet default that a vehicle uses unless it has its own value below.">?</span></b><div class="tw" id="ruleT" style="margin-top:10px"></div></div>
+<div class="card"><b><i class="fa-solid fa-volume-high"></i> Voice messages on the phone <span class="hp" data-tip="When an event starts, the phone speaks a short safety message after the buzzer, in the language chosen here. Untick an event to keep it silent. The &lt;b&gt;play&lt;/b&gt; button reads the message on this computer so you can hear it; the phone uses its own Android voice, so it may sound slightly different. If the phone has no voice installed for the language, it falls back to English.">?</span></b>
+<div class="frow" style="margin-top:10px"><label style="display:flex;gap:8px;align-items:center;font-weight:700;flex:1 1 260px"><input type="checkbox" id="vo_on"> Speak a safety message when an event happens</label><div class="field" style="flex:0 1 220px"><label>Voice language</label><select id="vo_lang" onchange="voTable()"></select></div></div>
+<div class="tw" id="voT" style="margin-top:10px"></div></div>
 <div class="card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><b style="flex:1;min-width:220px"><i class="fa-solid fa-truck"></i> Settings per vehicle <span class="hp" data-tip="A vehicle marked &lt;b&gt;custom&lt;/b&gt; keeps its own values; leave a box empty to follow the fleet default above. Phones apply changes within 5 minutes or at the next trip start. &lt;b&gt;Overspeed buffer&lt;/b&gt; is added on top of the limit before the alert starts. &lt;b&gt;Warning level&lt;/b&gt; buzzes the phone without recording an event. &lt;b&gt;Min. distance&lt;/b&gt; suppresses events until the vehicle has actually moved that far. Tick the box beside a vehicle and press Reset to send it back to the fleet defaults.">?</span></b><button class="btn o sm" onclick="resetSelV()"><i class="fa-solid fa-rotate-left"></i>Reset</button><span class="hp" data-tip="Clears the own values of every vehicle you ticked in the table below, so it follows the fleet defaults on this page again. Unticked vehicles are left exactly as they are. Phones apply the change within 5 minutes.">!</span></div>
 <div class="card"><div class="tw" id="cfgV" style="margin-top:10px"></div></div></section>
 <section id="trip"><div class="card frow"><div class="field"><label>Vehicle</label><select id="tr_v"></select></div><div class="field"><label>From</label><input id="tr_f" type="text"></div><div class="field"><label>To</label><input id="tr_t" type="text"></div>
@@ -175,8 +207,8 @@ const toast=(m,ok)=>{const t=$('toast');t.textContent=m;t.className='show '+(ok?
 let EVR=[],EVF={},ADMIN=false,UID,UNAME,evN=0,charts={},rep=[],mapL,mapH,markers={},last={},hLayer,hData=[],vehicles=[],drivers=[];
 const COL={go:'#27a46a',idle:'#f28c28',park:'#2f7fe6'},LBL={go:'Moving',idle:'Idling',park:'Parking'};
 const st=p=>(p.ignition===false||Date.now()-new Date(p.recorded_at)>STALE_MIN*6e4)?'park':(p.speed>0?'go':'idle');
-function mkMap(id,fit){
- const m=L.map(id).setView([23.6,58.5],8);
+function mkMap(id,fit,extra){
+ const m=L.map(id).setView([23.6,58.5],8);m._btn={};
  const T=(u,a,o={})=>L.tileLayer(u,{attribution:a,maxZoom:20,...o});
  const G=l=>T('https://{s}.google.com/vt/lyrs='+l+'&x={x}&y={y}&z={z}','Map data © Google',{subdomains:['mt0','mt1','mt2','mt3']});
  const base={'Street Map':T('https://tile.openstreetmap.org/{z}/{x}/{y}.png','© OpenStreetMap',{maxZoom:19}),'Google Map':G('m'),'Google Satellite':G('s'),'Google Hybrid':G('y'),'Esri Satellite':T('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}','Tiles © Esri')};
@@ -186,9 +218,9 @@ function mkMap(id,fit){
   const lb=L.DomUtil.create('button','',d),lab=n=>'<i class="fa-solid fa-layer-group"></i> '+n+' ▾',menu=L.DomUtil.create('div','mm hide',d);lb.innerHTML=lab(cur);lb.title='Map style';
   for(const n in base){const b=L.DomUtil.create('button','',menu);b.textContent=n;b.onclick=()=>{m.removeLayer(layer);layer=base[n].addTo(m);localStorage.base=n;lb.innerHTML=lab(n);menu.classList.add('hide')}}
   lb.onclick=()=>menu.classList.toggle('hide');
-  const tb=(ic,t,f)=>{const b=L.DomUtil.create('button','ic',d);b.innerHTML='<i class="fa-solid '+ic+'"></i>';b.title=t;b.onclick=f};
+  const tb=(ic,t,f,k)=>{const b=L.DomUtil.create('button','ic',d);b.innerHTML='<i class="fa-solid '+ic+'"></i>';b.title=t;b.onclick=f;if(k)m._btn[k]=b};
   tb('fa-expand','Full screen',()=>document.fullscreenElement?document.exitFullscreen():m.getContainer().requestFullscreen());
-  tb('fa-crosshairs','Zoom to all',()=>fit&&fit());tb('fa-ruler','Measure distance',()=>measure(m));return d};
+  tb('fa-crosshairs','Zoom to all',()=>fit&&fit());tb('fa-ruler','Measure distance',()=>measure(m));(extra||[]).forEach(x=>tb(...x));return d};
  c.addTo(m);L.control.scale({imperial:false}).addTo(m);document.addEventListener('fullscreenchange',()=>setTimeout(()=>m.invalidateSize(),250));return m}
 function measure(m){if(m._meas){m.off('click',m._meas.h);m._meas.g.remove();m._meas=null;m.getContainer().style.cursor='';return}
  const g=L.layerGroup().addTo(m),pts=[];let line=null;
@@ -225,19 +257,23 @@ function themeBtn(){const d=document.documentElement.dataset.theme==='dark';$('t
 // this can be read from (admin-only policy) and a failed insert must never block
 // or pretend to undo the action the user actually took.
 const DEV=/android|iphone|ipad|mobile/i.test(navigator.userAgent)?'phone':'computer';
-function logAct(action,details){if(!UID)return;(async()=>{
+function logAct(action,details){if(!UID)return Promise.resolve();return (async()=>{
  try{await sb.from('user_activity').insert({user_id:UID,user_name:UNAME,action,details:details==null?null:String(details).slice(0,300),device:DEV})}catch(e){}})()}
+async function signOut(){await logAct('Signed out','Dashboard');await sb.auth.signOut();location.reload()}
 async function boot(fresh){
  const {data:{session}}=await sb.auth.getSession();if(!session)return;
  const {data:p}=await sb.from('profiles').select('role').eq('id',session.user.id).single();
  ADMIN=p?.role==='admin';UID=session.user.id;document.body.classList.toggle('usr',!ADMIN);
  $('login').classList.add('hide');$('app').classList.remove('hide');UNAME=(session.user.email||'').replace('@fleet.local','');$('me').textContent=UNAME;$('accWho').textContent='Welcome, '+UNAME+'!';if(localStorage.pin==='1')document.querySelector('aside').classList.add('pin');pinBtn();themeBtn();
  logAct(fresh?'Signed in':'Opened dashboard','Role: '+(ADMIN?'admin':'user'));
- mapL=mkMap('mapLive',fitAll);mapH=mkMap('mapHist');
+ mapL=mkMap('mapLive',fitAll,[['fa-thumbtack','Pin: keep the selected vehicle in the centre of the map while it moves',pinV,'pin']]);mapH=mkMap('mapHist',hFit);
  initDates();
- await refs();await loadLive();loadRules();
+ await refs();await loadLive();loadRules();evInit();
  sb.channel('pos').on('postgres_changes',{event:'*',schema:'public',table:'positions'},e=>{if(e.new)upsert(e.new)}).subscribe(s=>{const ok=s==='SUBSCRIBED';$('conn').className='pill'+(ok?'':' bad');$('connT').textContent=ok?'Live':'Reconnecting'});
- sb.channel('ev').on('postgres_changes',{event:'INSERT',schema:'public',table:'events'},e=>{const x=e.new;alertEv(x);evN++;$('evb').style.display='';$('evb').textContent=evN}).subscribe();
+ sb.channel('ev').on('postgres_changes',{event:'INSERT',schema:'public',table:'events'},e=>onEv(e.new)).subscribe();
+ // realtime can silently miss inserts (dropped socket, table missing from the
+ // publication); this poll guarantees every event still raises its alert
+ setInterval(evPoll,20000);
  setInterval(renderList,15000);
 }
 document.querySelectorAll('.nb[data-t]').forEach(b=>b.onclick=()=>{
@@ -248,8 +284,8 @@ document.querySelectorAll('.nb[data-t]').forEach(b=>b.onclick=()=>{
 async function refs(){
  vehicles=(await sb.from('vehicles').select('*').order('name')).data||[];drivers=(await sb.from('drivers').select('*').order('name')).data||[];
  $('hv').innerHTML=vehicles.map(v=>`<option value="${v.id}">${esc(v.name)}</option>`).join('');
- $('ev_v').innerHTML='<option value="">All vehicles</option>'+vehicles.map(v=>`<option value="${v.id}">${esc(v.name)}</option>`).join('');
- $('tr_v').innerHTML=$('hv').innerHTML;$('ev_d').innerHTML='<option value="">All drivers</option>'+drivers.map(x=>`<option value="${x.id}">${esc(x.name)}</option>`).join('');$('vehT').innerHTML=tbl(vehicles,['name','type','make_model','year','speed_limit','fuel_moving','fuel_idle'],'vehicles');$('drvT').innerHTML=tbl(drivers,['name','phone','license_no','license_expiry'],'drivers');tools($('vehT'));tools($('drvT'))}
+ msel('ev_v',vehicles,'All vehicles',mselVal('ev_v'));msel('ev_d',drivers,'All drivers',mselVal('ev_d'));msel('ev_t',Object.keys(EV).map(k=>({id:k,name:EV[k][0]})),'All events',mselVal('ev_t'));
+ $('tr_v').innerHTML=$('hv').innerHTML;$('vehT').innerHTML=tbl(vehicles,['name','type','make_model','year','speed_limit','fuel_moving','fuel_idle'],'vehicles');$('drvT').innerHTML=tbl(drivers,['name','phone','license_no','license_expiry'],'drivers');tools($('vehT'));tools($('drvT'))}
 const tbl=(rows,cols,t)=>`<table><tr>${cols.map(c=>`<th>${c.replace(/_/g,' ')}</th>`).join('')}<th></th></tr>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(r[c])}</td>`).join('')}<td style="text-align:right;white-space:nowrap"><button class="btn b sm" onclick="edit('${t}','${r.id}')"><i class="fa-solid fa-pen"></i>Edit</button> <button class="btn r sm" onclick="del('${t}','${r.id}')"><i class="fa-solid fa-trash"></i>Delete</button></td></tr>`).join('')||'<tr><td colspan="9">Nothing here yet. Add one above.</td></tr>'}</table>`;
 async function add(e,t,cols){e.preventDefault();if(!ADMIN)return;const f=e.target,id=f.dataset.id,o={};cols.forEach(c=>o[c]=f[c].value||null);
  const {error}=id?await sb.from(t).update(o).eq('id',id):await sb.from(t).insert(o);if(error)return toast(error.message);
@@ -263,10 +299,10 @@ async function del(t,id){if(confirm('Delete this item?')){const nm=((t==='vehicl
 async function users(){
  const {data:ps}=await sb.from('profiles').select('*').order('email');const {data:as}=await sb.from('assignments').select('*');
  const mine=(id,k)=>(as||[]).filter(x=>x.user_id===id&&x[k]).map(x=>x[k]);
- const box=(id,l,sel)=>`<div class="pick" id="${id}">${l.length?l.map(x=>`<label><input type="checkbox" value="${x.id}" ${sel.includes(x.id)?'checked':''}><span>${esc(x.name)}</span></label>`).join(''):'<small>Nothing added yet</small>'}</div>`;
  const HP=t=>`<span class="hp" data-tip="${t}">?</span>`;
- $('usrT').innerHTML=`<table><tr><th>User</th><th>Vehicles ${HP('Tick every vehicle this login should see - tick as many as the driver is responsible for. A phone signed in here gets a vehicle picker on its own screen.')}</th><th>Drivers ${HP('Tick every driver profile this login should see. The first tick is paired with the first vehicle tick, the second with the second, and so on - that pairing is what the phone stamps on each position and event.')}</th><th>Role</th><th></th></tr>${(ps||[]).map(p=>`<tr><td><i class="fa-solid fa-user"></i> ${esc((p.email||'').replace('@fleet.local',''))}${p.role==='admin'?' <span class="chip" style="background:var(--bll);color:var(--bl)">admin</span>':''}</td><td>${box('v_'+p.id,vehicles,mine(p.id,'vehicle_id'))}</td><td>${box('d_'+p.id,drivers,mine(p.id,'driver_id'))}</td><td><select id="r_${p.id}" style="height:34px"><option value="user" ${p.role!=='admin'?'selected':''}>User</option><option value="admin" ${p.role==='admin'?'selected':''}>Admin</option></select></td><td style="text-align:right;vertical-align:top"><button class="btn g sm" onclick="link('${p.id}')"><i class="fa-solid fa-floppy-disk"></i>Save</button></td></tr>`).join('')}</table>`;tools($('usrT'))}
-const ticked=id=>[...document.querySelectorAll('#'+id+' input:checked')].map(i=>i.value);
+ $('usrT').innerHTML=`<table><tr><th>User</th><th>Vehicles ${HP('Open the list and tick every vehicle this login should see - use Select all or the search box when the fleet is large. A phone signed in here gets a vehicle picker on its own screen.')}</th><th>Drivers ${HP('Tick every driver profile this login should see. The first tick is paired with the first vehicle tick, the second with the second, and so on - that pairing is what the phone stamps on each position and event.')}</th><th>Role</th><th></th></tr>${(ps||[]).map(p=>`<tr><td><i class="fa-solid fa-user"></i> ${esc((p.email||'').replace('@fleet.local',''))}${p.role==='admin'?' <span class="chip" style="background:var(--bll);color:var(--bl)">admin</span>':''}</td><td><div id="v_${p.id}"></div></td><td><div id="d_${p.id}"></div></td><td><select id="r_${p.id}" style="height:34px"><option value="user" ${p.role!=='admin'?'selected':''}>User</option><option value="admin" ${p.role==='admin'?'selected':''}>Admin</option></select></td><td style="text-align:right"><button class="btn g sm" onclick="link('${p.id}')"><i class="fa-solid fa-floppy-disk"></i>Save</button></td></tr>`).join('')}</table>`;
+ (ps||[]).forEach(p=>{msel('v_'+p.id,vehicles,'None selected',mine(p.id,'vehicle_id'));msel('d_'+p.id,drivers,'None selected',mine(p.id,'driver_id'))});tools($('usrT'))}
+const ticked=id=>mselVal(id);
 async function link(id){const role=$('r_'+id).value;if(id===UID&&role!=='admin')return toast('You cannot remove your own admin role');
  const vs=ticked('v_'+id),ds=ticked('d_'+id);
  const rows=[];for(let i=0;i<Math.max(vs.length,ds.length);i++)rows.push({user_id:id,vehicle_id:vs[i]||null,driver_id:ds[i]||null});
@@ -279,7 +315,7 @@ async function link(id){const role=$('r_'+id).value;if(id===UID&&role!=='admin')
 // ---- activity log (admin only). The action list below is what both this
 // dashboard and the driver phone write, so the filter offers every kind of
 // entry even when the current period happens to contain none of it.
-const ACTS=['Signed in','Opened dashboard','Opened app','Changed own password','Added vehicle','Edited vehicle','Deleted vehicle','Added driver','Edited driver','Deleted driver','Created user','Saved user access','Saved configuration','Reset vehicles to fleet defaults','Exported report','Started trip','Ended trip'];
+const ACTS=['Signed in','Signed out','Opened dashboard','Opened app','Opened dashboard from app','Allowed permissions','Switched vehicle','Changed own password','Added vehicle','Edited vehicle','Deleted vehicle','Added driver','Edited driver','Deleted driver','Created user','Saved user access','Saved configuration','Reset vehicles to fleet defaults','Exported report','Printed trip','Started trip','Ended trip'];
 let ACT=[],ACTU=null;
 async function loadAct(){if(!ADMIN)return;
  if(!ACTU){const {data}=await sb.from('profiles').select('id,email').order('email');
@@ -296,18 +332,26 @@ async function loadAct(){if(!ADMIN)return;
 // ---- live
 const TI={Car:'fa-car',Sedan:'fa-car-side',Hatchback:'fa-car',SUV:'fa-car-rear',Pickup:'fa-truck-pickup',Van:'fa-van-shuttle',Minibus:'fa-van-shuttle',Bus:'fa-bus',Truck:'fa-truck','Heavy Truck':'fa-truck-moving',Tanker:'fa-truck-droplet',Taxi:'fa-taxi',Ambulance:'fa-truck-medical',Motorbike:'fa-motorcycle',Tractor:'fa-tractor',Trailer:'fa-trailer',Equipment:'fa-tractor'};
 const vt=p=>TI[(vehicles.find(v=>v.id===p.vehicle_id)||{}).type]||'fa-location-dot';
-let FILT='all';
+let FILT='all',SELV=null,PINV=null;
 const spd=p=>st(p)==='park'?0:Math.round(p.speed||0);
-const icon=p=>L.divIcon({className:'',html:`<div class="mk" style="background:${COL[st(p)]}"><i class="fa-solid ${vt(p)}"></i></div>`,iconSize:[32,32],iconAnchor:[16,16]});
+const icon=p=>L.divIcon({className:'',html:`<div class="mk${ALR[p.user_id]>Date.now()?' al':''}" style="background:${COL[st(p)]}"><i class="fa-solid ${vt(p)}"></i></div>`,iconSize:[32,32],iconAnchor:[16,16]});
 const pop=p=>{const s=st(p),v=vehicles.find(x=>x.id===p.vehicle_id)||{};return `<div style="min-width:220px"><b style="font-size:15px">${esc(p.vehicle_name||'Unassigned')}</b> <span class="chip" style="background:${COL[s]}22;color:${COL[s]}">${LBL[s]}</span><br><small>${esc(v.type||'')} ${esc(v.make_model||'')}</small><hr style="border:0;border-top:1px solid #8883">
  <i class="fa-solid fa-id-card"></i> ${esc(p.driver_name||'-')}<br><i class="fa-solid fa-gauge-high"></i> <b>${spd(p)} km/h</b><br><i class="fa-regular fa-clock"></i> ${new Date(p.recorded_at).toLocaleString()}<br><i class="fa-solid fa-location-dot"></i> ${(+p.lat).toFixed(5)}, ${(+p.lng).toFixed(5)}<br>
  Accuracy ${p.accuracy??'-'} m · Elev. ${p.altitude!=null?Math.round(p.altitude):'-'} m · Dir ${p.heading!=null?Math.round(p.heading)+'°':'-'}<br>Accel ${p.accel??'-'} km/h/s<br><i class="fa-solid fa-battery-half"></i> ${p.battery_pct!=null?Math.round(p.battery_pct)+'%':'-'}${p.charging?' ⚡':''}</div>`};
 const shown=p=>FILT==='all'||st(p)===FILT;
+// Pin keeps the selected vehicle in the centre as it moves; clicking a vehicle
+// on the map or in the list is what selects it.
+function selLive(uid){SELV=uid;const p=last[uid];if(!p)return;if(PINV)mapL.panTo([p.lat,p.lng]);markers[uid]&&markers[uid].openPopup();document.querySelectorAll('#liveList .veh').forEach(r=>r.classList.toggle('on',r.dataset.u===uid))}
+function pinV(){if(PINV){PINV=null;mapL._btn.pin&&mapL._btn.pin.classList.remove('on');return toast('Pin off — the map no longer follows the vehicle')}
+ const uid=SELV||(Object.keys(last).length===1?Object.keys(last)[0]:null);
+ if(!uid||!last[uid])return toast('Select a vehicle on the map or in the list first, then press Pin');
+ PINV=uid;mapL.setView([last[uid].lat,last[uid].lng],Math.max(mapL.getZoom(),15));mapL._btn.pin&&mapL._btn.pin.classList.add('on');toast('Pinned to '+(last[uid].vehicle_name||'vehicle'),1)}
 function setF(f){FILT=f;document.querySelectorAll('.kpi.click').forEach(k=>k.classList.toggle('on',k.dataset.f===f));renderList();fitAll()}
 function fitAll(){const a=Object.values(last).filter(shown);if(a.length)mapL.fitBounds(a.map(p=>[p.lat,p.lng]),{maxZoom:15,padding:[40,40]})}
-async function loadLive(){(await fetchAll(()=>sb.from('latest_positions').select('*'))).forEach(upsert);fitAll()}
+async function loadLive(){(await fetchAll(()=>sb.from('latest_positions').select('*'))).filter(okFix).forEach(upsert);fitAll()}
 function upsert(p){last[p.user_id]=p;const ll=[p.lat,p.lng];
- if(markers[p.user_id])markers[p.user_id].setLatLng(ll);else markers[p.user_id]=L.marker(ll,{icon:icon(p)}).addTo(mapL).bindPopup(()=>pop(last[p.user_id]));renderList()}
+ if(p.accuracy!=null&&+p.accuracy<=0)return;if(markers[p.user_id])markers[p.user_id].setLatLng(ll).setIcon(icon(p));else markers[p.user_id]=L.marker(ll,{icon:icon(p)}).addTo(mapL).bindPopup(()=>pop(last[p.user_id])).on('click',()=>selLive(p.user_id));
+ if(PINV===p.user_id)mapL.panTo(ll);renderList()}
 function renderList(){
  const all=Object.values(last),n={go:0,idle:0,park:0},rp=new Set(all.map(p=>p.vehicle_id));
  all.forEach(p=>{n[st(p)]++;const m=markers[p.user_id];if(!m)return;m.setIcon(icon(p));shown(p)?m.addTo(mapL):m.remove()});
@@ -315,57 +359,166 @@ function renderList(){
  $('k_all').textContent=vehicles.length||all.length;$('k_go').textContent=n.go;$('k_idle').textContent=n.idle;$('k_park').textContent=n.park;
  const q=$('q').value.toLowerCase();
  $('liveList').innerHTML=all.filter(p=>shown(p)&&((p.vehicle_name||'')+(p.driver_name||'')).toLowerCase().includes(q)).sort((a,b)=>(a.vehicle_name||'').localeCompare(b.vehicle_name||'')).map(p=>{const s=st(p);
- return `<div class="veh" onclick="mapL.setView([${p.lat},${p.lng}],16);markers['${p.user_id}'].openPopup()"><div class="av" style="background:${COL[s]}"><i class="fa-solid ${vt(p)}"></i></div><div class="t"><b>${esc(p.vehicle_name||'Unassigned')}</b><br><small>${esc(p.driver_name||'-')} · ${new Date(p.recorded_at).toLocaleTimeString()}</small></div><div style="text-align:right"><b>${spd(p)}</b> <small>km/h</small><br><span class="chip" style="background:${COL[s]}22;color:${COL[s]}">${LBL[s]}</span></div></div>`}).join('')||'<p style="color:var(--mut);padding:8px">No vehicles to show.</p>'}
-// ---- history
+ return `<div class="veh" data-u="${p.user_id}" onclick="mapL.setView([${p.lat},${p.lng}],16);selLive('${p.user_id}');markers['${p.user_id}'].openPopup()"><div class="av" style="background:${COL[s]}"><i class="fa-solid ${vt(p)}"></i></div><div class="t"><b>${esc(p.vehicle_name||'Unassigned')}</b><br><small>${esc(p.driver_name||'-')} · ${new Date(p.recorded_at).toLocaleTimeString()}</small></div><div style="text-align:right"><b>${spd(p)}</b> <small>km/h</small><br><span class="chip" style="background:${COL[s]}22;color:${COL[s]}">${LBL[s]}</span></div></div>`}).join('')||'<p style="color:var(--mut);padding:8px">No vehicles to show.</p>'}
+// ---- history: the period is split into trips (a gap of 10 minutes or an ended
+// trip starts a new one), each with its own colour, layer, details and playback
 const km=(a,b)=>{const r=x=>x*Math.PI/180,h=Math.sin(r(b.lat-a.lat)/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(r(b.lng-a.lng)/2)**2;return 12742*Math.asin(Math.sqrt(h))};
 const tile=(c,i,v,l)=>`<div class="card kpi ${c}"><div class="ic"><i class="fa-solid ${i}"></i></div><div><b>${v}</b><span>${l}</span></div></div>`;
-async function loadHist(){
- const hf=new Date($('hf').value).toISOString(),ht=new Date($('ht').value).toISOString();
- const data=await fetchAll(()=>sb.from('positions').select('*').eq('vehicle_id',$('hv').value).gte('recorded_at',hf).lte('recorded_at',ht).order('recorded_at'));
- if(hLayer)hLayer.remove();hData=data;if(!data.length){$('hstat').innerHTML='';return toast('No data in this period.')}
- hLayer=L.layerGroup().addTo(mapH);const pts=data.map(p=>[p.lat,p.lng]);L.polyline(pts,{color:'#2f7fe6',weight:5,opacity:.85}).addTo(hLayer);
- L.circleMarker(pts[0],{color:'#27a46a',fillOpacity:1,radius:9}).addTo(hLayer).bindPopup('Start '+new Date(data[0].recorded_at).toLocaleString());
- const e=data.at(-1);L.circleMarker(pts.at(-1),{color:'#d9534f',fillOpacity:1,radius:9}).addTo(hLayer).bindPopup('End '+new Date(e.recorded_at).toLocaleString());
- const Vh=vehicles.find(x=>x.id===$('hv').value)||{},fm=Vh.fuel_moving||0,fi=Vh.fuel_idle||0,k2=Math.ceil(data.length/400);let cum=0;
- data.forEach((p,i)=>{let l=0,r='';if(i){const q=data[i-1],dt=(new Date(p.recorded_at)-new Date(q.recorded_at))/1000;if(dt<=180){const dk=km(q,p);l=p.speed>0?dk*fm/100:dt/3600*fi;r=p.speed>0&&dk>0.005?(l/dk*100).toFixed(1)+' L/100km':fi+' L/h idling'}}cum+=l;
-  if(i%k2)return;L.circleMarker([p.lat,p.lng],{radius:3,color:'#f28c28',weight:1,fillOpacity:.9}).addTo(hLayer).bindPopup(`<b>${new Date(p.recorded_at).toLocaleString()}</b><br><i class="fa-solid fa-gauge-high"></i> ${Math.round(p.speed)} km/h · ${stt(p)}<br><i class="fa-solid fa-gas-pump"></i> Fuel ${l.toFixed(3)} L${r?' ('+r+')':''}<br>Trip fuel so far: ${cum.toFixed(2)} L<br><i class="fa-solid fa-location-dot"></i> ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}<br>Accuracy ${p.accuracy??'-'} m · Elev. ${p.altitude!=null?Math.round(p.altitude):'-'} m · Dir ${p.heading!=null?Math.round(p.heading):'-'}°<br>Accel ${p.accel??'-'} km/h/s<br><i class="fa-solid fa-battery-half"></i> ${p.battery_pct!=null?p.battery_pct+'%':'-'}${p.charging?' ⚡':''}`)});
- if(!fm&&!fi)toast('Set the fuel rates on the Vehicles page to see fuel figures');
- const evs=await fetchAll(()=>sb.from('events').select('*').eq('vehicle_id',$('hv').value).gte('recorded_at',hf).lte('recorded_at',ht));evs.forEach(x=>L.marker([x.lat,x.lng],{icon:evIcon(x.type)}).addTo(hLayer).bindPopup(`<b>${EV[x.type][0]}</b><br>${Math.round(x.speed)} km/h<br>${new Date(x.recorded_at).toLocaleString()}`));
- let d=0,dr=0,id=0;for(let i=1;i<data.length;i++){const dt=(new Date(data[i].recorded_at)-new Date(data[i-1].recorded_at))/1000;if(dt>180)continue;d+=km(data[i-1],data[i]);data[i].speed>0?dr+=dt:id+=dt}
- const mv=data.filter(p=>p.speed>0),tot=(new Date(e.recorded_at)-new Date(data[0].recorded_at))/1000,hm=x=>Math.floor(x/3600)+'h '+p2(Math.floor(x%3600/60))+'m '+p2(Math.round(x%60))+'s';
- $('hstat').innerHTML=tile('bl','fa-location-dot',data.length,'Points')+tile('gr','fa-road',d.toFixed(1)+' km','Distance')+tile('or','fa-gauge-high',Math.round(Math.max(...data.map(p=>p.speed)))+' km/h','Max speed')+tile('gy','fa-gauge',Math.round(mv.length?mv.reduce((a,p)=>a+p.speed,0)/mv.length:0)+' km/h','Average moving speed')+tile('gr','fa-road-circle-check',hm(dr),'Driving Period')+tile('or','fa-hourglass-half',hm(id),'Idling Period')+tile('bl','fa-clock',hm(tot),'Total Duration')+tile('rd','fa-triangle-exclamation',evs.length,'Recorded events')+tile('or','fa-gas-pump',cum.toFixed(1)+' L','Estimated fuel');
- mapH.fitBounds(pts,{padding:[40,40]})}
-function csv(){if(!hData.length)return toast('Show a route first');
- const v=vehicles.find(x=>x.id===$('hv').value)||{};
- const r=[['Historical Tracking route'],['Vehicle: '+(v.name||'-')],...metaLines(),['time,lat,lng,speed_kmh,driver'],...hData.map(p=>[p.recorded_at,p.lat,p.lng,Math.round(p.speed),'"'+(p.driver_name||'')+'"'].join(','))];
+// a fix reporting accuracy 0 or less is a placeholder, not a real position
+const okFix=p=>!(p.accuracy!=null&&+p.accuracy<=0);
+const hm=x=>{x=Math.max(0,Math.round(x||0));return Math.floor(x/3600)+'h '+p2(Math.floor(x%3600/60))+'m '+p2(x%60)+'s'};
+const hms=x=>{x=Math.max(0,Math.round(x||0));return p2(Math.floor(x/3600))+':'+p2(Math.floor(x%3600/60))+':'+p2(x%60)};
+const tms=p=>new Date(p.recorded_at).getTime();
+const brg=(a,b)=>{const r=x=>x*Math.PI/180,y=Math.sin(r(b.lng-a.lng))*Math.cos(r(b.lat)),x=Math.cos(r(a.lat))*Math.sin(r(b.lat))-Math.sin(r(a.lat))*Math.cos(r(b.lat))*Math.cos(r(b.lng-a.lng));return (Math.atan2(y,x)*180/Math.PI+360)%360};
+const TRIP_GAP=600,TCOL=['#2f7fe6','#e8590c','#27a46a','#9b51e0','#d6336c','#0b9fb3','#c99a00','#5c7cfa','#7a5c3e','#2b8a3e'];
+let TRIPS=[],TSEL=-1,HEVS=[],PB=null;
+function splitTrips(d){const out=[];let cur=[];
+ d.forEach(p=>{if(cur.length&&tms(p)-tms(cur.at(-1))>TRIP_GAP*1000){out.push(cur);cur=[]}cur.push(p);if(p.ignition===false&&cur.length>1){out.push(cur);cur=[]}});
+ if(cur.length)out.push(cur);const f=out.filter(t=>t.length>1);return f.length?f:out.slice(0,1)}
+function tStats(t,Vh){let d=0,dr=0,id=0,fuel=0,max=0,ms=0,mn=0;const fm=+Vh.fuel_moving||0,fi=+Vh.fuel_idle||0;
+ t.forEach(p=>{const s=+p.speed||0;if(s>max)max=s;if(s>0){ms+=s;mn++}});
+ for(let i=1;i<t.length;i++){const q=t[i-1],p=t[i],dt=(tms(p)-tms(q))/1000;if(dt>180)continue;const dk=km(q,p);d+=dk;if(p.speed>0){dr+=dt;fuel+=dk*fm/100}else{id+=dt;fuel+=dt/3600*fi}}
+ return {d,dr,id,fuel,max,avg:mn?ms/mn:0,s:tms(t[0]),e:tms(t.at(-1)),dur:(tms(t.at(-1))-tms(t[0]))/1000}}
+const arw=(b,c)=>L.divIcon({className:'arw',html:`<svg width="14" height="14" viewBox="0 0 14 14" style="transform:rotate(${Math.round(b)}deg)"><path d="M7 1L12.5 12.5L7 9.5L1.5 12.5Z" fill="${c}" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/></svg>`,iconSize:[14,14],iconAnchor:[7,7]});
+const shp=w=>L.divIcon({className:'',html:w==='s'?'<svg width="26" height="24" viewBox="0 0 26 24" style="display:block;filter:drop-shadow(0 1px 2px #0008)"><path d="M13 2L24.5 22H1.5Z" fill="#27a46a" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/></svg>':'<svg width="22" height="22" viewBox="0 0 22 22" style="display:block;filter:drop-shadow(0 1px 2px #0008)"><rect x="2" y="2" width="18" height="18" rx="2" fill="#d9534f" stroke="#fff" stroke-width="2.5"/></svg>',iconSize:w==='s'?[26,24]:[22,22],iconAnchor:w==='s'?[13,15]:[11,11],popupAnchor:[0,-10]});
+const evMk=x=>L.marker([x.lat,x.lng],{icon:evIcon(x.type),zIndexOffset:900}).bindPopup(()=>evPop(x),{minWidth:240});
+function geoFill(pop,p){geoOne(gk(p)).then(nm=>{const el=pop.getElement&&pop.getElement();const s=el&&el.querySelector('.gname');if(s)s.textContent=nm||'Place name not found'})}
+const HR='<hr style="border:0;border-top:1px solid #8883;margin:6px 0">';
+function tPop(T,w){const p=w==='s'?T.pts[0]:T.pts.at(-1),S=T.st,s=w==='s';
+ return `<div style="min-width:230px"><b style="font-size:15px;color:${s?'#27a46a':'#d9534f'}"><i class="fa-solid ${s?'fa-play':'fa-flag-checkered'}"></i> ${s?'Start':'End'} Trip</b> <span class="chip" style="background:${T.col}22;color:${T.col}">Trip ${T.n}</span>${HR}
+ <i class="fa-solid fa-car"></i> ${esc(p.vehicle_name||'-')}<br><i class="fa-solid fa-id-card"></i> ${esc(p.driver_name||'-')}<br><i class="fa-regular fa-clock"></i> ${new Date(p.recorded_at).toLocaleString()}<br>
+ <i class="fa-solid fa-map-pin"></i> <span class="gname">${esc(GC[gk(p)]||'Looking up the place…')}</span><br><i class="fa-solid fa-location-dot"></i> ${(+p.lat).toFixed(5)}, ${(+p.lng).toFixed(5)}<br><i class="fa-solid fa-gauge-high"></i> ${Math.round(p.speed||0)} km/h${HR}
+ Distance <b>${S.d.toFixed(2)} km</b> · Duration <b>${hm(S.dur)}</b><br>Max speed <b>${Math.round(S.max)} km/h</b> · Events <b>${T.evs.length}</b></div>`}
+function ptPop(p,T,l,r,c){return `<b>${new Date(p.recorded_at).toLocaleString()}</b> <span class="chip" style="background:${T.col}22;color:${T.col}">Trip ${T.n}</span><br><i class="fa-solid fa-car"></i> ${esc(p.vehicle_name||'-')} · <i class="fa-solid fa-id-card"></i> ${esc(p.driver_name||'-')}<br><i class="fa-solid fa-gauge-high"></i> ${Math.round(p.speed||0)} km/h · ${stt(p)}<br><i class="fa-solid fa-gas-pump"></i> Fuel ${l.toFixed(3)} L${r?' ('+r+')':''}<br>Trip fuel so far: ${c.toFixed(2)} L<br><i class="fa-solid fa-location-dot"></i> ${(+p.lat).toFixed(5)}, ${(+p.lng).toFixed(5)}<br>Accuracy ${p.accuracy??'-'} m · Elev. ${p.altitude!=null?Math.round(p.altitude):'-'} m · Dir ${p.heading!=null?Math.round(p.heading):'-'}°<br>Accel ${p.accel??'-'} km/h/s<br><i class="fa-solid fa-battery-half"></i> ${p.battery_pct!=null?Math.round(p.battery_pct)+'%':'-'}${p.charging?' ⚡':''}`}
+function drawTrip(T,Vh){const P=T.pts,g=T.ly,fm=+Vh.fuel_moving||0,fi=+Vh.fuel_idle||0,k=Math.max(1,Math.ceil(P.length/120));
+ T.pl=L.polyline(P.map(p=>[p.lat,p.lng]),{color:T.col,weight:5,opacity:.9}).addTo(g).on('click',()=>tSel(T.n-1));
+ let cum=0;
+ P.forEach((p,i)=>{let l=0,r='';if(i){const q=P[i-1],dt=(tms(p)-tms(q))/1000;if(dt<=180){const dk=km(q,p);l=p.speed>0?dk*fm/100:dt/3600*fi;r=p.speed>0&&dk>.005?(l/dk*100).toFixed(1)+' L/100km':fi+' L/h idling'}}cum+=l;
+  if(!i||i===P.length-1||i%k)return;
+  const c=cum,q=P[i-1],n=P[i+1];
+  // the drawn line's own direction is used first so the arrow always follows the route
+  let b=null;if(p.speed>0){if(km(q,n)>.003)b=brg(q,n);else if(p.heading!=null)b=+p.heading}
+  (b==null?L.circleMarker([p.lat,p.lng],{radius:3,color:T.col,weight:2,fillColor:'#fff',fillOpacity:1}):L.marker([p.lat,p.lng],{icon:arw(b,T.col)})).addTo(g).bindPopup(()=>ptPop(p,T,l,r,c))});
+ const a=P[0],z=P.at(-1);
+ L.marker([a.lat,a.lng],{icon:shp('s'),zIndexOffset:1500}).addTo(g).bindPopup(()=>tPop(T,'s')).on('popupopen',e=>geoFill(e.popup,a));
+ if(P.length>1)L.marker([z.lat,z.lng],{icon:shp('e'),zIndexOffset:1400}).addTo(g).bindPopup(()=>tPop(T,'e')).on('popupopen',e=>geoFill(e.popup,z));
+ T.evs.forEach(x=>evMk(x).addTo(g))}
+async function loadHist(){pbStop();
+ const vid=$('hv').value,hf=new Date($('hf').value).toISOString(),ht=new Date($('ht').value).toISOString();
+ const data=(await fetchAll(()=>sb.from('positions').select('*').eq('vehicle_id',vid).gte('recorded_at',hf).lte('recorded_at',ht).order('recorded_at'))).filter(okFix);
+ if(hLayer)hLayer.remove();TRIPS.forEach(t=>t.ly.remove());TRIPS=[];TSEL=-1;HEVS=[];hData=data;
+ if(!data.length){$('hstat').innerHTML='';hSide();return toast('No data in this period.')}
+ HEVS=(await fetchAll(()=>sb.from('events').select('*').eq('vehicle_id',vid).gte('recorded_at',hf).lte('recorded_at',ht).order('recorded_at'))).filter(x=>EV[x.type]&&okFix(x));
+ const Vh=vehicles.find(x=>x.id===vid)||{};
+ TRIPS=splitTrips(data).map((pts,i)=>({n:i+1,pts,col:TCOL[i%TCOL.length],on:true,st:tStats(pts,Vh),ly:L.layerGroup(),evs:[]}));
+ hLayer=L.layerGroup().addTo(mapH);
+ HEVS.forEach(x=>{const t=tms(x),T=TRIPS.find(T=>t>=T.st.s-6e4&&t<=T.st.e+6e4);if(T)T.evs.push(x);else evMk(x).addTo(hLayer)});
+ TRIPS.forEach(T=>{drawTrip(T,Vh);T.ly.addTo(mapH)});
+ if(!+Vh.fuel_moving&&!+Vh.fuel_idle)toast('Set the fuel rates on the Vehicles page to see fuel figures');
+ hSide();hKpis();hFit()}
+function hFit(){mapH.invalidateSize();const b=L.latLngBounds([]);TRIPS.forEach(t=>{if(t.on)t.pts.forEach(p=>b.extend([p.lat,p.lng]))});
+ if(!b.isValid()){if(hLayer)hLayer.eachLayer(l=>l.getLatLng&&b.extend(l.getLatLng()))}
+ if(b.isValid())mapH.fitBounds(b,{padding:[30,30],maxZoom:17,animate:false})}
+function hStyle(){TRIPS.forEach((t,i)=>t.pl&&t.pl.setStyle({weight:i===TSEL?7:5,opacity:TSEL<0||i===TSEL?.9:.4}));const T=TRIPS[TSEL];if(T&&T.on)T.pl.bringToFront()}
+function tTog(i,on){const T=TRIPS[i];T.on=on;on?T.ly.addTo(mapH):T.ly.remove();if(!on&&TSEL===i){TSEL=-1;pbStop()}hStyle();hSide();hKpis()}
+function tAll(on){TRIPS.forEach((T,i)=>{T.on=!!on;on?T.ly.addTo(mapH):T.ly.remove()});if(!on){TSEL=-1;pbStop()}hStyle();hSide();hKpis();if(on)hFit()}
+function tSel(i){const T=TRIPS[i];if(!T)return;if(!T.on){T.on=true;T.ly.addTo(mapH)}
+ if(TSEL!==i){TSEL=i;pbInit()}hStyle();hSide();hKpis();mapH.fitBounds(T.pts.map(p=>[p.lat,p.lng]),{padding:[30,30],maxZoom:17})}
+function tDet(T){const S=T.st;return [['Start',new Date(S.s).toLocaleString()],['End',new Date(S.e).toLocaleString()],['Distance',S.d.toFixed(2)+' km'],['Max Speed',Math.round(S.max)+' km/h'],['Avg moving speed',Math.round(S.avg)+' km/h'],['Driving',hm(S.dr)],['Idling',hm(S.id)],['Duration',hm(S.dur)],['Events',T.evs.length],['Estimated fuel',S.fuel.toFixed(2)+' L'],['Records',T.pts.length]]}
+function hSide(){const s=$('hside');
+ if(!TRIPS.length){s.innerHTML='<p style="color:var(--mut);margin:0">No trips in this period.</p>';return}
+ const T=TRIPS[TSEL];
+ s.innerHTML=`<div style="display:flex;align-items:center;gap:6px"><b style="flex:1"><i class="fa-solid fa-route"></i> Trips (${TRIPS.length})</b><button class="btn gh sm" onclick="tAll(1)" title="Show every trip">All</button><button class="btn gh sm" onclick="tAll(0)" title="Hide every trip">None</button></div>
+ <div class="trl">${TRIPS.map((t,i)=>`<div class="trr${i===TSEL?' on':''}" onclick="tSel(${i})" title="Click to see this trip's details and play it back"><input type="checkbox" ${t.on?'checked':''} onclick="event.stopPropagation()" onchange="tTog(${i},this.checked)" title="Show this trip on the map"><span class="sw" style="background:${t.col}"></span><div style="flex:1;min-width:0"><b>Trip ${t.n}</b> <small>${new Date(t.st.s).toLocaleString()} → ${new Date(t.st.e).toLocaleTimeString()} · ${t.st.d.toFixed(1)} km</small></div></div>`).join('')}</div>
+ ${T?`<div style="border:1px solid var(--line);border-left:4px solid ${T.col};border-radius:10px;padding:10px"><div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><b style="flex:1">Trip ${T.n} details</b><button class="btn gh sm" onclick="tPrint()" title="Print these trip details"><i class="fa-solid fa-print"></i>Print</button></div>
+ <div class="tdet">${tDet(T).map(r=>`<span>${r[0]}</span><b>${esc(r[1])}</b>`).join('')}<span>From</span><b id="tdS">${esc(GC[gk(T.pts[0])]||'…')}</b><span>To</span><b id="tdE">${esc(GC[gk(T.pts.at(-1))]||'…')}</b></div></div>
+ <div style="border:1px solid var(--line);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px"><b><i class="fa-solid fa-film"></i> Playback</b><div class="pbk"><button class="btn g sm" id="pbB" onclick="pbToggle()" title="Play / pause"><i class="fa-solid ${PB&&PB.run?'fa-pause':'fa-play'}"></i></button><select id="pbR" title="Playback speed">${[1,2,4,8,16,32,64].map(x=>`<option value="${x}" ${x===(PB&&PB.rate||8)?'selected':''}>${x}×</option>`).join('')}</select><input type="range" id="pbS" min="0" max="${T.pts.length-1}" value="${PB?PB.i:0}" oninput="pbSeek(+this.value)"></div><div class="pvals" id="pbV"></div></div>`
+ :'<small style="color:var(--mut)">Click a trip to see its details, print them and play the trip back.</small>'}`;
+ if(T){[['tdS',T.pts[0]],['tdE',T.pts.at(-1)]].forEach(([id,p])=>geoOne(gk(p)).then(nm=>{if($(id))$(id).textContent=nm||'Place name not found'}));
+  $('pbR').onchange=e=>{if(PB)PB.rate=+e.target.value};pbShow()}}
+async function tPrint(){const T=TRIPS[TSEL];if(!T)return;const a=T.pts[0],z=T.pts.at(-1);
+ const w=open('','_blank');if(!w)return toast('Allow pop-ups for this site to print');
+ const [ls,le]=await Promise.all([geoOne(gk(a)),geoOne(gk(z))]);
+ const rows=[['Vehicle',a.vehicle_name||'-'],['Driver',a.driver_name||'-'],...tDet(T),['Start location',ls||gk(a)],['End location',le||gk(z)]];
+ w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Trip ${T.n} - ${esc(a.vehicle_name||'')}</title><style>body{font:14px system-ui,sans-serif;margin:28px;color:#222}h2{margin:0 0 4px}small{color:#666}table{border-collapse:collapse;width:100%;margin-top:14px}td,th{border:1px solid #ccc;padding:6px 9px;text-align:left}td:first-child{background:#f5f5f5;font-weight:600;width:38%}th{background:#eee}</style></head><body>
+ <h2>Trip ${T.n} details</h2><small>Fleet Tracker · Generated: ${new Date().toLocaleString()}</small>
+ <table>${rows.map(r=>`<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join('')}</table>
+ ${T.evs.length?`<h3 style="margin-top:20px">Events</h3><table><tr><th>Time</th><th>Event</th><th>Speed</th></tr>${T.evs.map(x=>`<tr><td style="background:none;font-weight:400">${new Date(x.recorded_at).toLocaleString()}</td><td>${esc(EVX(x.type)[0])}</td><td>${Math.round(x.speed||0)} km/h</td></tr>`).join('')}</table>`:''}</body></html>`);
+ w.document.close();w.focus();setTimeout(()=>w.print(),300);
+ logAct('Printed trip',(a.vehicle_name||'-')+' trip '+T.n+' '+new Date(T.st.s).toLocaleString())}
+// ---- playback. Long pauses inside a trip are shortened to 30 s so the
+// marker never sits still for minutes at high playback speeds.
+const pbIcon=T=>L.divIcon({className:'',html:`<div class="mk" style="background:${T.col};box-shadow:0 0 0 4px ${T.col}55"><i class="fa-solid ${vt(T.pts[0])}"></i></div>`,iconSize:[32,32],iconAnchor:[16,16]});
+function pbInit(){pbStop();const T=TRIPS[TSEL];if(!T)return;const P=T.pts,c=[0],tl=[0];
+ for(let i=1;i<P.length;i++){const dt=tms(P[i])-tms(P[i-1]);c.push(c[i-1]+(dt<=180000?km(P[i-1],P[i]):0));tl.push(tl[i-1]+Math.min(Math.max(dt,0),30000))}
+ PB={T,i:0,c,tl,t:0,run:null,rate:8,mk:L.marker([P[0].lat,P[0].lng],{icon:pbIcon(T),zIndexOffset:2000}).addTo(mapH)}}
+function pbBtn(){const b=$('pbB');if(b)b.innerHTML=`<i class="fa-solid ${PB&&PB.run?'fa-pause':'fa-play'}"></i>`}
+function pbPause(){if(PB&&PB.run){clearInterval(PB.run);PB.run=null}pbBtn()}
+function pbToggle(){if(!PB)pbInit();if(!PB)return;if(PB.run)return pbPause();
+ if(PB.t>=PB.tl.at(-1))PB.t=0;PB.run=setInterval(pbTick,100);pbBtn()}
+function pbTick(){if(!PB)return;PB.t+=100*PB.rate;const end=PB.tl.at(-1);if(PB.t>=end){PB.t=end;pbShow();pbPause();return}pbShow()}
+function pbSeek(i){if(!PB)pbInit();if(!PB)return;PB.i=i;PB.t=PB.tl[i];pbShow()}
+function pbStop(){if(!PB)return;pbPause();PB.mk.remove();PB=null}
+function pbShow(){if(!PB)return;const {tl,c,T}=PB,P=T.pts;let i=Math.min(Math.max(0,PB.i|0),tl.length-1);
+ while(i<tl.length-1&&tl[i+1]<=PB.t)i++;while(i>0&&tl[i]>PB.t)i--;PB.i=i;
+ const p=P[i],q=P[i+1]||p,f=q===p||tl[i+1]===tl[i]?0:Math.min(1,(PB.t-tl[i])/(tl[i+1]-tl[i])),mix=(a,b)=>(+a||0)+((+b||0)-(+a||0))*f;
+ const ll=L.latLng(mix(p.lat,q.lat),mix(p.lng,q.lng));PB.mk.setLatLng(ll);
+ if(PB.run&&!mapH.getBounds().pad(-.15).contains(ll))mapH.panTo(ll);
+ const s=$('pbS');if(s&&document.activeElement!==s)s.value=i;
+ const now=tms(p)+(tms(q)-tms(p))*f,V=[['Time',new Date(now).toLocaleString()],['Speed',Math.round(mix(p.speed,q.speed))+' km/h'],['Status',stt(p)],['Distance',(c[i]+((c[i+1]??c[i])-c[i])*f).toFixed(2)+' km'],['Elapsed',hms((now-tms(P[0]))/1000)],['Accel',(p.accel??'-')+' km/h/s'],['Direction',p.heading!=null?Math.round(p.heading)+'°':'-'],['Elevation',p.altitude!=null?Math.round(p.altitude)+' m':'-'],['Battery',p.battery_pct!=null?Math.round(p.battery_pct)+'%'+(p.charging?' ⚡':''):'-'],['Point',(i+1)+' / '+P.length]];
+ const v=$('pbV');if(v)v.innerHTML=V.map(x=>`<div><small>${x[0]}</small><b>${esc(x[1])}</b></div>`).join('')}
+function hKpis(){const S=TRIPS.filter(t=>t.on),sm=k=>S.reduce((a,t)=>a+t.st[k],0);let ms=0,mn=0;S.forEach(t=>t.pts.forEach(p=>{if(p.speed>0){ms+=+p.speed;mn++}}));
+ const ev=S.reduce((a,t)=>a+t.evs.length,0)+HEVS.length-TRIPS.reduce((a,t)=>a+t.evs.length,0);
+ $('hstat').innerHTML=tile('bl','fa-route',S.length+' / '+TRIPS.length,'Trips shown')+tile('bl','fa-location-dot',S.reduce((a,t)=>a+t.pts.length,0),'Points')+tile('gr','fa-road',sm('d').toFixed(1)+' km','Distance')+tile('or','fa-gauge-high',Math.round(S.reduce((a,t)=>Math.max(a,t.st.max),0))+' km/h','Max speed')+tile('gy','fa-gauge',Math.round(mn?ms/mn:0)+' km/h','Avg moving speed')+tile('gr','fa-road-circle-check',hm(sm('dr')),'Driving')+tile('or','fa-hourglass-half',hm(sm('id')),'Idling')+tile('bl','fa-clock',hm(sm('dur')),'Duration')+tile('rd','fa-triangle-exclamation',ev,'Events')+tile('or','fa-gas-pump',sm('fuel').toFixed(1)+' L','Estimated fuel')}
+function hKpiSet(){const off=localStorage.hk==='0';$('hstat').classList.toggle('hide',off);$('hkB').innerHTML=`<i class="fa-solid ${off?'fa-eye':'fa-eye-slash'}"></i>${off?'Show summary':''}`;$('hkB').title=off?'Show the summary':'Hide the summary';if(mapH)setTimeout(()=>mapH.invalidateSize(),50)}
+function hKpi(){localStorage.hk=localStorage.hk==='0'?'1':'0';hKpiSet()}
+hKpiSet();
+function csv(){const S=TRIPS.filter(t=>t.on);if(!S.length)return toast('Show a route first');
+ const v=vehicles.find(x=>x.id===$('hv').value)||{},q=s=>'"'+String(s??'').replace(/"/g,'""')+'"';
+ const r=[['Historical Tracking route'],['Vehicle: '+(v.name||'-')],...metaLines(),['trip,time,lat,lng,speed_kmh,driver'],...S.flatMap(t=>t.pts.map(p=>[t.n,p.recorded_at,p.lat,p.lng,Math.round(p.speed||0),q(p.driver_name)].join(',')))];
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+r.join('\n')],{type:'text/csv'}));a.download='route.csv';a.click()}
 // ---- events + reports + charts
-const EV={harsh_braking:['Harsh braking','fa-hand','#d9534f','rd'],harsh_acceleration:['Harsh acceleration','fa-bolt','#f28c28','or'],overspeed:['Overspeed','fa-gauge-high','#2f7fe6','bl']};
-const evIcon=t=>L.divIcon({className:'',html:`<div class="mk sm" style="background:${EV[t][2]}"><i class="fa-solid ${EV[t][1]}"></i></div>`,iconSize:[20,20],iconAnchor:[10,10]});
+const EV={harsh_braking:['Harsh braking','fa-hand','#d9534f','rd'],harsh_acceleration:['Harsh acceleration','fa-bolt','#f28c28','or'],overspeed:['Overspeed','fa-gauge-high','#2f7fe6','bl'],road_overspeed:['Road speed limit','fa-road','#9b51e0','pu']};
+const EVX=t=>EV[t]||[t||'Event','fa-triangle-exclamation','#6b7a85','gy'];
+const evIcon=t=>L.divIcon({className:'',html:`<div class="mk sm" style="background:${EVX(t)[2]}"><i class="fa-solid ${EVX(t)[1]}"></i></div>`,iconSize:[20,20],iconAnchor:[10,10]});
+const evDur=x=>x.ended_at?(new Date(x.ended_at)-new Date(x.recorded_at))/1000:null;
+function evPop(x){const E=EVX(x.type),d=evDur(x),n=(a,u)=>a!=null&&a!==''?a+u:'-',
+ val=x.type==='overspeed'||x.type==='road_overspeed'?'':`<br><i class="fa-solid fa-gauge"></i> ${(+x.value||0).toFixed(1)} km/h/s`;
+ return `<div style="min-width:240px"><b style="font-size:15px;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</b>${HR}
+ <i class="fa-solid fa-car"></i> <b>${esc(x.vehicle_name||'-')}</b><br><i class="fa-solid fa-id-card"></i> ${esc(x.driver_name||'-')}<br>
+ <i class="fa-regular fa-clock"></i> ${new Date(x.recorded_at).toLocaleString()}${x.ended_at?'<br><i class="fa-regular fa-clock"></i> Ended '+new Date(x.ended_at).toLocaleTimeString()+' · <b>'+hms(d)+'</b>':''}<br>
+ <i class="fa-solid fa-gauge-high"></i> ${Math.round(x.speed||0)} km/h${x.road_limit?' · road limit '+x.road_limit+' km/h':''}${val}${x.details?'<br>'+esc(x.details):''}${HR}
+ <i class="fa-solid fa-location-dot"></i> ${(+x.lat).toFixed(5)}, ${(+x.lng).toFixed(5)}<br>Accuracy ${n(x.accuracy,' m')} · Elev. ${x.altitude!=null?Math.round(x.altitude)+' m':'-'} · Dir ${x.heading!=null?Math.round(x.heading)+'°':'-'}<br>Accel ${n(x.accel,' km/h/s')} · Ignition ${x.ignition===false?'off':x.ignition?'on':'-'}<br><i class="fa-solid fa-battery-half"></i> ${x.battery_pct!=null?Math.round(x.battery_pct)+'%':'-'}${x.charging?' ⚡':''}</div>`}
 async function fetchAll(q){let a=[];for(let i=0;i<30;i++){const {data,error}=await q().range(i*1000,i*1000+999);if(error){toast(error.message);break}a=a.concat(data);if(data.length<1000)break}return a}
 function chart(id,type,labels,sets,o={}){const cs=getComputedStyle(document.documentElement);Chart.defaults.color=cs.getPropertyValue('--mut');Chart.defaults.borderColor=cs.getPropertyValue('--line');charts[id]?.destroy();
  // o.mark draws a value beside one specific point - used for the trip's max speed
  const pl=o.mark?[{id:'mark',afterDatasetsDraw(c){const p=c.getDatasetMeta(0).data[o.mark.i];if(!p)return;const{ctx}=c;ctx.save();
   ctx.font='700 12px system-ui';ctx.fillStyle='#d9534f';ctx.textAlign=p.x>c.chartArea.right-110?'right':'left';
   ctx.fillText(o.mark.t,p.x+(ctx.textAlign==='right'?-9:9),p.y-9);ctx.restore()}}]:[];
- charts[id]=new Chart($(id),{type,data:{labels,datasets:sets},options:{maintainAspectRatio:false,onClick:o.click,indexAxis:o.h?'y':'x',plugins:{title:{display:true,text:o.t},legend:{display:sets.length>1||type==='doughnut'}},scales:type==='doughnut'?{}:{x:{stacked:!!o.s},y:{stacked:!!o.s,beginAtZero:true}}},plugins:pl})}
+ // index mode with intersect off: hovering anywhere above a time shows every value
+ // there, instead of needing the cursor exactly on a 1.5 px line
+ const dn=type==='doughnut',click=o.click&&((e,el,c)=>{const hit=dn?el:c.getElementsAtEventForMode(e,'nearest',{intersect:true},true);o.click(e,hit.length?hit:el)});
+ charts[id]=new Chart($(id),{type,data:{labels,datasets:sets},options:{maintainAspectRatio:false,onClick:click,indexAxis:o.h?'y':'x',interaction:dn?{mode:'nearest',intersect:true}:{mode:'index',intersect:false,axis:o.h?'y':'x'},plugins:{title:{display:true,text:o.t},legend:{display:sets.length>1||dn}},scales:dn?{}:{x:{stacked:!!o.s},y:{stacked:!!o.s,beginAtZero:true}}},plugins:pl})}
 const cnt=(rows,f)=>rows.reduce((o,r)=>{const k=f(r)||'-';o[k]=(o[k]||0)+1;return o},{});
 async function loadEvt(){
- const v=$('ev_v').value,d=$('ev_d').value,t=$('ev_t').value,f=new Date($('ev_f').value).toISOString(),to=new Date($('ev_to').value).toISOString();
- EVR=await fetchAll(()=>{let q=sb.from('events').select('*').gte('recorded_at',f).lte('recorded_at',to).order('recorded_at',{ascending:false});if(v)q=q.eq('vehicle_id',v);if(d)q=q.eq('driver_id',d);if(t)q=q.eq('type',t);return q});EVF={};renderEvt()}
+ const v=mselVal('ev_v'),d=mselVal('ev_d'),t=mselVal('ev_t'),f=new Date($('ev_f').value).toISOString(),to=new Date($('ev_to').value).toISOString();
+ EVR=await fetchAll(()=>{let q=sb.from('events').select('*').gte('recorded_at',f).lte('recorded_at',to).order('recorded_at',{ascending:false});if(v.length)q=q.in('vehicle_id',v);if(d.length)q=q.in('driver_id',d);if(t.length)q=q.in('type',t);return q});EVF={};renderEvt()}
 function evReset(){EVF={};renderEvt()}
 function evSet(k,val){EVF[k]=EVF[k]===val?undefined:val;renderEvt()}
 const dayOf=r=>new Date(r.recorded_at).toLocaleDateString('en-CA');
 function renderEvt(){
- const rows=EVR.filter(r=>(!EVF.type||r.type===EVF.type)&&(!EVF.driver||(r.driver_name||'-')===EVF.driver)&&(!EVF.day||dayOf(r)===EVF.day)),ty=cnt(rows,r=>r.type),K=Object.keys(EV);
- $('evFl').innerHTML=Object.entries(EVF).filter(x=>x[1]).map(x=>`<span class="chip" style="background:var(--bll);color:var(--bl)">${x[0]}: ${esc(x[0]==='type'?EV[x[1]][0]:x[1])}</span>`).join(' ')+(Object.values(EVF).some(Boolean)?' <button class="btn gh sm" onclick="evReset()"><i class="fa-solid fa-rotate-left"></i>Reset filter</button>':'<small style="color:var(--mut)">Click any chart to filter the table. Click again or press Reset to show everything.</small>');
- $('evK').innerHTML=tile('gy','fa-bell',rows.length,'Total events')+K.map(k=>tile(EV[k][3],EV[k][1],ty[k]||0,EV[k][0])).join('');
- chart('c1','doughnut',K.map(k=>EV[k][0]),[{data:K.map(k=>ty[k]||0),backgroundColor:K.map(k=>EV[k][2])}],{t:'Events by type',click:(e,el)=>el.length&&evSet('type',K[el[0].index])});
+ const fx=r=>(!EVF.driver||(r.driver_name||'-')===EVF.driver)&&(!EVF.day||dayOf(r)===EVF.day),base=EVR.filter(fx),rows=base.filter(r=>!EVF.type||r.type===EVF.type),ty=cnt(rows,r=>r.type),K=Object.keys(EV);
+ $('evFl').innerHTML=Object.entries(EVF).filter(x=>x[1]).map(x=>`<span class="chip" style="background:var(--bll);color:var(--bl)">${x[0]}: ${esc(x[0]==='type'?EVX(x[1])[0]:x[1])}</span>`).join(' ')+(Object.values(EVF).some(Boolean)?' <button class="btn gh sm" onclick="evReset()"><i class="fa-solid fa-rotate-left"></i>Reset filter</button>':'<small style="color:var(--mut)">Click a summary tile or any chart to filter everything. Click again or press Reset to show everything.</small>');
+ // the tiles count without the type filter, so every type stays clickable
+ const bt=cnt(base,r=>r.type),ct=(c,i,v,l,js,on)=>tile(c,i,v,l).replace('class="card kpi ',`onclick="${js}" title="Click to show only these" class="card kpi click${on?' on':''} `);
+ $('evK').innerHTML=ct('gy','fa-bell',base.length,'Total events',"EVF.type=undefined;renderEvt()",!EVF.type)+K.map(k=>ct(EV[k][3],EV[k][1],bt[k]||0,EV[k][0],`evSet('type','${k}')`,EVF.type===k)).join('');
+ chart('c1','doughnut',K.map(k=>EV[k][0]),[{data:K.map(k=>ty[k]||0),backgroundColor:K.map(k=>EV[k][2])}],{t:'Events by Type',click:(e,el)=>el.length&&evSet('type',K[el[0].index])});
  const days=[...new Set(rows.map(dayOf))].sort();
- chart('c2','bar',days,K.map(k=>({label:EV[k][0],backgroundColor:EV[k][2],data:days.map(d=>rows.filter(r=>r.type===k&&dayOf(r)===d).length)})),{t:'Events per day',s:1,click:(e,el)=>el.length&&evSet('day',days[el[0].index])});
+ chart('c2','bar',days,K.map(k=>({label:EV[k][0],backgroundColor:EV[k][2],data:days.map(d=>rows.filter(r=>r.type===k&&dayOf(r)===d).length)})),{t:'Events per Day',s:1,click:(e,el)=>el.length&&evSet('day',days[el[0].index])});
  const dr=Object.entries(cnt(rows,r=>r.driver_name)).sort((a,b)=>b[1]-a[1]).slice(0,8).map(x=>x[0]);
  chart('c3','bar',dr,K.map(k=>({label:EV[k][0],backgroundColor:EV[k][2],data:dr.map(n=>rows.filter(r=>(r.driver_name||'-')===n&&r.type===k).length)})),{t:'Violator Drivers',s:1,h:1,click:(e,el)=>{if(!el.length)return;EVF.driver=dr[el[0].index];EVF.type=K[el[0].datasetIndex];renderEvt()}});
- $('evT').innerHTML=`<table><tr><th>Event Start</th><th>Vehicle</th><th>Driver</th><th>Event</th><th>Speed (km/h)</th><th>Acceleration / Deceleration (km/h/s)</th><th>Details</th><th>Location</th></tr>${rows.slice(0,1000).map(r=>`<tr><td>${new Date(r.recorded_at).toLocaleString()}</td><td>${esc(r.vehicle_name)}</td><td>${esc(r.driver_name)}</td><td><span class="chip" style="background:${EV[r.type][2]}22;color:${EV[r.type][2]}"><i class="fa-solid ${EV[r.type][1]}"></i> ${EV[r.type][0]}</span></td><td>${Math.round(r.speed)}</td><td>${r.type==='overspeed'?'-':(+r.value).toFixed(1)}</td><td>${esc(r.details||'-')}</td><td><a href="#" onclick="goHist('${r.vehicle_id}','${r.recorded_at}',${r.lat},${r.lng});return false"><i class="fa-solid fa-map-location-dot"></i> ${(+r.lat).toFixed(5)}, ${(+r.lng).toFixed(5)}</a></td></tr>`).join('')||'<tr><td colspan="8">No events in this period.</td></tr>'}</table>`;tools($('evT'))}
+ const acc=r=>r.type==='overspeed'||r.type==='road_overspeed'?'-':(+r.value).toFixed(1);
+ $('evT').innerHTML=`<table><tr><th>Event Start</th><th>Event End</th><th>Duration</th><th>Vehicle</th><th>Driver</th><th>Event</th><th>Speed (km/h)</th><th>Acceleration / Deceleration (km/h/s)</th><th>Details</th><th>Location</th></tr>${rows.slice(0,1000).map(r=>{const E=EVX(r.type),d=evDur(r);return `<tr><td>${new Date(r.recorded_at).toLocaleString()}</td><td>${r.ended_at?new Date(r.ended_at).toLocaleString():'-'}</td><td>${d==null?'-':hms(d)}</td><td>${esc(r.vehicle_name)}</td><td>${esc(r.driver_name)}</td><td><span class="chip" style="background:${E[2]}22;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</span></td><td>${Math.round(r.speed||0)}</td><td>${acc(r)}</td><td>${esc(r.details||'-')}</td><td><a href="#" onclick="goHist('${r.vehicle_id}','${r.recorded_at}',${r.lat},${r.lng});return false"><i class="fa-solid fa-map-location-dot"></i> ${(+r.lat).toFixed(5)}, ${(+r.lng).toFixed(5)}</a></td></tr>`}).join('')||'<tr><td colspan="10">No events in this period.</td></tr>'}</table>`;tools($('evT'))}
 async function goHist(vid,iso,lat,lng){document.querySelector('.nb[data-t=hist]').click();$('hv').value=vid;const t=new Date(iso).getTime();$('hf')._flatpickr.setDate(new Date(t-9e5),true);$('ht')._flatpickr.setDate(new Date(t+9e5),true);await loadHist();mapH.setView([lat,lng],17)}
 async function loadRep(){
  const F=new Date($('rp_f').value),T=new Date($('rp_t').value);
@@ -376,9 +529,9 @@ async function loadRep(){
  if(error)return toast(error.message);
  if(!data||!data.length){rep=[];$('rpK').innerHTML='';['r1','r2','r3','r4'].forEach(id=>charts[id]?.destroy());$('rpT').innerHTML='<p style="padding:12px;color:var(--mut)">No positions recorded in this period.</p>';return toast('No data in this period. Pick a wider period or another day.')}
  const evs=await fetchAll(()=>sb.from('events').select('vehicle_id,type').gte('recorded_at',f).lte('recorded_at',t));
- const V={},D={},K={harsh_braking:'b',harsh_acceleration:'a',overspeed:'o'};
+ const V={},D={},K={harsh_braking:'b',harsh_acceleration:'a',overspeed:'o',road_overspeed:'o'};
  data.forEach(r=>{const o=V[r.vehicle_id]??={id:r.vehicle_id,name:r.vehicle_name,km:0,max:0,dr:0,sp:0,b:0,a:0,o:0,os:0};o.km+=+r.km;o.max=Math.max(o.max,+r.max_speed);o.dr+=+r.drive_min;o.sp+=+r.stop_min;o.os+=(+r.over_s||0);D[r.day]=(D[r.day]||0)+ +r.km});
- evs.forEach(e=>{if(V[e.vehicle_id])V[e.vehicle_id][K[e.type]]++});
+ evs.forEach(e=>{if(V[e.vehicle_id]&&K[e.type])V[e.vehicle_id][K[e.type]]++});
  rep=Object.values(V).map(o=>{const q=vehicles.find(x=>x.id===o.id)||{},fm=o.km*(q.fuel_moving||0)/100,fi=o.sp/60*(q.fuel_idle||0);return {...o,fm,fi,ft:fm+fi,l100:o.km>0?(fm+fi)/o.km*100:0,score:(o.a+o.b+o.os)*100/Math.max(o.km,1)}});
  const sum=k=>rep.reduce((a,o)=>a+o[k],0),n=rep.map(o=>o.name);
  const G=Number.isFinite(+SET.score_green)?+SET.score_green:1,R=Number.isFinite(+SET.score_red)?+SET.score_red:3,sc=s=>s>=R?'rd':s<=G?'gr':'or',avg=sum('score')/(rep.length||1);
@@ -398,22 +551,23 @@ async function addUser(e){e.preventDefault();
  if(!data.session)toast('User created but cannot sign in yet: turn OFF "Confirm email" in Supabase (see steps)');else toast('User created',1);
  logAct('Created user',e.target.u.value);e.target.reset();users()}
 let RULES={},SET={},OV=['speed_limit','brake_limit','accel_limit','moving_interval','stopped_interval','speed_buffer','max_accel_warning','min_moving_distance'];
-const UNIT={harsh_braking:'km/h per second',harsh_acceleration:'km/h per second',overspeed:'km/h'};
+const UNIT={harsh_braking:'km/h per second',harsh_acceleration:'km/h per second',overspeed:'km/h',road_overspeed:'km/h above the road limit'};
 const WARNED={};
 async function loadRules(){const {data}=await sb.from('event_rules').select('*').order('type');RULES={};(data||[]).forEach(r=>RULES[r.type]=r);
- if(data&&data.length&&!('hold_s'in data[0])&&!WARNED.hold)toast('The database is missing the new tolerance column. Run schema.sql in Supabase (SQL Editor) once to add it.');
+ if(data&&data.length&&(!('hold_s'in data[0])||!('voice'in data[0])||!RULES.road_overspeed)&&!WARNED.hold){WARNED.hold=1;toast('The database is missing the newest columns (tolerance, voice, road speed limit). Run schema.sql in Supabase (SQL Editor) once to add them.')}
  const num=(id,v,w,st)=>`<input type="number" step="${st||'any'}" min="0" id="${id}" value="${v??''}" style="width:${w||70}px">`;
- $('ruleT').innerHTML=`<table><tr><th>Event</th><th>Trigger limit</th><th>Tolerance (seconds)</th><th>Recorded</th><th>Visual alert</th><th>Buzzer alert</th><th>Buzzer seconds</th><th>Buzzer tone</th></tr>${(data||[]).map(r=>`<tr><td><b>${esc(r.label)}</b></td><td>${num('rt_'+r.type,r.threshold,80,'0.1')} <small>${UNIT[r.type]||''}</small></td><td>${num('rh_'+r.type,r.hold_s??0,70)}</td><td><input type="checkbox" id="re_${r.type}" ${r.enabled?'checked':''}></td><td><input type="checkbox" id="ra_${r.type}" ${r.alert?'checked':''}></td><td><input type="checkbox" id="rb_${r.type}" ${r.beep!==false?'checked':''}></td><td>${num('bd_'+r.type,r.beep_duration??5,70)}</td><td><select id="bt_${r.type}" style="width:150px"><option value="discontinuous" ${(r.beep_type||'discontinuous')==='discontinuous'?'selected':''}>Discontinuous</option><option value="continuous" ${r.beep_type==='continuous'?'selected':''}>Continuous</option></select></td></tr>`).join('')}</table>`}
+ $('ruleT').innerHTML=`<table><tr><th>Event</th><th>Trigger limit</th><th>Tolerance (seconds)</th><th>Recorded</th><th>Visual alert</th><th>Buzzer alert</th><th>Buzzer seconds</th><th>Buzzer tone</th></tr>${(data||[]).map(r=>`<tr><td><b>${esc(r.label)}</b></td><td>${num('rt_'+r.type,r.threshold,80,'0.1')} <small>${UNIT[r.type]||''}</small></td><td>${num('rh_'+r.type,r.hold_s??0,70)}</td><td><input type="checkbox" id="re_${r.type}" ${r.enabled?'checked':''}></td><td><input type="checkbox" id="ra_${r.type}" ${r.alert?'checked':''}></td><td><input type="checkbox" id="rb_${r.type}" ${r.beep!==false?'checked':''}></td><td>${num('bd_'+r.type,r.beep_duration??5,70)}</td><td style="white-space:nowrap"><select id="bt_${r.type}" style="width:150px">${Object.entries(TONES).map(([k,n])=>`<option value="${k}" ${(r.beep_type||'discontinuous')===k?'selected':''}>${n}</option>`).join('')}</select><button type="button" class="play" onclick="tryTone('${r.type}')" title="Play this tone"><i class="fa-solid fa-play"></i></button></td></tr>`).join('')}</table>`}
 async function getSet(){const {data}=await sb.from('app_settings').select('*');SET={};(data||[]).forEach(x=>SET[x.key]=x.value)}
 async function loadCfg(){await loadRules();await getSet();
  $('s_mov').value=SET.moving_interval||10;$('s_stp').value=SET.stopped_interval||60;
  $('sc_g').value=SET.score_green??1;$('sc_r').value=SET.score_red??3;
+ $('vo_on').checked=SET.voice_on!=='0';$('vo_lang').innerHTML=Object.entries(VLANG).map(([k,v])=>`<option value="${k}" ${(SET.voice_lang||'en')===k?'selected':''}>${v[0]}</option>`).join('');voTable();
  const cols=[['speed_limit','Overspeed limit','km/h',RULES.overspeed?.threshold],['speed_buffer','Overspeed buffer','km/h',0],['brake_limit','Harsh braking','km/h/s',RULES.harsh_braking?.threshold],['accel_limit','Harsh accel.','km/h/s',RULES.harsh_acceleration?.threshold],['max_accel_warning','Warning level','km/h/s',0],['moving_interval','Record moving','seconds',SET.moving_interval||10],['stopped_interval','Record stopped','seconds',SET.stopped_interval||60],['min_moving_distance','Min. distance before events','metres',0],['fuel_moving','Fuel moving','L/100 km',''],['fuel_idle','Fuel idling','L/hour','']];
  $('cfgV').innerHTML=`<table><tr><th><input type="checkbox" onclick="selAllV(this)" title="Tick every vehicle"></th><th>Vehicle</th>${cols.map(c=>`<th>${c[1]}<br><small>${c[2]}${c[3]?' (default '+c[3]+')':''}</small></th>`).join('')}</tr>${vehicles.map(v=>{const cust=OV.some(k=>v[k]!=null&&v[k]!=='');
  return `<tr><td style="text-align:center"><input type="checkbox" class="vsel" data-v="${v.id}" ${cust?'checked':''} title="Tick to include this vehicle in Reset selected"></td><td style="white-space:nowrap"><b>${esc(v.name)}</b>${cust?' <span class="chip" style="background:var(--orl);color:var(--ord)" title="This vehicle uses its own values instead of the fleet defaults">custom</span>':''}</td>${cols.map(c=>`<td><input type="number" step="any" min="0" data-v="${v.id}" data-k="${c[0]}" value="${v[c[0]]??''}" placeholder="${c[3]??''}" style="width:88px" title="${c[1]} (${c[2]})"></td>`).join('')}</tr>`}).join('')||'<tr><td colspan="12">Add vehicles first.</td></tr>'}</table>`;tools($('cfgV'))}
-const selV=()=>[...document.querySelectorAll('#cfgV .vsel:checked')].map(i=>i.dataset.v);
+const selCfg=()=>[...document.querySelectorAll('#cfgV .vsel:checked')].map(i=>i.dataset.v);
 function selAllV(c){document.querySelectorAll('#cfgV .vsel').forEach(i=>i.checked=c.checked)}
-async function resetSelV(){if(!ADMIN)return;const ids=selV();
+async function resetSelV(){if(!ADMIN)return;const ids=selCfg();
  if(!ids.length)return toast('Tick the vehicles you want to reset first');
  if(!confirm('Reset the settings on the '+ids.length+' ticked vehicle(s) back to the fleet defaults?'))return;
  const o={custom:false};OV.forEach(k=>o[k]=null);
@@ -421,50 +575,128 @@ async function resetSelV(){if(!ADMIN)return;const ids=selV();
  logAct('Reset vehicles to fleet defaults',ids.map(i=>vehicles.find(v=>v.id===i)?.name||i).join(', '));
  toast(ids.length+' vehicle(s) now follow the fleet defaults. Phones apply it within 5 minutes.',1);await refs();loadCfg()}
 async function saveCfg(){if(!ADMIN)return;
- const rules=Object.values(RULES).map(r=>({type:r.type,label:r.label,enabled:$('re_'+r.type).checked,threshold:+$('rt_'+r.type).value||null,hold_s:Math.max(0,+$('rh_'+r.type).value||0),alert:$('ra_'+r.type).checked,beep:$('rb_'+r.type).checked,beep_duration:Math.max(1,Math.round(+$('bd_'+r.type).value||5)),beep_type:$('bt_'+r.type).value}));
+ const hasV=Object.values(RULES).some(r=>'voice'in r);
+ const rules=Object.values(RULES).map(r=>({type:r.type,label:r.label,enabled:$('re_'+r.type).checked,threshold:+$('rt_'+r.type).value||null,hold_s:Math.max(0,+$('rh_'+r.type).value||0),alert:$('ra_'+r.type).checked,beep:$('rb_'+r.type).checked,beep_duration:Math.max(1,Math.round(+$('bd_'+r.type).value||5)),beep_type:$('bt_'+r.type).value,...(hasV&&$('vc_'+r.type)?{voice:$('vc_'+r.type).checked}:{})}));
  const byV={};document.querySelectorAll('#cfgV input[data-k]').forEach(i=>{(byV[i.dataset.v]??={})[i.dataset.k]=i.value===''?null:+i.value});
- const res=await Promise.all([sb.from('event_rules').upsert(rules),sb.from('app_settings').upsert([{key:'moving_interval',value:String(Math.max(1,+$('s_mov').value||10))},{key:'stopped_interval',value:String(Math.max(1,+$('s_stp').value||60))},{key:'score_green',value:String(Math.max(0,+$('sc_g').value||0))},{key:'score_red',value:String(Math.max(0,+$('sc_r').value||0))}]),...Object.entries(byV).map(([id,o])=>sb.from('vehicles').update({...o,custom:OV.some(k=>o[k]!=null)}).eq('id',id))]);
+ const res=await Promise.all([sb.from('event_rules').upsert(rules),sb.from('app_settings').upsert([{key:'moving_interval',value:String(Math.max(1,+$('s_mov').value||10))},{key:'stopped_interval',value:String(Math.max(1,+$('s_stp').value||60))},{key:'score_green',value:String(Math.max(0,+$('sc_g').value||0))},{key:'score_red',value:String(Math.max(0,+$('sc_r').value||0))},{key:'voice_on',value:$('vo_on').checked?'1':'0'},{key:'voice_lang',value:$('vo_lang').value||'en'}]),...Object.entries(byV).map(([id,o])=>sb.from('vehicles').update({...o,custom:OV.some(k=>o[k]!=null)}).eq('id',id))]);
  const e=res.find(r=>r.error);if(e)return toast(e.error.message);
- logAct('Saved configuration','Limits '+rules.map(r=>r.label+' '+(r.threshold??'off')).join(', ')+'; recording '+$('s_mov').value+'/'+$('s_stp').value+' s; score bands '+$('sc_g').value+'-'+$('sc_r').value+'; '+Object.keys(byV).length+' vehicle row(s)');
+ logAct('Saved configuration','Limits '+rules.map(r=>r.label+' '+(r.threshold??'off')).join(', ')+'; recording '+$('s_mov').value+'/'+$('s_stp').value+' s; score bands '+$('sc_g').value+'-'+$('sc_r').value+'; voice '+($('vo_on').checked?'on ('+$('vo_lang').value+')':'off')+'; '+Object.keys(byV).length+' vehicle row(s)');
  toast('Configuration saved. Phones apply it within 5 minutes or at the next trip start.',1);await refs();loadCfg()}
-function beep(R){try{const a=new (window.AudioContext||window.webkitAudioContext)(),t=a.currentTime,dur=Math.max(1,+((R||{}).beep_duration)||5),cont=(R||{}).beep_type==='continuous';
- if(cont){const o=a.createOscillator(),g=a.createGain();o.frequency.value=880;g.gain.value=.15;o.connect(g);g.connect(a.destination);o.start(t);o.stop(t+dur);return}
- const st=.5,n=Math.max(1,Math.round(dur/st));for(let i=0;i<n;i++){const o=a.createOscillator(),g=a.createGain();o.frequency.value=880;g.gain.value=.15;o.connect(g);g.connect(a.destination);o.start(t+i*st);o.stop(t+i*st+.25)}}catch(e){}}
-function alertEv(x){const R=RULES[x.type]||{},n=(EV[x.type]||[x.type])[0];
+// ---- audio: one shared context, unlocked by the first click or key press. A
+// context created later from a realtime callback starts suspended and stays
+// silent, which is why the buzzer used to fail when nobody touched the page.
+let AC=null;
+function actx(){const A=window.AudioContext||window.webkitAudioContext;if(!A)return null;if(!AC)AC=new A();
+ if(AC.state==='suspended'){const r=AC.resume();if(r&&r.catch)r.catch(()=>{})}return AC}
+['pointerdown','keydown'].forEach(t=>document.addEventListener(t,()=>actx(),{once:true}));
+const TONES={discontinuous:'Discontinuous',continuous:'Continuous',fast:'Fast beeps',twotone:'Two-tone alarm',siren:'Siren',chime:'Chime',pulse:'Rising pulse'};
+function playTone(a,type,dur,vol){if(!a)return;const t0=a.currentTime+.05,end=t0+dur;
+ const note=(f,s,e,w,f2)=>{if(s>=end)return;e=Math.min(e,end);const o=a.createOscillator(),g=a.createGain(),v=w==='square'||w==='sawtooth'?vol*.45:vol;
+  o.type=w||'sine';o.frequency.setValueAtTime(f,s);if(f2)o.frequency.linearRampToValueAtTime(f2,e);
+  g.gain.setValueAtTime(0,s);g.gain.linearRampToValueAtTime(v,s+.01);g.gain.setValueAtTime(v,Math.max(s+.01,e-.02));g.gain.linearRampToValueAtTime(0,e);
+  o.connect(g);g.connect(a.destination);o.start(s);o.stop(e+.01)};
+ const rep=(st,fn)=>{for(let s=t0;s<end;s+=st)fn(s)};
+ switch(type){
+  case 'continuous':note(880,t0,end);break;
+  case 'fast':rep(.2,s=>note(1000,s,s+.1));break;
+  case 'twotone':rep(.8,s=>{note(960,s,s+.4,'square');note(640,s+.4,s+.8,'square')});break;
+  case 'siren':rep(1.2,s=>{note(600,s,s+.6,'sawtooth',1200);note(1200,s+.6,s+1.2,'sawtooth',600)});break;
+  case 'chime':rep(1.4,s=>{note(1319,s,s+.5,'triangle');note(1047,s+.5,s+1.2,'triangle')});break;
+  case 'pulse':rep(.8,s=>[600,800,1000,1200].forEach((f,i)=>note(f,s+i*.16,s+i*.16+.12)));break;
+  default:rep(.5,s=>note(880,s,s+.25))}}
+function beep(R){R=R||{};try{playTone(actx(),R.beep_type,Math.max(1,+R.beep_duration||5),.15)}catch(e){}}
+function tryTone(k){try{playTone(actx(),$('bt_'+k).value,Math.min(4,Math.max(1,+$('bd_'+k).value||3)),.15)}catch(e){}}
+// ---- voice messages. The phone speaks them with its own text-to-speech; the
+// ▶ buttons here use the browser's voice so the wording can be checked.
+const VLANG={en:['English','en-US'],ar:['Arabic','ar-SA'],hi:['Hindi','hi-IN'],ur:['Urdu','ur-PK']};
+const VMSG={
+ en:{overspeed:'You are over the speed limit. Please slow down.',road_overspeed:'You are over the speed limit for this road. Please slow down.',harsh_braking:'Harsh braking detected. Keep a safe distance and brake gently.',harsh_acceleration:'Harsh acceleration detected. Please accelerate smoothly.'},
+ ar:{overspeed:'لقد تجاوزت حد السرعة. يرجى تخفيف السرعة.',road_overspeed:'لقد تجاوزت السرعة المحددة لهذا الطريق. يرجى تخفيف السرعة.',harsh_braking:'تم رصد فرملة قوية. حافظ على مسافة آمنة واضغط على الفرامل بهدوء.',harsh_acceleration:'تم رصد تسارع قوي. يرجى التسارع بسلاسة.'},
+ hi:{overspeed:'आप गति सीमा से ऊपर हैं। कृपया गति कम करें।',road_overspeed:'आप इस सड़क की गति सीमा से ऊपर हैं। कृपया गति कम करें।',harsh_braking:'तेज़ ब्रेक लगाया गया। सुरक्षित दूरी रखें और धीरे ब्रेक लगाएँ।',harsh_acceleration:'तेज़ रफ़्तार पकड़ी गई। कृपया धीरे-धीरे गति बढ़ाएँ।'},
+ ur:{overspeed:'آپ رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',road_overspeed:'آپ اس سڑک کی رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',harsh_braking:'سخت بریک لگائی گئی۔ محفوظ فاصلہ رکھیں اور آہستہ بریک لگائیں۔',harsh_acceleration:'تیز رفتاری پکڑی گئی۔ براہ کرم آہستہ آہستہ رفتار بڑھائیں۔'}};
+function say(lg,txt){const S=window.speechSynthesis;if(!S||!window.SpeechSynthesisUtterance)return toast('This browser cannot speak. The phone uses its own voice.');
+ const code=(VLANG[lg]||VLANG.en)[1],u=new SpeechSynthesisUtterance(txt),vs=S.getVoices(),v=vs.find(x=>x.lang===code)||vs.find(x=>x.lang&&x.lang.slice(0,2)===code.slice(0,2));
+ u.lang=code;if(v)u.voice=v;else if(vs.length&&lg!=='en')toast('This computer has no '+VLANG[lg][0]+' voice installed. The phone uses its own voice.');
+ S.cancel();S.speak(u)}
+function voTable(){const lg=VLANG[$('vo_lang').value]?$('vo_lang').value:'en',prev={},rtl=lg==='ar'||lg==='ur';
+ document.querySelectorAll('#voT input[id^=vc_]').forEach(i=>prev[i.id]=i.checked);
+ $('voT').innerHTML=`<table><tr><th>Event</th><th>Message spoken on the phone</th><th>Speak</th><th>Try</th></tr>${Object.values(RULES).filter(r=>VMSG.en[r.type]).map(r=>{const id='vc_'+r.type,on=id in prev?prev[id]:r.voice!==false;
+  return `<tr><td><b>${esc(r.label)}</b></td><td${rtl?' dir="rtl"':''}>${esc(VMSG[lg][r.type])}</td><td style="text-align:center"><input type="checkbox" id="${id}" ${on?'checked':''} title="Speak this message on the phone"></td><td><button type="button" class="play" onclick="say('${lg}',VMSG['${lg}']['${r.type}'])" title="Play this message"><i class="fa-solid fa-play"></i></button></td></tr>`}).join('')||'<tr><td colspan="4">No event rules yet.</td></tr>'}</table>`}
+// ---- live alerts. Realtime can silently miss an insert, so evPoll() also
+// fetches anything newer than the last id seen; EVSEEN stops a double alert.
+const ALR={},EVSEEN=new Set();let EVMAX=null;
+function alertEv(x){const R=RULES[x.type]||{},n=EVX(x.type)[0];
  if(R.alert!==false){toast('⚠ '+n+': '+(x.vehicle_name||'')+' / '+(x.driver_name||''));
-  const m=L.marker([x.lat,x.lng],{icon:L.divIcon({className:'',html:'<div class="pulse"></div>',iconSize:[44,44],iconAnchor:[22,22]}),zIndexOffset:1000}).addTo(mapL).bindPopup('<b>'+esc(n)+'</b><br>'+esc(x.vehicle_name||'')+' / '+esc(x.driver_name||'')).openPopup();setTimeout(()=>m.remove(),20000)}
+  const u=x.user_id,re=()=>{if(markers[u]&&last[u])markers[u].setIcon(icon(last[u]))};ALR[u]=Date.now()+60000;re();setTimeout(re,60500);
+  const m=L.marker([x.lat,x.lng],{icon:L.divIcon({className:'',html:'<div class="pulse"></div>',iconSize:[44,44],iconAnchor:[22,22]}),zIndexOffset:1000}).addTo(mapL).bindPopup(()=>evPop(x),{minWidth:240});
+  if($('live').classList.contains('on'))m.openPopup();setTimeout(()=>m.remove(),60000)}
  if(R.beep!==false)beep(R)}
+function onEv(x){if(!x||x.id==null||EVSEEN.has(x.id))return;EVSEEN.add(x.id);if(EVMAX==null||+x.id>+EVMAX)EVMAX=x.id;alertEv(x);
+ if(!$('evt').classList.contains('on')){evN++;$('evb').textContent=evN;$('evb').style.display='inline-block'}}
+async function evInit(){const {data}=await sb.from('events').select('id').order('id',{ascending:false}).limit(1);EVMAX=data&&data[0]?data[0].id:0}
+async function evPoll(){if(EVMAX==null)return evInit();const {data}=await sb.from('events').select('*').gt('id',EVMAX).order('id').limit(50);(data||[]).forEach(onEv)}
 // ---- trip report (second-by-second)
 let tr=[],tp=0;
 const stt=r=>r.ignition===false?'Parking':(r.speed>0?'Moving':'Idling');
+// ---- dropdown multi-select: one small box instead of a long list of tick
+// boxes, so a user row stays short even with 100 vehicles in the fleet.
+let MSO=null;
+function msel(id,items,none,sel){const el=$(id);if(!el)return;sel=sel||[];el.className='ms';el.dataset.none=none;
+ el.innerHTML=`<button type="button" class="msb" onclick="msOpen('${id}')"><span></span><i class="fa-solid fa-chevron-down"></i></button><div class="msp hide"><input class="msq" placeholder="Search..." oninput="msFind(this)">${items.length?`<label class="msa"><input type="checkbox" class="all" onchange="msAll(this)"><b>Select all</b></label>`:''}<div class="msl">${items.map(x=>`<label><input type="checkbox" class="it" value="${esc(x.id)}" ${sel.includes(x.id)?'checked':''} onchange="msLbl('${id}')"><span>${esc(x.name)}</span></label>`).join('')||'<small style="padding:4px 6px;color:var(--mut)">Nothing added yet</small>'}</div></div>`;
+ msLbl(id)}
+const mselVal=id=>[...document.querySelectorAll('#'+id+' input.it:checked')].map(i=>i.value);
+function msLbl(id){const el=$(id);if(!el)return;const it=[...el.querySelectorAll('input.it')],on=it.filter(i=>i.checked);
+ el.querySelector('.msb span').textContent=on.length===0?el.dataset.none:on.length===it.length&&it.length>1?'All ('+on.length+')':on.length<=2?on.map(i=>i.nextElementSibling.textContent).join(', '):on.length+' selected';
+ const a=el.querySelector('input.all');if(a){a.checked=on.length===it.length&&it.length>0;a.indeterminate=on.length>0&&on.length<it.length}}
+function msFind(i){const q=i.value.toLowerCase();i.closest('.msp').querySelectorAll('label:not(.msa)').forEach(l=>l.style.display=l.textContent.toLowerCase().includes(q)?'':'none')}
+function msAll(c){const p=c.closest('.msp');p.querySelectorAll('label:not(.msa)').forEach(l=>{if(l.style.display!=='none')l.querySelector('input').checked=c.checked});msLbl(p.closest('.ms').id)}
+function msPos(){if(!MSO)return;const p=$(MSO).querySelector('.msp'),r=$(MSO).querySelector('.msb').getBoundingClientRect();
+ p.style.left=Math.max(6,Math.min(r.left,innerWidth-p.offsetWidth-6))+'px';
+ p.style.top=(r.bottom+4+p.offsetHeight>innerHeight-6?Math.max(6,r.top-p.offsetHeight-4):r.bottom+4)+'px'}
+function msOpen(id){if(MSO===id)return msClose();msClose();MSO=id;$(id).querySelector('.msp').classList.remove('hide');msPos();msFind($(id).querySelector('.msq'))}
+function msClose(){if(!MSO)return;const e=$(MSO);e&&e.querySelector('.msp').classList.add('hide');MSO=null}
+document.addEventListener('mousedown',e=>{if(MSO&&!e.target.closest('.ms'))msClose()});
+// scroll or resize moves the box but not the fixed panel, so follow it
+addEventListener('scroll',e=>{if(MSO&&(e.target.closest?e.target.closest('.msp'):null))return;msPos()},true);
+addEventListener('resize',msPos);
 async function loadTrip(){
  const v=$('tr_v').value,f=new Date($('tr_f').value).toISOString(),t=new Date($('tr_t').value).toISOString();
- tr=await fetchAll(()=>sb.from('positions').select('*').eq('vehicle_id',v).gte('recorded_at',f).lte('recorded_at',t).order('recorded_at'));tp=0;
+ tr=await fetchAll(()=>sb.from('positions').select('*').eq('vehicle_id',v).gte('recorded_at',f).lte('recorded_at',t).order('recorded_at')).filter(okFix);tp=0;
  if(!tr.length)return toast('No data in this period');
  const sp=tr.map(r=>r.speed||0),mx=Math.max(...sp),mv=sp.filter(x=>x>0),av=mv.length?mv.reduce((a,b)=>a+b)/mv.length:0,lim=(vehicles.find(x=>x.id===v)||{}).speed_limit||RULES.overspeed?.threshold||100;
  $('trK').innerHTML=tile('bl','fa-database',tr.length,'Records')+tile('or','fa-gauge-high',Math.round(mx)+' km/h','Max speed')+tile('gr','fa-gauge',Math.round(av)+' km/h','Avg moving speed')+tile('gy','fa-mountain',Math.round(Math.max(...tr.map(r=>r.altitude||0)))+' m','Max elevation');
  const k=Math.ceil(tr.length/1500),s=tr.filter((_,i)=>i%k===0),lb=s.map(r=>new Date(r.recorded_at).toLocaleTimeString()),ln=(l,d,c)=>({label:l,data:d,borderColor:c,backgroundColor:c+'22',fill:true,pointRadius:0,borderWidth:1.5,tension:.2});
  const mi=s.reduce((b,x,i)=>(+x.speed||0)>(+s[b].speed||0)?i:b,0);
- chart('t1','line',lb,[Object.assign(ln('Speed km/h',s.map(r=>r.speed),'#2f7fe6'),{pointBackgroundColor:'#d9534f',pointRadius:s.map((_,i)=>i===mi?5:0)}),{label:'Limit',data:s.map(_=>lim),borderColor:'#d9534f',borderDash:[6,4],pointRadius:0,borderWidth:1}],{t:'Speed',mark:{i:mi,t:'Max '+Math.round(mx)+' km/h'}});
+ chart('t1','line',lb,[Object.assign(ln('Speed km/h',s.map(r=>Math.round(r.speed||0)),'#2f7fe6'),{pointBackgroundColor:'#d9534f',pointRadius:s.map((_,i)=>i===mi?5:0)}),{label:'Limit',data:s.map(_=>lim),borderColor:'#d9534f',borderDash:[6,4],pointRadius:0,borderWidth:1}],{t:'Speed',mark:{i:mi,t:'Max '+Math.round(mx)+' km/h'}});
  chart('t2','line',lb,[ln('km/h per s',s.map(r=>r.accel),'#f28c28')],{t:'Acceleration / deceleration'});
  chart('t3','line',lb,[ln('metres',s.map(r=>r.altitude),'#27a46a')],{t:'Elevation'});
  chart('t4','line',lb,[{label:'Ignition',data:s.map(r=>r.ignition===false?0:1),borderColor:'#2f7fe6',backgroundColor:'#2f7fe622',fill:true,stepped:true,pointRadius:0,borderWidth:1.5}],{t:'Ignition'});
  trTable()}
 const DD=d=>`${p2(d.getDate())}/${p2(d.getMonth()+1)}/${d.getFullYear()}`;
 // ---- reverse geocoding, cached in localStorage so a repeated trip costs nothing
-const GC=JSON.parse(localStorage.gc||'{}'),GLI=5;
+const GC=JSON.parse(localStorage.gc||'{}');Object.keys(GC).forEach(k=>{if(!GC[k])delete GC[k]});localStorage.gc=JSON.stringify(GC);const GLI=5,NOM=Date.now();let NOMS=0;
 const gk=r=>(+r.lat).toFixed(4)+','+(+r.lng).toFixed(4);
-async function geoOne(k){if(k in GC)return GC[k];
- const [la,lo]=k.split(',');let nm='';
- try{const j=await(await fetch('https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?f=json&langCode=en&location='+lo+','+la)).json();
-  const a=j.address||{};nm=a.Match_addr||[a.City,a.Region].filter(Boolean).join(', ')||''}catch(e){}
- if(!nm){try{const j=await(await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=16&lat='+la+'&lon='+lo)).json();nm=j.display_name||''}catch(e){}}
- GC[k]=nm;
- if(Object.keys(GC).length>3000)Object.keys(GC).slice(0,1000).forEach(x=>delete GC[x]);
- localStorage.gc=JSON.stringify(GC);return nm}
+async function geoOne(k){if(GC[k])return GC[k];
+ const [la,lo]=k.split(','),j=(u,o)=>fetch(u,o).then(r=>r.ok?r.json():null).catch(()=>null),nm=x=>{let y='';try{y=x()}catch(e){}return y&&String(y).replace(/\s+/g,' ').trim()};
+ // four free providers, tried in order; a name from any one of them is enough
+ let o=await j('https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?f=json&langCode=en&location='+lo+','+la);
+ let x=nm(()=>{const a=(o&&o.address)||{};return a.Match_addr||[a.Address,a.City,a.Region].filter(Boolean).join(', ')});
+ if(x)return GC[k]=x,save();
+ o=await j('https://photon.komoot.io/reverse?lat='+la+'&lon='+lo);
+ x=nm(()=>{const p=(o&&o.features&&o.features[0])||{},a=p.properties||{};return [a.name,a.street,a.district,a.city,a.state].filter(Boolean).slice(0,3).join(', ')});
+ if(x)return GC[k]=x,save();
+ // Nominatim bans a caller that exceeds 1 request/second, so the queue is gated
+ if(Date.now()-NOMS<1100)await new Promise(r=>setTimeout(r,NOMS+1100-Date.now()));NOMS=Date.now();
+ o=await j('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=16&lat='+la+'&lon='+lo,{referrerPolicy:'origin'});
+ x=nm(()=>o&&o.display_name);if(x)return GC[k]=x,save();
+ o=await j('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude='+la+'&longitude='+lo+'&localityLanguage=en');
+ x=nm(()=>{const c=[o&&o.locality,o&&o.principalSubdivision,o&&o.countryName].filter(Boolean).join(', ');return (o&&(o.city||o.locality))&&c||o&&o.locality});
+ if(x)return GC[k]=x,save();
+ return ''}
+function save(){if(Object.keys(GC).length>3000)Object.keys(GC).slice(0,1000).forEach(k=>delete GC[k]);localStorage.gc=JSON.stringify(GC)}
 let GQ=[],GBUSY=false;
 function geoRun(){if(GBUSY)return;GBUSY=true;(async()=>{while(GQ.length){const k=GQ.shift(),nm=await geoOne(k);
- document.querySelectorAll('#trT td[data-gk="'+k+'"]').forEach(td=>td.textContent=nm||'Not found');
+ document.querySelectorAll('#trT td[data-gk="'+k+'"]').forEach(td=>td.textContent=nm||'No place name found');
  await new Promise(r=>setTimeout(r,250))}GBUSY=false})()}
 // visible rows go first so the page fills in at once, the rest trickle behind
 function geoVis(){const q=[];
@@ -477,9 +709,9 @@ function trTable(){
  $('trT').innerHTML=`<table><tr>${H.map(h=>`<th>${h}</th>`).join('')}</tr>${tr.slice(0,2000).map(r=>{const c=R(r);return `<tr>${c.map((v,i)=>`<td${i===GLI?' class="gx" data-gk="'+gk(r)+'"':''}>${i===GLI?(v||'…'):esc(v)}</td>`).join('')}</tr>`}).join('')}</table>`+(tr.length>2000?`<p style="padding:8px">Showing the first 2000 of ${tr.length} rows. Exports include all rows.</p>`:'');
  tools($('trT'),{full:()=>({head:H,rows:tr.map(R)}),page:geoVis});geoVis()}
 // ---- shared tools: date ranges, tables, panels
-const PRE=[['today','Today'],['yest','Yesterday'],['24h','Last 24 hrs'],['lw','Last Week (previous Mon-Sun)'],['w','A week ago (last 7 days)'],['lm','Last Month (previous month)'],['m','A month ago (last 30 days)'],['ly','Last Year (previous year)'],['y','A year ago (last 365 days)'],['custom','Custom']];
+const PRE=[['today','Today'],['yest','Yesterday'],['24h','Last 24 hrs'],['lw','Last Week (previous Sun-Sat)'],['w','A week ago (last 7 days)'],['lm','Last Month (previous month)'],['m','A month ago (last 30 days)'],['ly','Last Year (previous year)'],['y','A year ago (last 365 days)'],['custom','Custom']];
 function range(k){const n=new Date(),y=n.getFullYear(),m=n.getMonth(),d=n.getDate(),D=(a,b,c,h=0,mi=0,se=0)=>new Date(a,b,c,h,mi,se);
- return {today:[D(y,m,d),n],yest:[D(y,m,d-1),D(y,m,d-1,23,59,59)],'24h':[new Date(n-864e5),n],lw:(()=>{const o=(D(y,m,d).getDay()+6)%7;return [D(y,m,d-o-7),D(y,m,d-o-1,23,59,59)]})(),w:[new Date(n-7*864e5),n],lm:[D(y,m-1,1),D(y,m,0,23,59,59)],m:[new Date(n-30*864e5),n],ly:[D(y-1,0,1),D(y-1,11,31,23,59,59)],y:[new Date(n-365*864e5),n]}[k]}
+ return {today:[D(y,m,d),n],yest:[D(y,m,d-1),D(y,m,d-1,23,59,59)],'24h':[new Date(n-864e5),n],lw:(()=>{const o=D(y,m,d).getDay();return [D(y,m,d-o-7),D(y,m,d-o-1,23,59,59)]})(),w:[new Date(n-7*864e5),n],lm:[D(y,m-1,1),D(y,m,0,23,59,59)],m:[new Date(n-30*864e5),n],ly:[D(y-1,0,1),D(y-1,11,31,23,59,59)],y:[new Date(n-365*864e5),n]}[k]}
 function setR(a,b,k){if(k==='custom')return;const r=range(k);$(a)._flatpickr.setDate(r[0],true);$(b)._flatpickr.setDate(r[1],true)}
 function initDates(){[['hf','ht','24h'],['ev_f','ev_to','w'],['tr_f','tr_t','custom'],['rp_f','rp_t','w'],['ac_f','ac_to','w']].forEach(([a,b,k])=>{
  const o={enableTime:true,enableSeconds:true,time_24hr:true,dateFormat:'Y-m-d\\TH:i:S',altInput:true,altFormat:'d/m/Y H:i:S',disableMobile:true};flatpickr('#'+a,o);flatpickr('#'+b,o);
@@ -497,7 +729,7 @@ function tipShow(h){const t=$('tip');t.innerHTML=h.dataset.tip||'';t.classList.a
  t.style.top=(r.bottom+8+ht>innerHeight-8?Math.max(8,r.top-ht-8):r.bottom+8)+'px'}
 document.addEventListener('mouseover',e=>{const h=e.target.closest('.hp');h?tipShow(h):$('tip').classList.remove('on')});
 addEventListener('scroll',()=>$('tip').classList.remove('on'),true);
-const cv=c=>{const p=c.querySelector('.pick');if(p)return[...p.querySelectorAll('input:checked')].map(i=>i.nextElementSibling.textContent).join(', ');const i=c.querySelector('input,select');return i?(i.type==='checkbox'?(i.checked?'Yes':'No'):i.tagName==='SELECT'?(i.multiple?[...i.selectedOptions].map(o=>o.text).join(', '):(i.options[i.selectedIndex]||{}).text||''):i.value):c.innerText.trim()};
+const cv=c=>{const m=c.querySelector('.ms');if(m)return[...m.querySelectorAll('input.it:checked')].map(i=>i.nextElementSibling.textContent).join(', ');const p=c.querySelector('.pick');if(p)return[...p.querySelectorAll('input:checked')].map(i=>i.nextElementSibling.textContent).join(', ');const i=c.querySelector('input,select');return i?(i.type==='checkbox'?(i.checked?'Yes':'No'):i.tagName==='SELECT'?(i.multiple?[...i.selectedOptions].map(o=>o.text).join(', '):(i.options[i.selectedIndex]||{}).text||''):i.value):c.innerText.trim()};
 const ky=v=>{const m=/^(\d\d)\/(\d\d)\/(\d{4})\s*(\d\d:\d\d:\d\d)?/.exec(v);if(m)return m[3]+m[2]+m[1]+(m[4]||'');const n=parseFloat(v);return isNaN(n)?String(v).toLowerCase():n};
 const RG={hist:['hf','ht'],evt:['ev_f','ev_to'],trip:['tr_f','tr_t'],rep:['rp_f','rp_t'],act:['ac_f','ac_to']};
 const dtv=id=>{const d=new Date($(id).value);return isNaN(d)?$(id).value:d.toLocaleString()};
@@ -532,7 +764,7 @@ function tools(el,opt={}){const t=el.querySelector('table');if(!t)return;
   if(b.dataset.x==='xlsx'){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([[title],[...m],[],head,...R]),'Report');XLSX.writeFile(wb,nm+'.xlsx')}
   if(b.dataset.x==='pdf'){const d=new jspdf.jsPDF({orientation:'landscape'});d.setFontSize(13);d.text(title,14,12);d.setFontSize(8);d.text(m.join('   |   '),14,17);d.autoTable({head:[head],body:R,startY:21,styles:{fontSize:7}});d.save(nm+'.pdf')}
   if(b.dataset.x==='print'){const w=window.open('','_blank');w.document.write('<html><head><title>'+esc(title)+'</title><style>body{font-family:sans-serif}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:4px;font-size:11px}.sub{font-size:12px;margin:0 0 10px;color:#333}.foot{font-size:10px;color:#666;margin-top:8px}</style></head><body><h3 style="margin:0 0 4px">'+esc(title)+'</h3><p class="sub">'+esc(m.join('  |  '))+'</p><table><tr>'+head.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr>'+R.map(r=>'<tr>'+r.map(c=>'<td>'+esc(c)+'</td>').join('')+'</tr>').join('')+'</table><p class="foot">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</p></body></html>');w.document.close();w.print()}}}
-const PN={c1:'Events by type',c2:'Events per day',c3:'Violator Drivers',t1:'Speed',t2:'Acceleration',t3:'Elevation',t4:'Ignition',r1:'Distance per vehicle',r2:'Fleet distance per day',r3:'Driving vs Idling',r4:'Fuel'};
+const PN={c1:'Events by Type',c2:'Events per Day',c3:'Violator Drivers',t1:'Speed',t2:'Acceleration',t3:'Elevation',t4:'Ignition',r1:'Distance per vehicle',r2:'Fleet distance per day',r3:'Driving vs Idling',r4:'Fuel'};
 function panels(sec){const g=document.querySelector('#'+sec+' .cgrid');if(!g)return;const key='lay_'+sec,bar=document.createElement('div');bar.className='pbar';g.before(bar);
  const orig=[...g.children];
  [...g.children].forEach(c=>{c.dataset.id=(c.querySelector('canvas')||c).id;c.insertAdjacentHTML('afterbegin','<div class="pt"><button data-a="big" title="Enlarge"><i class="fa-solid fa-expand"></i></button><button data-a="l" title="Move left"><i class="fa-solid fa-arrow-left"></i></button><button data-a="r" title="Move right"><i class="fa-solid fa-arrow-right"></i></button><button data-a="h" title="Hide"><i class="fa-solid fa-eye-slash"></i></button></div>');
