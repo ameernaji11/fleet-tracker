@@ -59,14 +59,24 @@ jobs:
       - name: Create Android project
         run: |
           npm init -y
-          npm i @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7 @capacitor/device@7 @capacitor/local-notifications@7 @capacitor/browser@7 @capacitor-community/background-geolocation@1.2.26 esbuild
+          npm i @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7 @capacitor/device@7 @capacitor/local-notifications@7 @capacitor/browser@7 @capacitor-community/background-geolocation@1.2.26 @capacitor-community/text-to-speech@6.1.0 esbuild
           echo "import { registerPlugin } from '@capacitor/core';" > bridge.js
-          echo "window.CapPlugins = { BG: registerPlugin('BackgroundGeolocation'), Device: registerPlugin('Device'), LN: registerPlugin('LocalNotifications'), Browser: registerPlugin('Browser') };" >> bridge.js
+          echo "window.CapPlugins = { BG: registerPlugin('BackgroundGeolocation'), Device: registerPlugin('Device'), LN: registerPlugin('LocalNotifications'), Browser: registerPlugin('Browser'), TTS: registerPlugin('TextToSpeech') };" >> bridge.js
           npx esbuild bridge.js --bundle --minify --outfile=www/bridge.js
           npx cap add android
           sed -i 's#</manifest>#<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/><uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/><uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/><uses-permission android:name="android.permission.POST_NOTIFICATIONS"/></manifest>#' android/app/src/main/AndroidManifest.xml
           sed -i 's/android:allowBackup="true"/android:allowBackup="false"/; s/<application/<application android:usesCleartextTraffic="false"/' android/app/src/main/AndroidManifest.xml
           npx cap sync android
+      # One artwork for the browser tab and the phone: both come from www/icon.svg.
+      # If the generator ever fails, the fallback writes the mipmaps by hand, and the
+      # step itself is non-fatal so a broken icon never blocks the build.
+      - name: Generate app icons
+        continue-on-error: true
+        run: |
+          npm i --no-save sharp@0.33.5 @capacitor/assets@3.0.5
+          node tools/make-icons.js
+          ./node_modules/.bin/capacitor-assets generate --android --icon-only || node tools/make-icons.js --direct
+          ls -l android/app/src/main/res/mipmap-xxxhdpi/
       - name: Build signed release APK
         env:
           KS_PASS: ${{ secrets.FLEET_KEYSTORE_PASSWORD }}
