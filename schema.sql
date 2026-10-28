@@ -24,6 +24,14 @@
 --   the seeded road_overspeed rule (the signed limit of the road being driven),
 --   and the events update policy the phone needs to close the event it opened.
 --
+-- New in v13 (offline tile, per-event voice language, time on screen) -- adds:
+--   user_activity.duration_s, the seconds each Session time entry holds, so the
+--   Activity Log can show how long a login was actually inside the dashboard or
+--   the app,
+--   event_rules.voice_lang, one spoken-alert language per event,
+--   app_settings offline_after_h, the hours of silence after which Live Tracking
+--   greys a vehicle out as Offline.
+--
 -- The "admin seed" block makes ameer@fleettrack.com role=admin, so the separate
 -- Admin.sql saved query in Supabase is no longer needed — delete it once this
 -- file has run and you have confirmed: select email, role from profiles;
@@ -151,6 +159,12 @@ create table if not exists user_activity (
   device text,
   recorded_at timestamptz not null default now());
 create index if not exists user_activity_time on user_activity (recorded_at desc);
+
+-- v13: how long the user was actually in front of the screen. The dashboard and
+-- the phone write one 'Session time' row each time they are left (sign out, tab
+-- hidden, app backgrounded) with the seconds spent there, which the Activity Log
+-- report then shows beside the entry.
+alter table user_activity add column if not exists duration_s integer;
 create index if not exists user_activity_user on user_activity (user_id, recorded_at desc);
 
 -- --------------------------------------------------- additive columns ----
@@ -190,6 +204,16 @@ alter table event_rules add column if not exists beep boolean default true,
   add column if not exists beep_type text default 'discontinuous',
   add column if not exists hold_s numeric default 0,
   add column if not exists voice boolean default true;
+
+-- v13: each event now chooses its own spoken language instead of one fleet-wide
+-- setting. 'off' keeps the event silent, otherwise it is a language code the
+-- phone recognizes (en, ar, hi, ur). The old boolean is kept in step with it so
+-- a phone that has not been rebuilt yet still behaves.
+alter table event_rules add column if not exists voice_lang text;
+update event_rules set voice_lang = case
+    when voice then coalesce(nullif((select value from app_settings where key = 'voice_lang'), ''), 'en')
+    else 'off' end
+  where voice_lang is null;
 
 -- ------------------------------------------------- assignments, many-to-one ----
 -- v11: one login can now be linked to several vehicles and several drivers, so
@@ -239,10 +263,16 @@ insert into app_settings (key, value) values ('moving_interval','10'), ('stopped
 insert into app_settings (key, value) values ('score_green','1'), ('score_red','3')
   on conflict (key) do nothing;
 
--- spoken safety warnings (v12): voice_on switches them off fleet-wide and
--- voice_lang picks the language. The phone reads both, along with the per-event
--- event_rules.voice tick, and speaks the message with its own text-to-speech.
+-- spoken safety warnings (v12): voice_on is the fallback switch and voice_lang
+-- the fleet language. From v13 every event carries its own language in
+-- event_rules.voice_lang, which wins; these two are what an event uses until it
+-- has one, and what a phone built before v13 reads.
 insert into app_settings (key, value) values ('voice_on','1'), ('voice_lang','en')
+  on conflict (key) do nothing;
+
+-- v13: Live Tracking shows a vehicle greyed out as Offline once it has been
+-- silent for longer than this many hours. Editable from the Offline tile.
+insert into app_settings (key, value) values ('offline_after_h','24')
   on conflict (key) do nothing;
 
 -- ------------------------------------------------------------ views/procs ----
@@ -509,4 +539,13 @@ end $$;
 --   seeded event_rules row 'road_overspeed' (threshold 10 km/h, hold 5 s)  -> a new event type: the phone looks up
 --        the maxspeed signed on the road it is driving on (OpenStreetMap data) and records a breach when the vehicle
 --        passes that limit by more than the threshold.
+-- v13, on top of the above:
+--   user_activity.duration_s                                           -> the Activity Log's Time on screen column.
+--        Both apps write a 'Session time' row (sign out, tab hidden, app backgrounded) holding the seconds spent
+--        there; without the column those rows land as ordinary entries with no length.
+--   event_rules.voice_lang                                             -> one voice per event (Off, English,
+--        Arabic, Hindi or Urdu) chosen on the Configuration page; the two app_settings keys above become the
+--        fallback only.
+--   app_settings key 'offline_after_h' (24)                            -> Live Tracking greys a vehicle out as
+--        Offline after this many hours without a position; the number is editable in the Offline tile itself.
 -- ============================================================================
