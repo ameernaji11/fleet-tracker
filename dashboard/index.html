@@ -1,10 +1,11 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://geocode.arcgis.com https://photon.komoot.io https://nominatim.openstreetmap.org https://api.bigdatacloud.net https://overpass-api.de https://overpass.kumi.systems; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="referrer" content="no-referrer">
 <title>Fleet Tracker</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icon.svg">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" crossorigin="anonymous" integrity="sha384-c6Rcwz4e4CITMbu/NBmnNS8yN2sC3cUElMEMfP3vqqKFp7GOYaaBBCqmaWBjmkjb">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" integrity="sha384-t1nt8BQoYMLFN5p42tRAtuAAFQaCQODekUVeKKZrEnEyp4H2R0RHFz0KWpmj7i8g">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap">
 <style>
 :root{--bg:#fff7ee;--ink:#26323a;--mut:#6b7a85;--line:#efe3d4;--or:#f28c28;--orl:#ffe9d2;--ord:#b85d00;--gr:#27a46a;--grl:#ddf4e8;--bl:#2f7fe6;--bll:#dcebfd;--rd:#d9534f;--rdl:#fde4e2;--gy:#9aa7b0;--gyl:#eef1f3;--card:#fff;--th:#fffaf4}
@@ -27,6 +28,13 @@ header h1{font-size:19px;margin:0;flex:1;font-weight:800}#me{color:var(--mut)}
 main{flex:1;min-height:0;min-width:0;padding:12px 16px;overflow:auto}
 section{display:none;height:100%;flex-direction:column;gap:10px;min-width:0}section.on{display:flex}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;min-width:0}
+/* zone drawing: the bar that guides the click-by-click ring, and the dialog it ends in */
+#zHint{position:fixed;left:50%;transform:translateX(-50%);bottom:64px;z-index:3000;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px;box-shadow:0 10px 28px #0003;display:flex;gap:10px;align-items:center;flex-wrap:wrap;max-width:92vw}
+.mdl{position:fixed;inset:0;z-index:3001;background:#0006;display:none;place-items:center;padding:14px}
+.mdl.on{display:grid}.mdl>div{background:var(--card);border-radius:16px;padding:16px 18px;width:min(560px,100%);box-shadow:0 18px 50px #0005;max-height:92vh;overflow:auto}
+.fg{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.ck{display:flex;gap:6px;align-items:center;font-weight:700;font-size:12px;cursor:pointer}
+.ck input{width:20px;height:20px;margin:0}
 /* page title outside a card, and the icon+title+note header every Configuration block uses */
 .ctitle{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:0 2px}.ctitle b{font-size:17px}.ctitle small{color:var(--mut)}
 .csh{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}.csh>i{width:32px;height:32px;border-radius:10px;background:var(--bll);color:var(--bl);display:grid;place-items:center;font-size:14px;flex:none}
@@ -177,9 +185,16 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <tr><td>Recording interval — while moving</td><td><input id="s_mov" type="number" min="1" style="width:110px"></td><td><small>Seconds between positions while the vehicle is moving.</small></td></tr>
 <tr><td>Recording interval — while stopped</td><td><input id="s_stp" type="number" min="1" style="width:110px"></td><td><small>Seconds between positions while the vehicle is standing still.</small></td></tr>
 <tr><td>Safety score — green at or below <span class="hp" data-tip="Fleet Summary scores every vehicle with &lt;b&gt;(harsh acceleration events + harsh braking events + overspeed seconds) &times; (100 &divide; distance in km)&lt;/b&gt;, so a lower number is safer. Set where green stops and red starts; everything between the two is amber.">?</span></td><td><input id="sc_g" type="number" step="0.1" min="0" style="width:110px"></td><td><small>A vehicle at or under this score is shown green.</small></td></tr>
-<tr><td>Safety score — red at or above</td><td><input id="sc_r" type="number" step="0.1" min="0" style="width:110px"></td><td><small>A vehicle at or over this score is shown red; in between is amber.</small></td></tr></table></div></div>
+<tr><td>Safety score — red at or above</td><td><input id="sc_r" type="number" step="0.1" min="0" style="width:110px"></td><td><small>A vehicle at or over this score is shown red; in between is amber.</small></td></tr>
+<tr><td>Blackbox recording on the phone <span class="hp" data-tip="The phone keeps &lt;b&gt;every&lt;/b&gt; fix it receives - about one per second - in its own storage and never uploads them, so the server stays small. When an incident has to be investigated, choose the vehicle and the period on the Vehicles page and press Download: the phone then pushes exactly the fixes in that window, each stamped with the moment it was taken.">?</span></td><td><label class="ck"><input id="s_bb" type="checkbox"> Keep every fix on the handset</label></td><td><small>Off stops the recording; anything already stored stays until it ages out.</small></td></tr>
+<tr><td>Blackbox kept for</td><td><input id="s_bbd" type="number" min="1" max="14" style="width:110px"></td><td><small>Days the phone holds before it overwrites the oldest fixes.</small></td></tr>
+<tr><td>Zone detection <span class="hp" data-tip="Turns zone checking off for the whole fleet without deleting any shape. Draw, name and limit your zones in the Zones table below.">?</span></td><td><label class="ck"><input id="s_z" type="checkbox"> Report entry, exit and overspeed</label></td><td><small>Each zone's own limit and alerts are set in the Zones table below.</small></td></tr></table></div></div>
 <div class="card"><div class="csh"><i class="fa-solid fa-triangle-exclamation"></i><div><b>Events (defaults for all vehicles) <span class="hp" data-tip="&lt;b&gt;Tolerance&lt;/b&gt; is how long the driver must keep breaking the rule before it is written to the database. The buzzer and the on-screen alert fire immediately; the event is only recorded once the violation lasts longer than the tolerance. Use 2 s for harsh braking/acceleration and 10 s for overspeed. &lt;b&gt;Trigger limit&lt;/b&gt; is the fleet default that a vehicle uses unless it has its own value below.">?</span></b><small>The limit, the buzzer and the spoken message the whole fleet starts from.</small></div></div><div class="tw" id="ruleT" style="margin-top:10px"></div></div>
 <div class="card"><div class="csh"><i class="fa-solid fa-truck"></i><div><b>Settings per vehicle <span class="hp" data-tip="A vehicle marked &lt;b&gt;custom&lt;/b&gt; keeps its own values; leave a box empty to follow the fleet default above. Phones apply changes within 5 minutes or at the next trip start. &lt;b&gt;Overspeed buffer&lt;/b&gt; is added on top of the limit before the alert starts. &lt;b&gt;Warning level&lt;/b&gt; buzzes the phone without recording an event. &lt;b&gt;Min. distance&lt;/b&gt; suppresses events until the vehicle has actually moved that far. Tick the box beside a vehicle and press Reset to send it back to the fleet defaults.">?</span></b><small>Overrides for one vehicle. Tick the box beside it to include it in Reset.</small></div><button class="btn o sm" onclick="resetSelV()" title="Clears the own values of every vehicle you ticked in the table below, so it follows the fleet defaults on this page again. Unticked vehicles are left exactly as they are. Phones apply the change within 5 minutes."><i class="fa-solid fa-rotate-left"></i>Reset selected</button></div><div class="tw" id="cfgV" style="margin-top:10px"></div></div>
+<div class="card"><div class="csh"><i class="fa-solid fa-draw-polygon"></i><div><b>Zones (geofences) <span class="hp" data-tip="A zone is a shape you draw on the Live Tracking map. Every phone tests each position against it, so driving in, driving out or passing the zone's own speed limit makes an event - and each of those three has its own alert, buzzer, voice and tolerance in the Events table above. &lt;b&gt;Leave a limit empty&lt;/b&gt; and the zone only reports entries and exits. Phones reload the shapes within 5 minutes.">?</span></b><small>The areas the whole fleet is watched against, and what each one reports.</small></div><button class="btn b sm" onclick="switchTab('live');setTimeout(()=>{if(!DRAW)drawZone(mapL)},200)" title="Switches to Live Tracking and starts the drawing tool"><i class="fa-solid fa-draw-polygon"></i>Draw a zone</button></div>
+<div class="tw" id="zT" style="margin-top:10px"></div></div>
+<div class="card"><div class="csh"><i class="fa-solid fa-signature"></i><div><b>Saved place names <span class="hp" data-tip="Map services name a place from their own data, so a private or newly built address often shows the wrong label - a neighbour's building, or just a street number. A saved name here wins over every map service: any position inside its radius is reported with this name in trip popups, the trip list and every report. Names already shown on screen are corrected as soon as the page reloads.">?</span></b><small>Names you choose yourself, overriding what the map services call a place.</small></div><button class="btn b sm" onclick="plAdd()"><i class="fa-solid fa-plus"></i>Add a place</button></div>
+<div class="tw" id="plT" style="margin-top:10px"></div></div>
 <div class="card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><small style="flex:1;min-width:220px;color:var(--mut)">Everything on this page is saved together. Phones apply the changes within 5 minutes, or at the next trip start.</small><button class="btn g" onclick="saveCfg()"><i class="fa-solid fa-floppy-disk"></i>Save</button></div></section>
 <section id="trip"><div class="card frow"><div class="field"><label>Vehicle</label><select id="tr_v"></select></div><div class="field"><label>From</label><input id="tr_f" type="text"></div><div class="field"><label>To</label><input id="tr_t" type="text"></div>
 <button class="btn b" onclick="loadTrip()"><i class="fa-solid fa-stopwatch"></i>Generate</button></div>
@@ -191,7 +206,12 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <div class="field"><label>Type</label><select name="type"><option value="">-</option><option>Sedan</option><option>Hatchback</option><option>SUV</option><option>Pickup</option><option>Van</option><option>Minibus</option><option>Bus</option><option>Truck</option><option>Heavy Truck</option><option>Tanker</option><option>Taxi</option><option>Ambulance</option><option>Motorbike</option><option>Tractor</option><option>Trailer</option><option>Equipment</option><option>Car</option></select></div>
 <div class="field"><label>Make / model</label><input name="make_model"></div><div class="field"><label>Year</label><input name="year" type="number" min="1980" max="2100"></div><div class="field"><label>VIN / chassis</label><input name="vin"></div>
 <div class="field"><label>Fuel</label><select name="fuel_type"><option value="">-</option><option>Petrol</option><option>Diesel</option><option>Hybrid</option><option>Electric</option></select></div>
-<div class="field"><label>Speed limit (km/h)</label><input name="speed_limit" type="number" min="10" max="250"></div><div class="field"><label>Fuel moving (L/100 km)</label><input name="fuel_moving" type="number" step="0.1" min="0"></div><div class="field"><label>Fuel idling (L/hour)</label><input name="fuel_idle" type="number" step="0.1" min="0"></div><div class="field"><label>Notes</label><input name="notes"></div><button class="btn g"><i class="fa-solid fa-plus"></i>Add vehicle</button></form></div><div class="tw" id="vehT"></div></section>
+<div class="field"><label>Speed limit (km/h)</label><input name="speed_limit" type="number" min="10" max="250"></div><div class="field"><label>Fuel moving (L/100 km)</label><input name="fuel_moving" type="number" step="0.1" min="0"></div><div class="field"><label>Fuel idling (L/hour)</label><input name="fuel_idle" type="number" step="0.1" min="0"></div><div class="field"><label>Notes</label><input name="notes"></div><button class="btn g"><i class="fa-solid fa-plus"></i>Add vehicle</button></form></div><div class="tw" id="vehT"></div>
+<div class="card" style="margin-top:10px"><div class="csh"><i class="fa-solid fa-box-archive"></i><div><b>Blackbox download <span class="hp" data-tip="Each phone keeps &lt;b&gt;every&lt;/b&gt; fix it receives - about one per second - in its own storage, and never uploads that stream. Pick the vehicle and the period around an incident and press Download: the request reaches the phone over realtime (or on its next minute-long poll), and the phone then pushes exactly the stored fixes in that window, each stamped with the moment it was taken. They appear in Historical Tracking and the Tacho report as Blackbox rows. A phone that is switched off or out of coverage answers as soon as it is back.">?</span></b><small>Ask one vehicle for its stored 1-per-second fixes for a period — for accident investigation.</small></div><button class="btn gh sm" onclick="bbTable()" title="Check whether the phone has answered yet"><i class="fa-solid fa-rotate"></i>Refresh</button></div>
+<div class="frow" style="margin-top:10px"><div class="field"><label>Vehicle</label><select id="bb_v"></select></div>
+<div class="field"><label>From</label><input id="bb_f" type="text"></div><div class="field"><label>To</label><input id="bb_t" type="text"></div>
+<button class="btn b" onclick="bbAsk()"><i class="fa-solid fa-cloud-arrow-down"></i>Download</button></div>
+<div class="tw" id="bbT"></div></div></section>
 <section id="drv"><div class="card"><form class="fgrid" onsubmit="add(event,'drivers',['name','phone','employee_id','license_no','license_expiry','nationality','notes'])"><div class="field"><label>Driver name *</label><input name="name" required></div>
 <div class="field"><label>Phone</label><input name="phone"></div><div class="field"><label>Employee ID</label><input name="employee_id"></div><div class="field"><label>Licence number</label><input name="license_no"></div>
 <div class="field"><label>Licence expiry</label><input name="license_expiry" type="text"></div><div class="field"><label>Nationality</label><input name="nationality"></div><div class="field"><label>Notes</label><input name="notes"></div><button class="btn g"><i class="fa-solid fa-plus"></i>Add driver</button></form></div><div class="tw" id="drvT"></div></section>
@@ -204,6 +224,29 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <div class="card"><i class="fa-solid fa-circle-info" style="color:var(--bl)"></i> <b>Who did what, and when.</b> Every sign-in, saved configuration, vehicle, driver or user change, trip start or end and exported report is listed here. <span class="hp" data-tip="Entries are written by the account they describe, so an anonymous or signed-out visit never appears. The log cannot be edited or deleted by anyone, including admins - it is the proof a change was not made by you. Use the search box or the User filter to read one person's history, then CSV, Excel or PDF to hand it over.">?</span> Only admins can see this page.</div>
 <div class="kpis" id="acK"></div><div class="tw" id="acT"></div></section>
 </main><footer class="pagefoot">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</footer></div></div><div id="toast"></div><div id="tip"></div>
+<div id="zHint" class="hide"></div>
+<div id="zdlg" class="mdl"><div><div id="zTitle" style="font-size:15px;font-weight:800;margin-bottom:8px"></div>
+<div class="fg"><div class="field"><label>Zone name</label><input id="zName" maxlength="60" placeholder="Old port"></div>
+<div class="field"><label>Speed limit in this zone (km/h) — leave empty for no zone limit</label><input id="zLim" type="number" min="5" max="250"></div></div>
+<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:10px 0 4px">
+<label class="ck"><input id="zEnter" type="checkbox"> Alert on entry</label>
+<label class="ck"><input id="zExit" type="checkbox"> Alert on exit</label>
+<label class="ck"><input id="zOver" type="checkbox"> Alert on overspeed inside</label>
+<label class="ck"><input id="zOn" type="checkbox"> Zone active</label>
+<label class="ck"><input id="zCol" type="color"> Colour</label></div>
+<p id="zShape" style="color:var(--mut);margin:6px 0 12px"></p>
+<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn r sm hide" id="zDelB" onclick="zDelById(ZED&&ZED.id)"><i class="fa-solid fa-trash"></i>Delete</button>
+<button class="btn gh" onclick="zClose()">Cancel</button><button class="btn b" onclick="zSave()"><i class="fa-solid fa-floppy-disk"></i>Save zone</button></div>
+<small style="color:var(--mut);display:block;margin-top:8px">A vehicle crossing the line makes an event, and a vehicle faster than the limit above makes a Zone overspeed event — each with the alert, buzzer and voice you set for it in Configuration.</small></div></div>
+<div id="pdlg" class="mdl"><div><div id="plTitle" style="font-size:15px;font-weight:800;margin-bottom:8px"></div>
+<div class="fg"><div class="field"><label>Name to show <span class="hp" data-tip="Written exactly as you type it, and used instead of the name the map services give.">?</span></label><input id="plN" maxlength="60" placeholder="Ameer's Home"></div>
+<div class="field"><label>Radius (metres)</label><input id="plR" type="number" min="20" max="5000" value="150"></div></div>
+<div class="fg" style="margin-top:10px"><div class="field"><label>Latitude</label><input id="plLa" type="number" step="0.00001" min="-90" max="90"></div>
+<div class="field"><label>Longitude</label><input id="plLo" type="number" step="0.00001" min="-180" max="180"></div></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"><button class="btn gh sm" onclick="plPick()" title="Close this and click the spot on the Live Tracking map"><i class="fa-solid fa-crosshairs"></i>Pick on the map</button><small id="plMap" style="color:var(--mut);align-self:center"></small></div>
+<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn r sm hide" id="plDelB" onclick="plDel(+PLI.i)"><i class="fa-solid fa-trash"></i>Delete</button>
+<button class="btn gh" onclick="$('pdlg').classList.remove('on')">Cancel</button><button class="btn b" onclick="plSave()"><i class="fa-solid fa-floppy-disk"></i>Save place</button></div>
+<small style="color:var(--mut);display:block;margin-top:8px">Any vehicle position within the radius of this point is shown with the name above, in popups, trip lists and reports.</small></div></div>
 <script>
 document.documentElement.dataset.theme=localStorage.theme||'light';
 const p2=n=>String(n).padStart(2,'0');
@@ -215,19 +258,19 @@ const showErr=m=>{const s=('Error: '+((m&&m.message)||m)).slice(0,300),app=docum
 window.onerror=(m,s,l)=>showErr(m+' (line '+l+')');
 window.addEventListener('unhandledrejection',e=>showErr(e.reason&&e.reason.message||e.reason));
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flatpickr/4.6.13/flatpickr.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/flatpickr/4.6.13/flatpickr.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous" integrity="sha384-NElt3Op+9NBMCYaef5HxeJmU4Xeard/Lku8ek6hoPTvYkQPh3zLIrJP7KiRocsxO"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" crossorigin="anonymous" integrity="sha384-bs/nf9FbdNouRbMiFcrcZfLXYPKiPaGVGplVbv7dLGECccEXDW+S3zjqSKR5ZEaD"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flatpickr/4.6.13/flatpickr.min.css" crossorigin="anonymous" integrity="sha384-RkASv+6KfBMW9eknReJIJ6b3UnjKOKC5bOUaNgIY778NFbQ8MtWq9Lr/khUgqtTt">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/flatpickr/4.6.13/flatpickr.min.js" crossorigin="anonymous" integrity="sha384-5JqMv4L/Xa0hfvtF06qboNdhvuYXUku9ZrhZh3bSk8VXF0A/RuSLHpLsSV9Zqhl6"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" crossorigin="anonymous" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js" crossorigin="anonymous" integrity="sha384-b8MpgG2ZzWN6OPAtiB1JiBmDr9MpTt3NKK6KQf61hC/L7X4wJrvoTeVmMFPgp3nL"></script>
 <script src="config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" crossorigin="anonymous" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug"></script>
 <script>
 const SPEED_LIMIT=100, STALE_MIN=3; // km/h over which a vehicle counts as speeding; minutes without data = no signal
-let REM=localStorage.rem!=='0';const mk=r=>supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storage:r?localStorage:sessionStorage}});let sb=mk(REM);
-const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let REM=localStorage.rem!=='0';const mk=r=>supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storage:r?localStorage:sessionStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'implicit'}});let sb=mk(REM);
+const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const toast=(m,ok)=>{const t=$('toast');t.textContent=m;t.className='show '+(ok?'ok':'bad');setTimeout(()=>t.className='',3500)};
 let EVR=[],EVF={},ADMIN=false,UID,UNAME,evN=0,charts={},rep=[],mapL,mapH,markers={},last={},hLayer,hData=[],vehicles=[],drivers=[];
 const COL={go:'#27a46a',idle:'#f28c28',park:'#2f7fe6',off:'#8b98a5'},LBL={go:'Moving',idle:'Idling',park:'Parking',off:'Offline'};
@@ -259,6 +302,109 @@ function measure(m){if(m._meas){m.off('click',m._meas.h);m._meas.g.remove();m._m
  const g=L.layerGroup().addTo(m),pts=[];let line=null;
  const h=e=>{pts.push(e.latlng);L.circleMarker(e.latlng,{radius:4,color:'#2f7fe6'}).addTo(g);if(line)line.remove();line=L.polyline(pts,{color:'#2f7fe6',dashArray:'6 4'}).addTo(g);let d=0;for(let i=1;i<pts.length;i++)d+=pts[i-1].distanceTo(pts[i]);line.bindTooltip((d/1000).toFixed(2)+' km',{permanent:true,direction:'top'}).openTooltip()};
  m.on('click',h);m._meas={h,g};m.getContainer().style.cursor='crosshair';toast('Click points on the map to measure. Press the ruler again to clear.',1)}
+// ---- geofences. An admin draws the ring here; the phone reads the same rows and
+// turns a crossing, or speeding inside a zone, into an event of its own.
+let zones=[],zG={},DRAW=null,ZED=null;
+const zin=(lat,lng,pts)=>{let c=false;
+ for(let i=0,j=pts.length-1;i<pts.length;j=i++){const a=pts[i],b=pts[j];
+  if((a[1]>lng)!==(b[1]>lng)&&lat<(b[0]-a[0])*(lng-a[1])/(b[1]-a[1])+a[0])c=!c}
+ return c};
+// plane area of the ring in km2, accurate enough for the figure an admin checks
+const zArea=p=>{let s=0;for(let i=0;i<p.length;i++){const a=p[i],b=p[(i+1)%p.length];s+=a[1]*b[0]-b[1]*a[0]}
+ // a degree of latitude is 110.574 km and a degree of longitude 111.32 km times
+ // the cosine of the latitude, so the plane figure is scaled into square kilometres
+ return Math.abs(s/2)*110.574*111.32*Math.cos((p[0]&&p[0][0]||0)*Math.PI/180)};
+const zPts=sh=>(((sh||{}).pts)||[]).map(p=>[+p[0],+p[1]]).filter(p=>p.length===2&&Math.abs(p[0])<=90&&Math.abs(p[1])<=180);
+const zRing=z=>z.pts&&z.pts.length?z.pts:zPts(z.shape);
+function switchTab(t){const b=document.querySelector('.nb[data-t="'+t+'"]');if(b)b.click()}
+function zPaint(){[mapL,mapH].forEach(m=>{if(!m)return;const id=m.getContainer().id;
+ if(zG[id]){m.removeLayer(zG[id]);delete zG[id]}
+ const g=L.layerGroup().addTo(m);
+ zones.forEach(z=>{const p=zPts(z.shape);if(p.length<3)return;const off=z.enabled===false;
+  L.polygon(p,{color:off?'#9aa7b0':(z.color||'#2f7fe6'),weight:2.5,fillOpacity:off?.04:.1,dashArray:off?'6 5':null})
+   .bindTooltip(z.name+(z.speed_limit?' - max '+z.speed_limit+' km/h':'')+(off?' - off':''),{sticky:true}).addTo(g)});
+ zG[id]=g})}
+function zCancel(){if(!DRAW)return;const m=DRAW.m;
+ m.off('click',DRAW.click);m.off('dblclick',DRAW.fin);m.doubleClickZoom.enable();m.getContainer().style.cursor='';
+ m.removeLayer(DRAW.g);$('zHint').classList.add('hide');DRAW=null}
+function drawZone(m){if(DRAW){zCancel();return}
+ if(!ADMIN)return toast('Only an admin can draw zones');
+ const pts=[];let line=null;const g=L.layerGroup().addTo(m);
+ const ui=()=>{g.clearLayers();if(line)line.remove();
+  line=L.polyline(pts.length>2?pts.concat([pts[0]]):pts,{color:'#27a46a',weight:3,dashArray:'7 5'}).addTo(g);
+  pts.forEach((p,i)=>L.circleMarker(p,{radius:i?4:6,color:'#fff',weight:2,fillColor:i?'#27a46a':'#2f7fe6',fillOpacity:1}).addTo(g));
+  const h=$('zHint');
+  h.innerHTML='<b>'+(pts.length<3?(3-pts.length)+' more corner'+(pts.length===2?'s':'')+' needed':'Press Finish, or double-click the map')+'</b> &middot; '+pts.length+' corners &middot; '+zArea(pts).toFixed(3)+' km&sup2; '+
+   '<button class="btn g sm" onclick="zFinish()"><i class="fa-solid fa-check"></i>Finish</button> <button class="btn r sm" onclick="zCancel()"><i class="fa-solid fa-xmark"></i>Cancel</button>';
+  h.classList.remove('hide')};
+ DRAW={m,pts,g,click:e=>{const l=[+e.latlng.lat,+e.latlng.lng],q=pts[pts.length-1];
+   if(q&&Math.abs(l[0]-q[0])<1e-7&&Math.abs(l[1]-q[1])<1e-7)return;pts.push(l);ui()},fin:()=>zFinish()};
+ m.on('click',DRAW.click);m.on('dblclick',DRAW.fin);m.doubleClickZoom.disable();
+ m.getContainer().style.cursor='crosshair';ui();
+ toast('Click the map for each corner of the zone, then double-click or press Finish.',1)}
+function zFinish(){if(!DRAW)return;if(DRAW.pts.length<3)return toast('A zone needs at least 3 corners');
+ const p=DRAW.pts.slice();zCancel();
+ zDlg({pts:p,name:'',speed_limit:'',enter:true,exit:true,overspeed:true,enabled:true,color:'#2f7fe6',isNew:true})}
+function zDlg(z){if(!ADMIN)return;ZED=z;
+ $('zTitle').innerHTML='<i class="fa-solid fa-draw-polygon"></i> '+(z.isNew?'New zone':'Edit zone');
+ $('zName').value=z.name||'';$('zLim').value=z.speed_limit==null?'':z.speed_limit;
+ $('zEnter').checked=z.enter!==false;$('zExit').checked=z.exit!==false;
+ $('zOver').checked=z.overspeed!==false;$('zOn').checked=z.enabled!==false;
+ $('zCol').value=z.color||'#2f7fe6';const p=zRing(z);
+ $('zShape').textContent=p.length+' corners &middot; '+zArea(p).toFixed(3)+' km&sup2;';
+ $('zDelB').classList.toggle('hide',!z.id);$('zdlg').classList.add('on');$('zName').focus()}
+function zClose(){if($('zdlg'))$('zdlg').classList.remove('on');ZED=null}
+async function zSave(){if(!ADMIN||!ZED)return;const p=zRing(ZED);
+ if(p.length<3)return toast('A zone needs at least 3 corners');
+ const lim=$('zLim').value===''?null:Math.min(250,Math.max(5,+$('zLim').value||0));
+ const r={name:($('zName').value||'').trim().slice(0,60)||'Unnamed zone',
+  shape:{type:'polygon',pts:p.map(x=>[+x[0].toFixed(6),+x[1].toFixed(6)])},
+  color:$('zCol').value||'#2f7fe6',enabled:$('zOn').checked,enter:$('zEnter').checked,
+  exit:$('zExit').checked,overspeed:$('zOver').checked,speed_limit:lim};
+ const id=ZED.id,was=r.name;
+ const {error}=await(id?sb.from('geofences').update(Object.assign({updated_at:new Date().toISOString()},r)).eq('id',id)
+  :sb.from('geofences').insert(r));
+ if(error)return toast(error.message);
+ zClose();await zRefs();
+ toast('Zone "'+was+'" saved'+(lim?' with a '+lim+' km/h limit':'')+'. Phones pick it up within 5 minutes.',1);
+ logAct(id?'Edited zone':'Drew zone',was+' - '+p.length+' corners - '+(lim?lim+' km/h':'no zone limit'))}
+async function zRefs(){const {data}=await sb.from('geofences').select('*').order('name');zones=data||[];zPaint();zTable()}
+function zTable(){const t=$('zT');if(!t)return;
+ t.innerHTML=ADMIN?`<table><tr><th>Zone</th><th>Corners</th><th>Area km2</th><th>Speed limit km/h</th><th>Alert on entry</th><th>Alert on exit</th><th>Alert on overspeed</th><th>On</th><th></th></tr>${zones.map(z=>{const p=zPts(z.shape);
+  return `<tr><td><b>${esc(z.name)}</b></td><td>${p.length}</td><td>${p.length>2?zArea(p).toFixed(3):'-'}</td><td><input type="number" min="5" max="250" value="${z.speed_limit==null?'':z.speed_limit}" style="width:78px" onchange="zSet('${z.id}','speed_limit',this.value===''?null:+this.value)"></td>${['enter','exit','overspeed'].map(k=>`<td style="text-align:center"><input type="checkbox" ${z[k]!==false?'checked':''} onchange="zSet('${z.id}','${k}',this.checked)"></td>`).join('')}<td style="text-align:center"><input type="checkbox" ${z.enabled!==false?'checked':''} onchange="zSet('${z.id}','enabled',this.checked)"></td><td style="text-align:right;white-space:nowrap"><button class="btn b sm" onclick="zEdit('${z.id}')"><i class="fa-solid fa-pen"></i>Edit</button> <button class="btn r sm" onclick="zDelById('${z.id}')"><i class="fa-solid fa-trash"></i>Delete</button></td></tr>`}).join('')||'<tr><td colspan="9">No zones yet. Press <b>Draw zone</b> on the Live Tracking map to add one.</td></tr>'}</table>`
+  :`<table><tr><th>Zone</th><th>Speed limit km/h</th><th>Area km2</th></tr>${zones.filter(z=>z.enabled!==false).map(z=>{const p=zPts(z.shape);return `<tr><td><b>${esc(z.name)}</b></td><td>${z.speed_limit==null?'-':z.speed_limit}</td><td>${p.length>2?zArea(p).toFixed(3):'-'}</td></tr>`}).join('')||'<tr><td colspan="3">No zones are active.</td></tr>'}</table>`}
+async function zSet(id,k,v){if(!ADMIN)return;
+ const u={updated_at:new Date().toISOString()};u[k]=k==='speed_limit'?(v==null||v===''?null:+v):!!v;
+ const {error}=await sb.from('geofences').update(u).eq('id',id);
+ if(error)return toast(error.message);
+ await zRefs();const z=zones.find(x=>x.id===id);logAct('Zone setting',(z&&z.name||'')+' - '+k+' = '+(v==null?'off':v))}
+function zEdit(id){const z=zones.find(x=>x.id===id);if(z)zDlg(Object.assign({},z))}
+function zDelById(id){const z=zones.find(x=>x.id===id);if(!z)return;
+ if(!confirm('Delete the zone "'+z.name+'"? Events already recorded in it stay.'))return;
+ sb.from('geofences').delete().eq('id',id).then(()=>{zRefs();toast('Zone deleted');logAct('Deleted zone',z.name)})}
+// ---- blackbox pull. The phone keeps every fix locally; this asks it for a window
+// and it answers over realtime or on its own minute poll.
+let BBS=[];
+async function bbTable(){if(!ADMIN)return;const el=$('bbT');if(!el)return;
+ const {data}=await sb.from('bb_requests').select('*').order('requested_at',{ascending:false}).limit(30);BBS=data||[];
+ el.innerHTML=`<table><tr><th>Asked</th><th>Vehicle</th><th>From</th><th>To</th><th>Status</th><th>Fixes delivered</th><th>Phone answered</th><th></th></tr>${BBS.map(r=>`<tr><td>${new Date(r.requested_at).toLocaleString()}</td><td><b>${esc(r.vehicle_name||'-')}</b></td><td>${new Date(r.from_ts).toLocaleString()}</td><td>${new Date(r.to_ts).toLocaleString()}</td>
+  <td><span class="chip" style="background:var(--${r.status==='sent'?'grl':r.status==='failed'?'rdl':'orl'});color:var(--${r.status==='sent'?'gr':r.status==='failed'?'rd':'or'})">${r.status}</span></td><td>${r.n_rows==null?'-':r.n_rows}</td><td>${r.answered_at?new Date(r.answered_at).toLocaleString():'-'}${r.error?'<br><small style="color:var(--rd)">'+esc(r.error).slice(0,90)+'</small>':''}</td>
+  <td style="text-align:right">${r.status==='pending'?`<button class="btn r sm" onclick="bbCancel('${r.id}')"><i class="fa-solid fa-xmark"></i>Cancel</button>`:''}</td></tr>`).join('')||'<tr><td colspan="8">No download has been asked for yet.</td></tr>'}</table>`}
+async function bbAsk(){if(!ADMIN)return;const v=$('bb_v').value,nm=(vehicles.find(x=>x.id===v)||{}).name||'';
+ if(!v)return toast('Choose a vehicle first');
+ const f=new Date($('bb_f').value),t=new Date($('bb_t').value);
+ if(isNaN(f)||isNaN(t))return toast('Set both ends of the period');
+ if(t<=f)return toast('The end of the period must be after its start');
+ const hrs=Math.round((t-f)/36e5*10)/10;
+ if(hrs>6&&!confirm('This window is '+hrs+' hours of one-fix-per-second data (up to '+Math.round(hrs*3600).toLocaleString()+' rows). The phone needs to be on and in coverage to answer it.\n\nContinue?'))return;
+ const {error}=await sb.from('bb_requests').insert({vehicle_id:v,vehicle_name:nm,from_ts:f.toISOString(),to_ts:t.toISOString(),requested_by:UID});
+ if(error)return toast(error.message);
+ await bbTable();logAct('Blackbox download asked',nm+' '+f.toLocaleString()+' to '+t.toLocaleString());
+ toast('Request sent to '+nm+'. The phone pushes that window as soon as it is online.',1)}
+async function bbCancel(id){if(!ADMIN)return;
+ if(!confirm('Cancel this request? A phone that already started sending keeps what it pushed.'))return;
+ await sb.from('bb_requests').delete().eq('id',id);bbTable();logAct('Blackbox request cancelled','')}
+
 async function signIn(){
  const want=$('rem').checked;if(want!==REM){REM=want;localStorage.rem=want?'1':'0';sb=mk(REM)}
  const b=$('sib');b.disabled=true;b.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i>Signing in...';$('lerr').textContent='';
@@ -302,17 +448,34 @@ function sessStart(){if(UID)SST=Date.now()}
 document.addEventListener('visibilitychange',()=>{document.hidden?sessStop():sessStart()});
 addEventListener('pagehide',sessStop);
 async function signOut(){sessStop();await logAct('Signed out','Dashboard');await sb.auth.signOut();location.reload()}
+let KA=null;
+async function keepAlive(){try{const {data:{session}}=await sb.auth.getSession();
+  // a session Supabase has already dropped means every tile on this page can only
+  // fail from here on, so say it once instead of letting each report show its own
+  if(!session&&UID){toast('Your session ended. Sign in again to keep watching the fleet.',0);clearInterval(KA);KA=null}}catch(e){}}
 async function boot(fresh){
- const {data:{session}}=await sb.auth.getSession();if(!session)return;
+ const {data:{session}}=await sb.auth.getSession();
+ // the driver app hands its session over in the URL fragment. Supabase has read it
+ // by now, so remove it from the address bar, the history and the referrer at once:
+ // a token left there is copied into bookmarks, logs and shoulder-surfaced screens
+ if(/access_token=|refresh_token=/.test(location.hash))history.replaceState(null,'',location.pathname+location.search);
+ if(!session)return;
+ // Supabase refreshes quietly while the tab is used; this keeps a dashboard left
+ // open all day signed in, and notices the moment the session really has ended
+ if(!KA)KA=setInterval(keepAlive,10*60*1000);
  const {data:p}=await sb.from('profiles').select('role').eq('id',session.user.id).single();
  ADMIN=p?.role==='admin';UID=session.user.id;document.body.classList.toggle('usr',!ADMIN);
  $('login').classList.add('hide');$('app').classList.remove('hide');UNAME=(session.user.email||'').replace('@fleet.local','');$('me').textContent=UNAME;$('accWho').textContent='Welcome, '+UNAME+'!';if(localStorage.pin==='1')document.querySelector('aside').classList.add('pin');pinBtn();themeBtn();
  logAct(fresh?'Signed in':'Opened dashboard','Role: '+(ADMIN?'admin':'user'));sessStart();
- mapL=mkMap('mapLive',fitAll,[['fa-thumbtack','Pin: keep the selected vehicle in the centre of the map while it moves',pinV,'pin']]);mapH=mkMap('mapHist',hFit);
+ mapL=mkMap('mapLive',fitAll,[['fa-thumbtack','Pin: keep the selected vehicle in the centre of the map while it moves',pinV,'pin'],['fa-draw-polygon','Draw zone: click the map for each corner of a geofence, then double-click to finish',()=>drawZone(mapL),'zone']]);mapH=mkMap('mapHist',hFit);
  initDates();
- await refs();await getSet();await loadLive();loadRules();evInit();
- sb.channel('pos').on('postgres_changes',{event:'*',schema:'public',table:'positions'},e=>{if(e.new)upsert(e.new)}).subscribe(s=>{const ok=s==='SUBSCRIBED';$('conn').className='pill'+(ok?'':' bad');$('connT').textContent=ok?'Live':'Reconnecting'});
+ await refs();await getSet();await zRefs();await loadLive();loadRules();evInit();
+ sb.channel('pos').on('postgres_changes',{event:'INSERT',schema:'public',table:'positions'},e=>{if(e.new)upsert(e.new)}).subscribe(s=>{const ok=s==='SUBSCRIBED';$('conn').className='pill'+(ok?'':' bad');$('connT').textContent=ok?'Live':'Reconnecting'});
  sb.channel('ev').on('postgres_changes',{event:'INSERT',schema:'public',table:'events'},e=>onEv(e.new)).subscribe();
+ // a zone drawn by another admin, or a phone answering a blackbox pull, appears
+ // without pressing Refresh
+ sb.channel('geo').on('postgres_changes',{event:'*',schema:'public',table:'geofences'},()=>zRefs()).subscribe();
+ if(ADMIN)sb.channel('bb').on('postgres_changes',{event:'*',schema:'public',table:'bb_requests'},()=>{if($('veh').classList.contains('on'))bbTable()}).subscribe();
  // realtime can silently miss inserts (dropped socket, table missing from the
  // publication); this poll guarantees every event still raises its alert
  setInterval(evPoll,20000);
@@ -322,22 +485,22 @@ document.querySelectorAll('.nb[data-t]').forEach(b=>b.onclick=()=>{
  document.querySelectorAll('.nb').forEach(x=>x.classList.remove('on'));b.classList.add('on');$('title').textContent=b.dataset.h;
  document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===b.dataset.t));
  setTimeout(()=>{mapL?.invalidateSize();mapH?.invalidateSize()},50);
- if(b.dataset.t==='evt'){evN=0;$('evb').style.display='none';loadEvt()}if(b.dataset.t==='rep')loadRep();if(b.dataset.t==='cfg')loadCfg();if(b.dataset.t==='usr')users();if(b.dataset.t==='act')loadAct();if(b.dataset.t==='veh'||b.dataset.t==='drv')refs()});
+ if(b.dataset.t==='evt'){evN=0;$('evb').style.display='none';loadEvt()}if(b.dataset.t==='rep')loadRep();if(b.dataset.t==='cfg')loadCfg();if(b.dataset.t==='usr')users();if(b.dataset.t==='act')loadAct();if(b.dataset.t==='veh'||b.dataset.t==='drv'){refs();if(b.dataset.t==='veh')bbTable()}});
 async function refs(){
  vehicles=(await sb.from('vehicles').select('*').order('name')).data||[];drivers=(await sb.from('drivers').select('*').order('name')).data||[];
  $('hv').innerHTML=vehicles.map(v=>`<option value="${v.id}">${esc(v.name)}</option>`).join('');
  msel('lv_v',vehicles,'All vehicles',mselVal('lv_v'));if(!LVW){LVW=1;$('lv_v').addEventListener('change',lvChg)}
  msel('ev_v',vehicles,'All vehicles',mselVal('ev_v'));msel('ev_d',drivers,'All drivers',mselVal('ev_d'));msel('ev_t',Object.keys(EV).map(k=>({id:k,name:EV[k][0]})),'All events',mselVal('ev_t'));
- $('tr_v').innerHTML=$('hv').innerHTML;$('vehT').innerHTML=tbl(vehicles,['name','type','make_model','year','speed_limit','fuel_moving','fuel_idle'],'vehicles');$('drvT').innerHTML=tbl(drivers,['name','phone','license_no','license_expiry'],'drivers');tools($('vehT'));tools($('drvT'))}
+ $('tr_v').innerHTML=$('hv').innerHTML;$('bb_v').innerHTML=$('hv').innerHTML;$('vehT').innerHTML=tbl(vehicles,['name','type','make_model','year','speed_limit','fuel_moving','fuel_idle'],'vehicles');$('drvT').innerHTML=tbl(drivers,['name','phone','license_no','license_expiry'],'drivers');tools($('vehT'));tools($('drvT'))}
 const tbl=(rows,cols,t)=>`<table><tr>${cols.map(c=>`<th>${c.replace(/_/g,' ')}</th>`).join('')}<th></th></tr>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(r[c])}</td>`).join('')}<td style="text-align:right;white-space:nowrap"><button class="btn b sm" onclick="edit('${t}','${r.id}')"><i class="fa-solid fa-pen"></i>Edit</button> <button class="btn r sm" onclick="del('${t}','${r.id}')"><i class="fa-solid fa-trash"></i>Delete</button></td></tr>`).join('')||'<tr><td colspan="9">Nothing here yet. Add one above.</td></tr>'}</table>`;
 async function add(e,t,cols){e.preventDefault();if(!ADMIN)return;const f=e.target,id=f.dataset.id,o={};cols.forEach(c=>o[c]=f[c].value||null);
  const {error}=id?await sb.from(t).update(o).eq('id',id):await sb.from(t).insert(o);if(error)return toast(error.message);
  logAct((id?'Edited ':'Added ')+t.replace(/s$/,''),o.name);
  toast(id?'Changes saved':'Added',1);if(id){delete f.dataset.id;f.querySelector('button').innerHTML=f.dataset.lbl}f.reset();f.querySelectorAll('input').forEach(i=>i._flatpickr&&i._flatpickr.clear());refs()}
-function edit(t,id){const r=(t==='vehicles'?vehicles:drivers).find(x=>x.id===id),f=document.querySelector(t==='vehicles'?'#veh form':'#drv form');
+function edit(t,id){if(!ADMIN)return;const r=(t==='vehicles'?vehicles:drivers).find(x=>x.id===id),f=document.querySelector(t==='vehicles'?'#veh form':'#drv form');
  [...f.elements].forEach(el=>{if(el.name){el.value=r[el.name]??'';if(el._flatpickr)el._flatpickr.setDate(el.value||null)}});f.dataset.id=id;f.dataset.lbl||=f.querySelector('button').innerHTML;
  f.querySelector('button').innerHTML='<i class="fa-solid fa-floppy-disk"></i>Save changes';f.scrollIntoView({behavior:'smooth'});f.elements[0].focus()}
-async function del(t,id){if(confirm('Delete this item?')){const nm=((t==='vehicles'?vehicles:drivers).find(x=>x.id===id)||{}).name||id;
+async function del(t,id){if(!ADMIN)return;if(confirm('Delete this item?')){const nm=((t==='vehicles'?vehicles:drivers).find(x=>x.id===id)||{}).name||id;
  await sb.from(t).delete().eq('id',id);logAct('Deleted '+t.replace(/s$/,''),nm);refs()}}
 async function users(){
  const {data:ps}=await sb.from('profiles').select('*').order('email');const {data:as}=await sb.from('assignments').select('*');
@@ -431,12 +594,15 @@ function tStats(t,Vh){let d=0,dr=0,id=0,fuel=0,max=0,ms=0,mn=0;const fm=+Vh.fuel
 const arw=(b,c)=>L.divIcon({className:'arw',html:`<svg width="14" height="14" viewBox="0 0 14 14" style="transform:rotate(${Math.round(b)}deg)"><path d="M7 1L12.5 12.5L7 9.5L1.5 12.5Z" fill="${c}" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/></svg>`,iconSize:[14,14],iconAnchor:[7,7]});
 const shp=w=>L.divIcon({className:'',html:w==='s'?'<svg width="26" height="24" viewBox="0 0 26 24" style="display:block;filter:drop-shadow(0 1px 2px #0008)"><path d="M13 2L24.5 22H1.5Z" fill="#27a46a" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/></svg>':'<svg width="22" height="22" viewBox="0 0 22 22" style="display:block;filter:drop-shadow(0 1px 2px #0008)"><rect x="2" y="2" width="18" height="18" rx="2" fill="#d9534f" stroke="#fff" stroke-width="2.5"/></svg>',iconSize:w==='s'?[26,24]:[22,22],iconAnchor:w==='s'?[13,15]:[11,11],popupAnchor:[0,-10]});
 const evMk=x=>L.marker([x.lat,x.lng],{icon:evIcon(x.type),zIndexOffset:900}).bindPopup(()=>evPop(x),{minWidth:240});
-function geoFill(pop,p){geoOne(gk(p)).then(nm=>{const el=pop.getElement&&pop.getElement();const s=el&&el.querySelector('.gname');if(s)s.textContent=nm||'Place name not found'})}
+function geoFill(pop,p){geoOne(gk(p)).then(nm=>{const el=pop.getElement&&pop.getElement();const s=el&&el.querySelector('.gname');if(!s)return;
+ s.textContent=nm||'Place name not found';
+ // an admin can rename the spot from wherever he is looking at it
+ if(ADMIN&&!pop.__pl){pop.__pl=1;s.insertAdjacentHTML('afterend',` <button class="btn gh sm" style="height:20px;padding:0 7px;font-size:11px" title="Give this spot a name of your own" onclick="plHere(${(+p.lat).toFixed(5)},${(+p.lng).toFixed(5)})"><i class="fa-solid fa-pen"></i>Name it</button>`)}})}
 const HR='<hr style="border:0;border-top:1px solid #8883;margin:6px 0">';
 function tPop(T,w){const p=w==='s'?T.pts[0]:T.pts.at(-1),S=T.st,s=w==='s';
  return `<div style="min-width:230px"><b style="font-size:15px;color:${s?'#27a46a':'#d9534f'}"><i class="fa-solid ${s?'fa-play':'fa-flag-checkered'}"></i> ${s?'Start':'End'} Trip</b> <span class="chip" style="background:${T.col}22;color:${T.col}">Trip ${T.n}</span>${HR}
  <i class="fa-solid fa-car"></i> ${esc(p.vehicle_name||'-')}<br><i class="fa-solid fa-id-card"></i> ${esc(p.driver_name||'-')}<br><i class="fa-regular fa-clock"></i> ${new Date(p.recorded_at).toLocaleString()}<br>
- <i class="fa-solid fa-map-pin"></i> <span class="gname">${esc(GC[gk(p)]||'Looking up the place…')}</span><br><i class="fa-solid fa-location-dot"></i> ${(+p.lat).toFixed(5)}, ${(+p.lng).toFixed(5)}<br><i class="fa-solid fa-gauge-high"></i> ${Math.round(p.speed||0)} km/h${HR}
+ <i class="fa-solid fa-map-pin"></i> <span class="gname">${esc(plName(p)||'Looking up the place…')}</span><br><i class="fa-solid fa-location-dot"></i> ${(+p.lat).toFixed(5)}, ${(+p.lng).toFixed(5)}<br><i class="fa-solid fa-gauge-high"></i> ${Math.round(p.speed||0)} km/h${HR}
  Distance <b>${S.d.toFixed(2)} km</b> · Duration <b>${hm(S.dur)}</b><br>Max speed <b>${Math.round(S.max)} km/h</b> · Events <b>${T.evs.length}</b></div>`}
 function ptPop(p,T,l,r,c){return `<b>${new Date(p.recorded_at).toLocaleString()}</b> <span class="chip" style="background:${T.col}22;color:${T.col}">Trip ${T.n}</span><br><i class="fa-solid fa-car"></i> ${esc(p.vehicle_name||'-')} · <i class="fa-solid fa-id-card"></i> ${esc(p.driver_name||'-')}<br><i class="fa-solid fa-gauge-high"></i> ${Math.round(p.speed||0)} km/h · ${stt(p)}<br><i class="fa-solid fa-gas-pump"></i> Fuel ${l.toFixed(3)} L${r?' ('+r+')':''}<br>Trip fuel so far: ${c.toFixed(2)} L<br><i class="fa-solid fa-location-dot"></i> ${(+p.lat).toFixed(5)}, ${(+p.lng).toFixed(5)}<br>Accuracy ${p.accuracy??'-'} m · Elev. ${p.altitude!=null?Math.round(p.altitude):'-'} m · Dir ${p.heading!=null?Math.round(p.heading):'-'}°<br>Accel ${p.accel??'-'} km/h/s<br><i class="fa-solid fa-battery-half"></i> ${p.battery_pct!=null?Math.round(p.battery_pct)+'%':'-'}${p.charging?' ⚡':''}`}
 function drawTrip(T,Vh){const P=T.pts,g=T.ly,fm=+Vh.fuel_moving||0,fi=+Vh.fuel_idle||0,k=Math.max(1,Math.ceil(P.length/120));
@@ -484,7 +650,7 @@ function hSide(){const s=$('hside');
   $('pbR').onchange=e=>{if(PB)PB.rate=+e.target.value};pbShow()}}
 function tdBox(T){return `<div class="tbox" style="border-left:4px solid ${T.col};margin-top:2px">
  <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><b style="flex:1">Trip ${T.n} details</b><button class="btn gh sm" onclick="tPrint()" title="Print these trip details together with the route"><i class="fa-solid fa-print"></i>Print</button></div>
- <div class="tdet">${tDet(T).map(r=>`<span>${r[0]}</span><b>${esc(r[1])}</b>`).join('')}<span>From</span><b id="tdS">${esc(GC[gk(T.pts[0])]||'…')}</b><span>To</span><b id="tdE">${esc(GC[gk(T.pts.at(-1))]||'…')}</b></div>
+ <div class="tdet">${tDet(T).map(r=>`<span>${r[0]}</span><b>${esc(r[1])}</b>`).join('')}<span>From</span><b id="tdS">${esc(plName(T.pts[0])||'…')}</b><span>To</span><b id="tdE">${esc(plName(T.pts.at(-1))||'…')}</b></div>
  <div class="tbox" style="margin-top:8px"><b><i class="fa-solid fa-film"></i> Playback</b><div class="pbk" style="margin-top:6px"><button class="btn g sm" id="pbB" onclick="pbToggle()" title="Play / pause"><i class="fa-solid ${PB&&PB.run?'fa-pause':'fa-play'}"></i></button><select id="pbR" title="Playback speed">${[1,2,4,8,16,32,64].map(x=>`<option value="${x}" ${x===(PB&&PB.rate||8)?'selected':''}>${x}×</option>`).join('')}</select><input type="range" id="pbS" min="0" max="${T.pts.length-1}" value="${PB?PB.i:0}" oninput="pbSeek(+this.value)"></div><div class="pvals" id="pbV"></div></div></div>`}
 async function tPrint(){const T=TRIPS[TSEL];if(!T)return;const a=T.pts[0],z=T.pts.at(-1);
  const w=open('','_blank');if(!w)return toast('Allow pop-ups for this site to print');
@@ -493,14 +659,22 @@ async function tPrint(){const T=TRIPS[TSEL];if(!T)return;const a=T.pts[0],z=T.pt
  // the print-out carries a real map of the trip so the reader can see where it
  // ran; the popup prints itself once every tile has arrived, with a timeout for
  // a network that never answers
- const B=BASES[baseN()],k=Math.max(1,Math.ceil(T.pts.length/1200));
- const MAP=JSON.stringify({u:B[0],o:{attribution:B[1],maxZoom:B[2],...B[3]},pts:T.pts.filter((_,i)=>i%k===0).map(p=>[+p.lat,+p.lng]),col:T.col,evs:T.evs.map(x=>[+x.lat,+x.lng])});
+ const B=BASES[baseN()];
+ // a bad fix (null island, or a zeroed lat/lng) would stretch the bounds across
+ // the whole planet and the printed route would vanish, so drop it here
+ const GP=T.pts.map(p=>[+p.lat,+p.lng]).filter(x=>Math.abs(x[0])<=90&&Math.abs(x[1])<=180&&Math.abs(x[0])+Math.abs(x[1])>.01);
+ const k=GP.length>2?Math.ceil(GP.length/1200):1;
+ const MAP=JSON.stringify({u:B[0],o:{attribution:B[1],maxZoom:B[2],...B[3]},pts:GP.filter((_,i)=>i%k===0),col:T.col,evs:T.evs.map(x=>[+x.lat,+x.lng]).filter(x=>Math.abs(x[0])<=90&&Math.abs(x[1])<=180)});
  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Trip ${T.n} - ${esc(a.vehicle_name||'')}</title><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"><\/script><style>*{print-color-adjust:exact;-webkit-print-color-adjust:exact}body{font:14px system-ui,sans-serif;margin:28px;color:#222}h2{margin:0 0 4px}h3{margin:22px 0 6px}small{color:#666}table{border-collapse:collapse;width:100%;margin-top:14px}td,th{border:1px solid #ccc;padding:6px 9px;text-align:left}td:first-child{background:#f5f5f5;font-weight:600;width:38%}th{background:#eee}.rt{margin-top:16px}#pm{height:430px;width:100%;border:1px solid #ccc;border-radius:10px;background:#f7fafc}.lg{font-size:12px;color:#444;margin:6px 0 0}</style></head><body>
  <h2>Trip ${T.n} details</h2><small>Fleet Tracker · Generated: ${new Date().toLocaleString()}</small>
  <div class="rt"><h3>Route map</h3><div id="pm"></div><p class="lg"><b style="color:${T.col}">&#9644;</b> driven route &nbsp;·&nbsp; <span style="color:#27a46a">&#9679;</span> start ${esc(ls||gk(a))} &nbsp;·&nbsp; <span style="color:#d9534f">&#9679;</span> end ${esc(le||gk(z))}${T.evs.length?' &nbsp;·&nbsp; <span style="color:#f28c28">&#9679;</span> '+T.evs.length+' event(s)':''}</p></div>
  <table>${rows.map(r=>`<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join('')}</table>
  ${T.evs.length?`<h3>Events</h3><table><tr><th>Time</th><th>Event</th><th>Speed</th></tr>${T.evs.map(x=>`<tr><td style="background:none;font-weight:400">${new Date(x.recorded_at).toLocaleString()}</td><td>${esc(EVX(x.type)[0])}</td><td>${Math.round(x.speed||0)} km/h</td></tr>`).join('')}</table>`:''}
- <script>window.MAP=${MAP};window.addEventListener('load',function(){var m=L.map('pm',{zoomControl:false,attributionControl:false,scrollWheelZoom:false});L.tileLayer(MAP.u,MAP.o).addTo(m);var pl=L.polyline(MAP.pts,{color:MAP.col,weight:5,opacity:.95}).addTo(m);var dot=function(p,c){L.circleMarker(p,{radius:7,color:'#fff',weight:2,fillColor:c,fillOpacity:1}).addTo(m)};dot(MAP.pts[0],'#27a46a');dot(MAP.pts[MAP.pts.length-1],'#d9534f');MAP.evs.forEach(function(e){L.circleMarker(e,{radius:5,color:'#fff',weight:1.5,fillColor:'#f28c28',fillOpacity:1}).addTo(m)});m.fitBounds(pl.getBounds(),{padding:[26,26]});var done=false,go=function(){if(done)return;done=true;window.focus();window.print()};var chk=setInterval(function(){var a=document.querySelectorAll('#pm img.leaflet-tile'),b=document.querySelectorAll('#pm img.leaflet-tile-loaded');if(a.length&&a.length===b.length){clearInterval(chk);setTimeout(go,350)}},250);setTimeout(go,5000)});<\/script></body></html>`);
+ <script>window.MAP=${MAP};window.addEventListener('load',function(){var m=L.map('pm',{zoomControl:false,attributionControl:false,scrollWheelZoom:false,maxZoom:MAP.o.maxZoom||19});L.tileLayer(MAP.u,MAP.o).addTo(m);var pl=L.polyline(MAP.pts,{color:'#fff',weight:9,opacity:.95}).addTo(m);pl=L.polyline(MAP.pts,{color:MAP.col,weight:5,opacity:1}).addTo(m);var dot=function(p,c){L.circleMarker(p,{radius:7,color:'#fff',weight:2,fillColor:c,fillOpacity:1}).addTo(m)};if(MAP.pts.length){dot(MAP.pts[0],'#27a46a');if(MAP.pts.length>1)dot(MAP.pts[MAP.pts.length-1],'#d9534f')}MAP.evs.forEach(function(e){L.circleMarker(e,{radius:5,color:'#fff',weight:1.5,fillColor:'#f28c28',fillOpacity:1}).addTo(m)});
+ // measure the box, then frame the whole route: a popup that was still laying out
+ // when load fired used to keep the default view and show only the start point
+ var fit=function(){m.invalidateSize(false);var b=L.latLngBounds(MAP.pts);if(MAP.pts.length>1&&b.isValid())m.fitBounds(b,{padding:[30,30],maxZoom:17,animate:false});else if(MAP.pts.length)m.setView(MAP.pts[0],Math.min(16,m.getMaxZoom()))};
+ fit();var done=false,go=function(){if(done)return;done=true;fit();setTimeout(function(){window.focus();window.print()},120)};var chk=setInterval(function(){var a=document.querySelectorAll('#pm img.leaflet-tile'),b=document.querySelectorAll('#pm img.leaflet-tile-loaded');if(a.length&&a.length===b.length){clearInterval(chk);setTimeout(go,350)}},250);setTimeout(go,5000)});<\/script></body></html>`);
  w.document.close();
  logAct('Printed trip',(a.vehicle_name||'-')+' trip '+T.n+' '+new Date(T.st.s).toLocaleString()+' with route map')}
 // ---- playback. Long pauses inside a trip are shortened to 30 s so the
@@ -532,7 +706,8 @@ function hKpi(){localStorage.hk=localStorage.hk==='0'?'1':'0';hKpiSet()}
 hKpiSet();
 
 // ---- events + reports + charts
-const EV={harsh_braking:['Harsh braking','fa-hand','#d9534f','rd'],harsh_acceleration:['Harsh acceleration','fa-bolt','#f28c28','or'],overspeed:['Overspeed','fa-gauge-high','#2f7fe6','bl'],road_overspeed:['Road speed limit','fa-road','#9b51e0','pu']};
+const EV={harsh_braking:['Harsh braking','fa-hand','#d9534f','rd'],harsh_acceleration:['Harsh acceleration','fa-bolt','#f28c28','or'],overspeed:['Overspeed','fa-gauge-high','#2f7fe6','bl'],road_overspeed:['Road speed limit','fa-road','#9b51e0','pu'],
+ zone_enter:['Zone entered','fa-location-crosshairs','#27a46a','gr'],zone_exit:['Zone exited','fa-door-open','#0b9fb3','bl'],zone_overspeed:['Zone overspeed','fa-gauge-simple-high','#b85d00','or']};
 const EVX=t=>EV[t]||[t||'Event','fa-triangle-exclamation','#6b7a85','gy'];
 const evIcon=t=>L.divIcon({className:'',html:`<div class="mk sm" style="background:${EVX(t)[2]}"><i class="fa-solid ${EVX(t)[1]}"></i></div>`,iconSize:[20,20],iconAnchor:[10,10]});
 const evDur=x=>x.ended_at?(new Date(x.ended_at)-new Date(x.recorded_at))/1000:null;
@@ -598,7 +773,7 @@ async function loadRep(){
 // ---- theme, users, event rules, alerts
 function theme(){const d=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=d;localStorage.theme=d;themeBtn()}
 const mail=u=>u.includes('@')?u.trim():u.trim().toLowerCase()+'@fleet.local';
-async function addUser(e){e.preventDefault();
+async function addUser(e){e.preventDefault();if(!ADMIN)return toast('Only an admin can add accounts',1);
  const c=supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:false,autoRefreshToken:false,storageKey:'tmp-signup'}});
  const {data,error}=await c.auth.signUp({email:mail(e.target.u.value),password:e.target.p.value});
  if(error)return toast(error.message);
@@ -619,7 +794,7 @@ async function loadRules(){const {data}=await sb.from('event_rules').select('*')
  const num=(id,v,w,st)=>`<input type="number" step="${st||'any'}" min="0" id="${id}" value="${v??''}" style="width:${w||58}px">`;
  $('ruleT').innerHTML=`<table><tr><th>Event</th><th>Trigger limit</th><th>Tolerance (seconds)</th><th>Recorded</th><th>Visual alert</th><th>Buzzer alert</th><th>Buzzer seconds</th><th>Voice alert</th></tr>${(data||[]).map(r=>`<tr><td><b>${esc(r.label)}</b></td><td>${num('rt_'+r.type,r.threshold,66,'0.1')} <small>${UNIT[r.type]||''}</small></td><td>${num('rh_'+r.type,r.hold_s??0)}</td><td><input type="checkbox" id="re_${r.type}" ${r.enabled?'checked':''}></td><td><input type="checkbox" id="ra_${r.type}" ${r.alert?'checked':''}></td><td style="white-space:nowrap"><select id="bt_${r.type}" style="width:126px" onchange="toneSync(this)">${Object.entries(TONES).map(([k,n])=>`<option value="${k}" ${(r.beep_type||'discontinuous')===k?'selected':''}>${n}</option>`).join('')}</select><button type="button" class="play" onclick="tryTone('${r.type}')" title="Play this tone"><i class="fa-solid fa-play"></i></button></td><td class="bd">${num('bd_'+r.type,r.beep_duration??5)}</td><td style="white-space:nowrap"><select id="vl_${r.type}" style="width:96px" onchange="syncPl(this)">${vlOpts(r)}</select><button type="button" class="play" onclick="tryVoice('${r.type}')" title="Speak this message"><i class="fa-solid fa-volume-high"></i></button></td></tr>`).join('')}</table>`;
  [...$('ruleT').querySelectorAll('select')].forEach(s=>s.id.startsWith('bt_')?toneSync(s):s.id.startsWith('vl_')&&syncPl(s))}
-async function getSet(){const {data}=await sb.from('app_settings').select('*');SET={};(data||[]).forEach(x=>SET[x.key]=x.value);
+async function getSet(){const {data}=await sb.from('app_settings').select('*');SET={};(data||[]).forEach(x=>SET[x.key]=x.value);plLoad();
  const e=$('offH');if(e){e.value=OFFH();e.disabled=!ADMIN}}
 async function saveOff(){const h=Math.min(720,Math.max(0.5,+$('offH').value||24));$('offH').value=h;SET.offline_after_h=String(h);
  if(ADMIN){const {error}=await sb.from('app_settings').upsert({key:'offline_after_h',value:String(h)});if(error)return toast(error.message);logAct('Saved configuration','Offline threshold '+h+' h without a signal')}
@@ -627,6 +802,8 @@ async function saveOff(){const h=Math.min(720,Math.max(0.5,+$('offH').value||24)
 async function loadCfg(){await loadRules();await getSet();
  $('s_mov').value=SET.moving_interval||10;$('s_stp').value=SET.stopped_interval||60;
  $('sc_g').value=SET.score_green??1;$('sc_r').value=SET.score_red??3;
+ $('s_bb').checked=SET.bb_on!=='0';$('s_bbd').value=SET.bb_days||3;$('s_z').checked=SET.zones_on!=='0';
+ zTable();bbTable();
 
  const cols=[['speed_limit','Overspeed limit','km/h',RULES.overspeed?.threshold],['speed_buffer','Overspeed buffer','km/h',0],['brake_limit','Harsh braking','km/h/s',RULES.harsh_braking?.threshold],['accel_limit','Harsh accel.','km/h/s',RULES.harsh_acceleration?.threshold],['max_accel_warning','Warning level','km/h/s',0],['moving_interval','Record moving','seconds',SET.moving_interval||10],['stopped_interval','Record stopped','seconds',SET.stopped_interval||60],['min_moving_distance','Min. distance before events','metres',0],['fuel_moving','Fuel moving','L/100 km',''],['fuel_idle','Fuel idling','L/hour','']];
  $('cfgV').innerHTML=`<table><tr><th><input type="checkbox" onclick="selAllV(this)" title="Tick every vehicle"></th><th>Vehicle</th>${cols.map(c=>`<th>${c[1]}<br><small>${c[2]}${c[3]?' (default '+c[3]+')':''}</small></th>`).join('')}</tr>${vehicles.map(v=>{const cust=OV.some(k=>v[k]!=null&&v[k]!=='');
@@ -646,7 +823,7 @@ async function saveCfg(){if(!ADMIN)return;
   return{type:r.type,label:r.label,enabled:$('re_'+r.type).checked,threshold:+$('rt_'+r.type).value||null,hold_s:Math.max(0,+$('rh_'+r.type).value||0),alert:$('ra_'+r.type).checked,beep:bt!=='off',beep_duration:Math.max(1,Math.round(+$('bd_'+r.type).value||5)),beep_type:bt,voice:vl!=='off',...(hasVL?{voice_lang:vl}:{})}});
  const vls=rules.map(r=>r.voice_lang).filter(v=>v&&v!=='off');
  const byV={};document.querySelectorAll('#cfgV input[data-k]').forEach(i=>{(byV[i.dataset.v]??={})[i.dataset.k]=i.value===''?null:+i.value});
- const res=await Promise.all([sb.from('event_rules').upsert(rules),sb.from('app_settings').upsert([{key:'moving_interval',value:String(Math.max(1,+$('s_mov').value||10))},{key:'stopped_interval',value:String(Math.max(1,+$('s_stp').value||60))},{key:'score_green',value:String(Math.max(0,+$('sc_g').value||0))},{key:'score_red',value:String(Math.max(0,+$('sc_r').value||0))},{key:'voice_on',value:vls.length?'1':'0'},{key:'voice_lang',value:vls[0]||'en'}]),...Object.entries(byV).map(([id,o])=>sb.from('vehicles').update({...o,custom:OV.some(k=>o[k]!=null)}).eq('id',id))]);
+ const res=await Promise.all([sb.from('event_rules').upsert(rules),sb.from('app_settings').upsert([{key:'moving_interval',value:String(Math.max(1,+$('s_mov').value||10))},{key:'stopped_interval',value:String(Math.max(1,+$('s_stp').value||60))},{key:'score_green',value:String(Math.max(0,+$('sc_g').value||0))},{key:'score_red',value:String(Math.max(0,+$('sc_r').value||0))},{key:'voice_on',value:vls.length?'1':'0'},{key:'voice_lang',value:vls[0]||'en'},{key:'bb_on',value:$('s_bb').checked?'1':'0'},{key:'bb_days',value:String(Math.min(14,Math.max(1,+$('s_bbd').value||3)))},{key:'zones_on',value:$('s_z').checked?'1':'0'}]),...Object.entries(byV).map(([id,o])=>sb.from('vehicles').update({...o,custom:OV.some(k=>o[k]!=null)}).eq('id',id))]);
  const e=res.find(r=>r.error);if(e)return toast(e.error.message);
  logAct('Saved configuration','Limits '+rules.map(r=>r.label+' '+(r.threshold??'off')).join(', ')+'; recording '+$('s_mov').value+'/'+$('s_stp').value+' s; score bands '+$('sc_g').value+'-'+$('sc_r').value+'; voice '+(vls.length?vls.join('/'):'off')+'; '+Object.keys(byV).length+' vehicle row(s)');
  toast('Configuration saved. Phones apply it within 5 minutes or at the next trip start.',1);await refs();loadCfg()}
@@ -755,8 +932,54 @@ const DD=d=>`${p2(d.getDate())}/${p2(d.getMonth()+1)}/${d.getFullYear()}`;
 // ---- reverse geocoding, cached in localStorage so a repeated trip costs nothing
 const GC=JSON.parse(localStorage.gc||'{}');Object.keys(GC).forEach(k=>{if(!GC[k])delete GC[k]});localStorage.gc=JSON.stringify(GC);const GLI=5,NOM=Date.now();let NOMS=0;
 const gk=r=>(+r.lat).toFixed(4)+','+(+r.lng).toFixed(4);
-async function geoOne(k){if(GC[k])return GC[k];
- const [la,lo]=k.split(','),j=(u,o)=>fetch(u,o).then(r=>r.ok?r.json():null).catch(()=>null),nm=x=>{let y='';try{y=x()}catch(e){}return y&&String(y).replace(/\s+/g,' ').trim()};
+// ---- saved place names. A map service names a place from its own data, so a
+// private or newly built address usually reads wrong — a neighbour's building, or
+// a bare street number. A name saved here beats every provider and every cached
+// lookup: it is matched by distance, so it also fixes a spot the services ignore.
+let PLACES=[],PLI=null;
+function plLoad(){let a=[];try{a=JSON.parse(SET.places||'[]')}catch(e){}
+ PLACES=Array.isArray(a)?a.filter(x=>x&&x.n&&isFinite(+x.la)&&isFinite(+x.lo)):[];plTable()}
+// metres, accurate enough at the few-kilometre scale a radius works at
+const plDist=(a,b,c,d)=>Math.hypot((c-a)*111320*Math.cos(b*Math.PI/180),(d-b)*110540);
+const plRad=x=>Math.min(5000,Math.max(20,+x.r||150));
+function plNear(lat,lng){let best=null,bd=1e9;
+ PLACES.forEach(x=>{const d=plDist(lat,lng,+x.la,+x.lo);if(d<=plRad(x)&&d<bd){bd=d;best=x}});return best&&best.n}
+const plName=p=>plNear(+p.lat,+p.lng)||GC[gk(p)];
+function plTable(){const t=$('plT');if(!t)return;
+ t.innerHTML=`<table><tr><th>Name shown</th><th>Latitude</th><th>Longitude</th><th>Radius (m)</th><th></th></tr>${PLACES.map((x,i)=>`<tr><td><b>${esc(x.n)}</b></td><td>${(+x.la).toFixed(5)}</td><td>${(+x.lo).toFixed(5)}</td><td>${plRad(x)}</td><td style="text-align:right;white-space:nowrap"><button class="btn gh sm" onclick="plEdit(${i})"><i class="fa-solid fa-pen"></i>Edit</button> <button class="btn r sm" onclick="plDel(${i})"><i class="fa-solid fa-trash"></i>Delete</button></td></tr>`).join('')||'<tr><td colspan="5">No saved names yet. Add one and it is shown instead of the name the map services give.</td></tr>'}</table>`;
+ tools(t)}
+function plDlg(i,x){PLI={i:i??-1,...(x||{})};
+ $('plTitle').textContent=(i>=0?'Edit':'Add')+' a saved place name';
+ $('plN').value=PLI.n||'';$('plLa').value=PLI.la??'';$('plLo').value=PLI.lo??'';$('plR').value=PLI.r||150;
+ $('plDelB').classList.toggle('hide',i<0);$('pdlg').classList.add('on');$('plN').focus()}
+const plAdd=()=>plDlg(-1,{r:150});
+function plEdit(i){plDlg(i,PLACES[i])}
+const plHere=(la,lo)=>plDlg(-1,{n:'',la,lo,r:150});
+// close over the map so the spot can be clicked instead of typed
+function plPick(){const s={n:$('plN').value,la:null,lo:null,r:+$('plR').value||150},i=PLI?PLI.i:-1;
+ $('pdlg').classList.remove('on');switchTab('live');if(!mapL)return;
+ toast('Click the exact spot on the Live Tracking map',4);
+ mapL.once('click',e=>{s.la=+e.latlng.lat.toFixed(5);s.lo=+e.latlng.lng.toFixed(5);plDlg(i,s)})}
+async function plWrite(a){const {error}=await sb.from('app_settings').upsert({key:'places',value:JSON.stringify(a)});
+ if(error)return toast(error.message),false;SET.places=JSON.stringify(a);PLACES=a;plTable();return true}
+async function plSave(){if(!ADMIN)return;const n=$('plN').value.trim(),la=+$('plLa').value,lo=+$('plLo').value;
+ if(!n)return toast('Type the name this place should show',1);
+ if(!isFinite(la)||Math.abs(la)>90||!isFinite(lo)||Math.abs(lo)>180)return toast('Set the latitude and longitude first, or pick the spot on the map',1);
+ const x={n,la,lo,r:Math.min(5000,Math.max(20,+$('plR').value||150))},a=PLACES.slice(),i=PLI?PLI.i:-1;
+ if(i>=0)a[i]=x;else a.push(x);
+ if(!await plWrite(a))return;
+ $('pdlg').classList.remove('on');
+ logAct(i>=0?'Edited a place name':'Saved a place name',n+' at '+la.toFixed(5)+', '+lo.toFixed(5)+' ('+x.r+' m)');
+ toast('"'+n+'" is now used for that spot. Reload the page to correct names already on screen.',5)}
+async function plDel(i){const x=PLACES[i];if(!ADMIN||!x)return;
+ if(!confirm('Stop using the name "'+x.n+'"? The map services will name that place again.'))return;
+ const a=PLACES.slice();a.splice(i,1);
+ if(!await plWrite(a))return;logAct('Deleted a place name',x.n);toast('"'+x.n+'" removed',3)}
+async function geoOne(k){const [la,lo]=k.split(',');
+ // a saved name always wins, and never costs a request
+ const sv=plNear(+la,+lo);if(sv)return sv;
+ if(GC[k])return GC[k];
+ const j=(u,o)=>fetch(u,o).then(r=>r.ok?r.json():null).catch(()=>null),nm=x=>{let y='';try{y=x()}catch(e){}return y&&String(y).replace(/\s+/g,' ').trim()};
  // four free providers, tried in order; a name from any one of them is enough
  let o=await j('https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer/reverseGeocode?f=json&langCode=en&location='+lo+','+la);
  let x=nm(()=>{const a=(o&&o.address)||{};return a.Match_addr||[a.Address,a.City,a.Region].filter(Boolean).join(', ')});
@@ -767,7 +990,8 @@ async function geoOne(k){if(GC[k])return GC[k];
  // Nominatim bans a caller that exceeds 1 request/second, so the queue is gated
  if(Date.now()-NOMS<1100)await new Promise(r=>setTimeout(r,NOMS+1100-Date.now()));NOMS=Date.now();
  o=await j('https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=16&lat='+la+'&lon='+lo,{referrerPolicy:'origin'});
- x=nm(()=>o&&o.display_name);if(x)return GC[k]=x,save();
+ // the name a person would give the place beats the long postal address
+ x=nm(()=>o&&(o.name||o.display_name));if(x)return GC[k]=x,save();
  o=await j('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude='+la+'&longitude='+lo+'&localityLanguage=en');
  x=nm(()=>{const c=[o&&o.locality,o&&o.principalSubdivision,o&&o.countryName].filter(Boolean).join(', ');return (o&&(o.city||o.locality))&&c||o&&o.locality});
  if(x)return GC[k]=x,save();
@@ -784,15 +1008,15 @@ function geoVis(){const q=[];
  GQ=[...new Set(q.concat(rest))].slice(0,600);geoRun()}
 function trTable(){
  const H=['Date','Time','Vehicle Name','Driver Name','Vehicle Status','Location','Position','Accuracy (m)','Elevation (m)','Direction (°)','Ignition','Speed','Accel (km/h/s)','Battery (%)'];
- const R=r=>{const d=new Date(r.recorded_at);return [DD(d),d.toLocaleTimeString(),r.vehicle_name||'',r.driver_name||'',stt(r),GC[gk(r)]||'',(+r.lat).toFixed(5)+', '+(+r.lng).toFixed(5),r.accuracy??'',r.altitude!=null?Math.round(r.altitude):'',r.heading!=null?Math.round(r.heading):'',r.ignition===false?0:1,Math.round(r.speed||0),r.accel??'',r.battery_pct!=null?Math.round(r.battery_pct)+(r.charging?' ⚡':''):'']};
- $('trT').innerHTML=`<table><tr>${H.map(h=>`<th>${h}</th>`).join('')}</tr>${tr.slice(0,2000).map(r=>{const c=R(r);return `<tr>${c.map((v,i)=>`<td${i===GLI?' class="gx" data-gk="'+gk(r)+'"':''}>${i===GLI?(v||'…'):esc(v)}</td>`).join('')}</tr>`}).join('')}</table>`+(tr.length>2000?`<p style="padding:8px">Showing the first 2000 of ${tr.length} rows. Exports include all rows.</p>`:'');
+ const R=r=>{const d=new Date(r.recorded_at);return [DD(d),d.toLocaleTimeString(),r.vehicle_name||'',r.driver_name||'',stt(r),plName(r)||'',(+r.lat).toFixed(5)+', '+(+r.lng).toFixed(5),r.accuracy??'',r.altitude!=null?Math.round(r.altitude):'',r.heading!=null?Math.round(r.heading):'',r.ignition===false?0:1,Math.round(r.speed||0),r.accel??'',r.battery_pct!=null?Math.round(r.battery_pct)+(r.charging?' ⚡':''):'']};
+ $('trT').innerHTML=`<table><tr>${H.map(h=>`<th>${h}</th>`).join('')}</tr>${tr.slice(0,2000).map(r=>{const c=R(r);return `<tr>${c.map((v,i)=>`<td${i===GLI?' class="gx" data-gk="'+gk(r)+'"':''}>${i===GLI?(v?esc(v):'…'):esc(v)}</td>`).join('')}</tr>`}).join('')}</table>`+(tr.length>2000?`<p style="padding:8px">Showing the first 2000 of ${tr.length} rows. Exports include all rows.</p>`:'');
  tools($('trT'),{full:()=>({head:H,rows:tr.map(R)}),page:geoVis});geoVis()}
 // ---- shared tools: date ranges, tables, panels
 const PRE=[['today','Today'],['yest','Yesterday'],['24h','Last 24 hrs'],['lw','Last Week (previous Sun-Sat)'],['w','A week ago (last 7 days)'],['lm','Last Month (previous month)'],['m','A month ago (last 30 days)'],['ly','Last Year (previous year)'],['y','A year ago (last 365 days)'],['custom','Custom']];
 function range(k){const n=new Date(),y=n.getFullYear(),m=n.getMonth(),d=n.getDate(),D=(a,b,c,h=0,mi=0,se=0)=>new Date(a,b,c,h,mi,se);
  return {today:[D(y,m,d),n],yest:[D(y,m,d-1),D(y,m,d-1,23,59,59)],'24h':[new Date(n-864e5),n],lw:(()=>{const o=D(y,m,d).getDay();return [D(y,m,d-o-7),D(y,m,d-o-1,23,59,59)]})(),w:[new Date(n-7*864e5),n],lm:[D(y,m-1,1),D(y,m,0,23,59,59)],m:[new Date(n-30*864e5),n],ly:[D(y-1,0,1),D(y-1,11,31,23,59,59)],y:[new Date(n-365*864e5),n]}[k]}
 function setR(a,b,k){if(k==='custom')return;const r=range(k);$(a)._flatpickr.setDate(r[0],true);$(b)._flatpickr.setDate(r[1],true)}
-function initDates(){[['hf','ht','24h'],['ev_f','ev_to','w'],['tr_f','tr_t','custom'],['rp_f','rp_t','w'],['ac_f','ac_to','w']].forEach(([a,b,k])=>{
+function initDates(){[['hf','ht','24h'],['ev_f','ev_to','w'],['tr_f','tr_t','custom'],['rp_f','rp_t','w'],['ac_f','ac_to','w'],['bb_f','bb_t','custom']].forEach(([a,b,k])=>{
  const o={enableTime:true,enableSeconds:true,time_24hr:true,dateFormat:'Y-m-d\\TH:i:S',altInput:true,altFormat:'d/m/Y H:i:S',disableMobile:true};flatpickr('#'+a,o);flatpickr('#'+b,o);
  $(a).closest('.field').insertAdjacentHTML('beforebegin',`<div class="field"><label>Period</label><select onchange="setR('${a}','${b}',this.value)">${PRE.map(p=>`<option value="${p[0]}" ${p[0]===k?'selected':''}>${p[1]}</option>`).join('')}</select></div>`);
  if(k==='custom'){const n=new Date();$(a)._flatpickr.setDate(new Date(n-36e5));$(b)._flatpickr.setDate(n)}else setR(a,b,k)});
@@ -867,5 +1091,5 @@ function panels(sec){const g=document.querySelector('#'+sec+' .cgrid');if(!g)ret
 if(localStorage.user){$('em').value=localStorage.user;$('rem').checked=true}
 boot();
 // the driver app hands a session over in the URL fragment; once Supabase has read it, keep it out of the address bar and browser history
-setTimeout(()=>{if(/access_token=/.test(location.hash))history.replaceState(null,'',location.pathname+location.search)},2500);
+
 </script></body></html>
