@@ -60,6 +60,18 @@ jobs:
         run: |
           npm init -y
           npm i @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7 @capacitor/device@7 @capacitor/local-notifications@7 @capacitor/browser@7 @capacitor-community/background-geolocation@1.2.26 @capacitor-community/text-to-speech@6.1.0 esbuild
+          # The app has to open in a basement, a tunnel or a dead spot, so the map
+          # library, the database client and the icon font travel inside the APK
+          # instead of being fetched from a CDN at start-up. Pinned versions, taken
+          # from npm here; index.html falls back to the CDN if these are missing.
+          npm i --no-save leaflet@1.9.4 @supabase/supabase-js@2.45.4 @fortawesome/fontawesome-free@6.5.1
+          mkdir -p www/vendor/fa/css www/vendor/fa/webfonts
+          cp node_modules/leaflet/dist/leaflet.js www/vendor/leaflet.js
+          cp node_modules/leaflet/dist/leaflet.css www/vendor/leaflet.css
+          cp node_modules/@supabase/supabase-js/dist/umd/supabase.min.js www/vendor/supabase.js
+          cp node_modules/@fortawesome/fontawesome-free/css/all.min.css www/vendor/fa/css/all.min.css
+          cp node_modules/@fortawesome/fontawesome-free/webfonts/fa-*-*.woff2 www/vendor/fa/webfonts/
+          ls -l www/vendor www/vendor/fa/css www/vendor/fa/webfonts
           echo "import { registerPlugin } from '@capacitor/core';" > bridge.js
           echo "window.CapPlugins = { BG: registerPlugin('BackgroundGeolocation'), Device: registerPlugin('Device'), LN: registerPlugin('LocalNotifications'), Browser: registerPlugin('Browser'), TTS: registerPlugin('TextToSpeech') };" >> bridge.js
           npx esbuild bridge.js --bundle --minify --outfile=www/bridge.js
