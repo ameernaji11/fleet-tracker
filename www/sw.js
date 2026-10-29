@@ -10,9 +10,10 @@
  * they are there either way.
  */
 const TILES='fleet-tiles-v1', LIBS='fleet-libs-v1', TCAP=2000, LCAP=40;
-// Google's tiles for the map and the satellite view, plus any ordinary x/y/z tile
-// service: both are addressed by zoom, column and row.
-const isTile=u=>/\/vt\/lyrs=/.test(u)||/\/\d+\/\d+\/\d+\.(png|jpe?g|webp)/.test(u);
+// Google's tiles for the map and the satellite view, Esri's numbered tile path
+// (which has no file extension), and any ordinary x/y/z tile service addressed by
+// zoom, column and row: every style the app offers falls into one of these.
+const isTile=u=>/\/vt\/lyrs=/.test(u)||/\/tile\/\d+\/\d+\/\d+/.test(u)||/\/\d+\/\d+\/\d+\.(png|jpe?g|webp)/.test(u);
 // the CDN copies of the map library and the icon font, used only when the build
 // fell back to a CDN instead of the files bundled in the APK
 const isLib=u=>/^https:\/\/(cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net)\//.test(u);

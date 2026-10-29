@@ -43,6 +43,10 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.grid3 div{background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px 8px;min-width:0}.grid3 small{display:block;color:var(--mut);font-size:10px}.grid3 b{font-size:12px;white-space:nowrap}.grid3 .w2{grid-column:span 2}
 .btns{display:flex;gap:8px}.btns .btn{margin:0;height:48px}
 .mcl{position:absolute;z-index:999;right:8px;top:8px;display:flex;flex-direction:column;gap:6px}.mcl button{width:38px;height:38px;border:0;border-radius:10px;background:#fff;box-shadow:0 1px 6px #0004;color:var(--ink)}
+/* the style name has to be readable the moment the driver taps the layer button,
+   because a touch device never shows a button title - so it sits level with that
+   button (the second in the cluster) and just to the left of it */
+.layN{position:absolute;z-index:999;right:54px;top:53px;background:#fff;color:var(--ink);box-shadow:0 1px 6px #0004;border-radius:10px;padding:9px 11px;font-size:12px;font-weight:700;pointer-events:none;white-space:nowrap}
 /* grey squares with no signal are the map waiting for a tile, not a broken app:
    the driver is told, and the route, the zones and the vehicle still draw */
 .mn{position:absolute;z-index:998;left:8px;bottom:8px;max-width:calc(100% - 60px);background:#16222ce6;color:#fff;
@@ -87,7 +91,7 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 <div class="top"><div><small>Welcome,</small> <b id="wn"></b><b>!</b></div><div><button class="ib hide" id="dash" onclick="openDash()" title="Open dashboard"><i class="fa-solid fa-chart-line"></i></button><button class="ib" onclick="testAlert()" title="Test the buzzer and the voice alert"><i class="fa-solid fa-bell"></i></button><button class="ib" onclick="pwUi()" title="Change password"><i class="fa-solid fa-key"></i></button><button class="ib" onclick="signOut()" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i></button></div></div>
 <div class="card id"><div class="av" style="width:38px;height:38px;font-size:17px"><i id="vi" class="fa-solid fa-car"></i></div><div><b id="vn"></b><br><small><i class="fa-solid fa-id-card"></i> <span id="dn"></span></small><br><select id="pk" class="hide" onchange="pickV()" style="margin-top:6px;max-width:190px"></select></div><span class="chip" id="stc">Parking</span></div>
 <div class="card spd"><div><b id="sp">0</b><span>km/h</span></div><div class="pr"><small>Position</small><b id="v_pos">-</b><br><small id="lt">No record yet</small></div></div>
-<div id="map"><div id="fr"></div><div class="mn hide" id="mn"><i class="fa-solid fa-wifi"></i> No signal: this area was not cached, the route and zones are still drawn</div><div class="mcl"><button id="muteB" onclick="muteTog()" title="Mute the alerts"><i class="fa-solid fa-volume-high"></i></button><button onclick="togMap()" title="Satellite / map"><i class="fa-solid fa-layer-group"></i></button><button id="fsB" onclick="fsMap()" title="Full screen"><i class="fa-solid fa-expand"></i></button><button id="pinB" class="on" onclick="togPin()" title="Pin: keep the vehicle in the centre"><i class="fa-solid fa-thumbtack"></i></button></div></div>
+<div id="map"><div id="fr"></div><div class="mn hide" id="mn"><i class="fa-solid fa-wifi"></i> No signal: this area was not cached, the route and zones are still drawn</div><div class="layN hide" id="layN"></div><div class="mcl"><button id="muteB" onclick="muteTog()" title="Mute the alerts"><i class="fa-solid fa-volume-high"></i></button><button id="layB" onclick="togMap()" title="Map style"><i class="fa-solid fa-layer-group"></i></button><button id="fsB" onclick="fsMap()" title="Full screen"><i class="fa-solid fa-expand"></i></button><button id="pinB" class="on" onclick="togPin()" title="Pin: keep the vehicle in the centre"><i class="fa-solid fa-thumbtack"></i></button></div></div>
 <div class="grid3" id="vals"></div>
 <div class="btns"><button id="go" class="btn g" onclick="start()"><i class="fa-solid fa-play"></i>Start trip</button><button id="stp" class="btn r hide" onclick="stop()"><i class="fa-solid fa-stop"></i>End trip</button></div>
 <div class="foot">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</div>
@@ -210,7 +214,7 @@ async function signIn(){
     :'No internet, and this phone has not signed in as '+($('em').value.trim()||'that user')+' before. Sign in once with a signal, then it can let you in offline.');
    OFFFAIL=0;localStorage.offfail='0';await init(1,{id:c.i,email:c.e});return}
   const g=await lockCall('login_gate',em);
-  if(g&&g.locked)soft('Your account is locked after '+LOCK_AT+' wrong passwords. Please contact the administrator.');
+  if(g&&g.locked)soft('Your account is locked. Please contact the administrator.');
   let r;try{r=await Promise.race([sb.auth.signInWithPassword({email:em,password:$('pw').value}),
    new Promise((_,rej)=>{setTimeout(()=>rej(new Error('The server did not answer in time')),8e3)})])}
   // a late answer from a request that already timed out must not be read as a
@@ -285,12 +289,15 @@ async function init(fresh,who){
   else{try{const r=await sb.auth.getSession();s=r.data&&r.data.session}catch(e){}}}
  else{const w=who||cachedWho();if(w)s={user:w,offline:true}}
  if(!s)return;me=s.user;OFFL=!!s.offline;
- // the two things the administrator can do to an account from the Users page have
- // to be noticed here as well: a lock set while this phone was already signed in
- // ends the session on the spot, and a password they typed for the driver has to be
- // replaced before the app carries on. With no signal neither can be asked.
+ // the two things the administrator can do to an account have to be noticed here as
+ // well: a lock set while this phone was already signed in ends the session on the
+ // spot, and a password they typed for the driver has to be replaced before the app
+ // carries on. With no signal neither can be asked.
  if(!OFFL)try{const {data:a}=await sb.from('profiles').select('locked_at,must_change').eq('id',me.id).single();
-  if(a&&a.locked_at){await sb.auth.signOut();show('lg');$('err').textContent='Your account is locked. Please contact the administrator.';return}
+  // the lock is not named on the sign-in screen for simply opening the app - that
+  // sentence belongs to the moment the driver presses Sign in - and the phone loses
+  // its offline credential with it, so a lock cannot be signed around with no signal
+  if(a&&a.locked_at){await sb.auth.signOut();localStorage.removeItem('offl');show('lg');$('err').textContent='';return}
   if(a&&a.must_change)pwUi(1)}catch(e){}
  await outInit();
  await loadRules();
@@ -334,17 +341,32 @@ function lgHint(){const h=$('offh');if(h)h.classList.toggle('hide',navigator.onL
 setInterval(()=>{if(!document.hidden&&PEND&&!fl)flush()},60000);
 function enter(){show('app');initMap();showLast()}
 // ---- map
-let map,mrk,trail,tiles,sat=false,follow=true;
-const G=l=>'https://{s}.google.com/vt/lyrs='+l+'&x={x}&y={y}&z={z}';
+let map,mrk,trail,tiles,follow=true,MI=0;
+const G=l=>'https://{s}.google.com/vt/lyrs='+l+'&x={x}&y={y}&z={z}',GS={subdomains:['mt0','mt1','mt2','mt3']};
+// the same six styles the dashboard offers, in the same order, so a manager and a
+// driver are always looking at the same picture. OpenStreetMap is last on purpose:
+// that server blocked this app once, and if it blocks again the line below is the
+// only one to delete.
+const MAPS=[['Google Map',G('m'),'Map data © Google',20,GS],
+ ['Google Hybrid',G('y'),'Map data © Google',20,GS],
+ ['Google Satellite',G('s'),'Map data © Google',20,GS],
+ ['Esri Street Map','https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}','Tiles © Esri',19,null],
+ ['Esri Satellite','https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}','Tiles © Esri',20,null],
+ ['OpenStreetMap','https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png','© OpenStreetMap contributors',19,{subdomains:['a','b','c']}]];
 function initMap(){if(map)return;map=L.map('map',{zoomControl:false}).setView([23.6,58.5],12);map.on('dragstart',()=>{follow=false;pinUi()});
  document.addEventListener('fullscreenchange',()=>{topLift();const on=!!document.fullscreenElement,b=$('fsB');if(b){b.title=on?'Shrink back':'Full screen';const i=b.querySelector('i');if(i)i.className='fa-solid '+(on?'fa-minimize':'fa-expand')}setTimeout(()=>map.invalidateSize(),250)});
- tiles=L.tileLayer(G('m'),{maxZoom:20,subdomains:['mt0','mt1','mt2','mt3'],attribution:'Map data © Google'}).addTo(map);trail=L.polyline([],{color:'#2f7fe6',weight:4}).addTo(map);zDraw();setTimeout(()=>map.invalidateSize(),200);
- // a tile that will not arrive while there is no signal is expected, but it has to
- // be explained: the picture comes from the cache this app keeps of the areas the
- // driver has already driven through with internet
- tiles.on('tileerror',()=>{if(!navigator.onLine)$('mn').classList.remove('hide')});
- tiles.on('tileload',()=>{if(navigator.onLine)$('mn').classList.add('hide')})}
-function togMap(){sat=!sat;tiles.setUrl(G(sat?'y':'m'))}
+ MI=Math.min(MAPS.length-1,Math.max(0,+localStorage.mbase||0));tiles=lay(MI);trail=L.polyline([],{color:'#2f7fe6',weight:4}).addTo(map);zDraw();setTimeout(()=>map.invalidateSize(),200)}
+// a tile that will not arrive while there is no signal is expected, but it has to
+// be explained: the picture comes from the cache this app keeps of the areas the
+// driver has already driven through with internet
+function lay(i){const b=MAPS[i],t=L.tileLayer(b[1],{attribution:b[2],maxZoom:b[3],...(b[4]||{})}).addTo(map);
+ t.on('tileerror',()=>{if(!navigator.onLine)$('mn').classList.remove('hide')});
+ t.on('tileload',()=>{if(navigator.onLine)$('mn').classList.add('hide')});return t}
+let layT=0;
+function togMap(){if(!map)return;MI=(MI+1)%MAPS.length;localStorage.mbase=MI;
+ if(tiles)map.removeLayer(tiles);tiles=lay(MI);
+ // a touch device never shows a button title, so the name has to appear on screen
+ const n=$('layN');n.textContent=MAPS[MI][0];n.classList.remove('hide');clearTimeout(layT);layT=setTimeout(()=>n.classList.add('hide'),1600)}
 function fsMap(){document.fullscreenElement?document.exitFullscreen():$('map').requestFullscreen()}
 // A full-screen map is lifted out of the page into the browser's own top layer, so a
 // message that still hangs straight off the body - the alert banner and the error line -
