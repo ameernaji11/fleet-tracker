@@ -1,5 +1,5 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://overpass-api.de https://overpass.kumi.systems; media-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; media-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 
 <link rel="stylesheet" href="vendor/leaflet.css" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'">
@@ -33,9 +33,6 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 #app.screen{display:flex;flex-direction:column;height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));padding:8px 12px;gap:6px;overflow:hidden}#app.hide{display:none}
 #app .card{margin:0;padding:8px 10px}.top b{font-size:17px}.top small{font-size:11px}#app .foot{margin:0;font-size:10px}
 .spd{display:flex;align-items:center;gap:10px}.spd b{font-size:40px}.spd .pr{margin-left:auto;text-align:right;font-size:13px;color:var(--mut);min-width:0}.spd .pr b{display:block;font-size:15px;color:var(--ink);white-space:nowrap}
-.rl{position:absolute;z-index:999;left:8px;top:8px;width:42px;height:50px;background:#fff;border:2px solid #111;border-radius:6px;box-shadow:0 1px 6px #0005}
-.rl:before{content:"";position:absolute;top:2px;left:2px;right:2px;height:10px;background:#d9534f}
-.rl b{position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:19px}
 .mcl button.on{background:var(--bl);color:#fff}
 .mk.pulse{width:52px;height:52px;border:0;background:none;box-shadow:none;animation:pl .9s infinite alternate}
 @keyframes pl{50%{transform:scale(1.5);opacity:.45}}
@@ -89,7 +86,7 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 <div id="app" class="screen hide">
 <div class="top"><div><small>Welcome,</small> <b id="wn"></b><b>!</b></div><div><button class="ib hide" id="dash" onclick="openDash()" title="Open dashboard"><i class="fa-solid fa-chart-line"></i></button><button class="ib" onclick="testAlert()" title="Test the buzzer and the voice alert"><i class="fa-solid fa-bell"></i></button><button class="ib" onclick="pwUi()" title="Change password"><i class="fa-solid fa-key"></i></button><button class="ib" onclick="signOut()" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i></button></div></div>
 <div class="card id"><div class="av" style="width:38px;height:38px;font-size:17px"><i id="vi" class="fa-solid fa-car"></i></div><div><b id="vn"></b><br><small><i class="fa-solid fa-id-card"></i> <span id="dn"></span></small><br><select id="pk" class="hide" onchange="pickV()" style="margin-top:6px;max-width:190px"></select></div><span class="chip" id="stc">Parking</span></div>
-<div class="card spd"><div style="position:relative"><b id="sp">0</b><span>km/h</span><div class="rl hide" id="rl" title="Speed limit of this road"><b></b></div></div><div class="pr"><small>Position</small><b id="v_pos">-</b><br><small id="lt">No record yet</small></div></div>
+<div class="card spd"><div><b id="sp">0</b><span>km/h</span></div><div class="pr"><small>Position</small><b id="v_pos">-</b><br><small id="lt">No record yet</small></div></div>
 <div id="map"><div id="fr"></div><div class="mn hide" id="mn"><i class="fa-solid fa-wifi"></i> No signal: this area was not cached, the route and zones are still drawn</div><div class="mcl"><button id="muteB" onclick="muteTog()" title="Mute the alerts"><i class="fa-solid fa-volume-high"></i></button><button onclick="togMap()" title="Satellite / map"><i class="fa-solid fa-layer-group"></i></button><button id="fsB" onclick="fsMap()" title="Full screen"><i class="fa-solid fa-expand"></i></button><button id="pinB" class="on" onclick="togPin()" title="Pin: keep the vehicle in the centre"><i class="fa-solid fa-thumbtack"></i></button></div></div>
 <div class="grid3" id="vals"></div>
 <div class="btns"><button id="go" class="btn g" onclick="start()"><i class="fa-solid fa-play"></i>Start trip</button><button id="stp" class="btn r hide" onclick="stop()"><i class="fa-solid fa-stop"></i>End trip</button></div>
@@ -210,6 +207,8 @@ async function signIn(){
 async function signOut(){sessStop();await logAct('Signed out','Phone');
  localStorage.removeItem('offl');try{await sb.auth.signOut()}catch(e){}location.reload()}
 function pwUi(){const c=$('pwcard');c.classList.toggle('hide');const open=!c.classList.contains('hide');
+ // this panel takes the map's place on the screen, so a full-screen map steps back first
+ if(open&&document.fullscreenElement)document.exitFullscreen().catch(()=>{});
  // the app screen is fixed-height, so the map gives up its space while the panel is open
  $('map').classList.toggle('hide',open);
  if(open){$('np1').focus();return}
@@ -237,7 +236,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){sessStop()
  sessStart();if(Date.now()<ALRM)$('fr').classList.add('on');
  // coming back to the front: stop a tone whose deadline passed while we were away,
  // and push whatever the phone saved in the meantime
- toneEnd();outUi();if(PEND)flush()});
+ toneEnd();outUi();if(PEND)flush();maybeResume()});
 addEventListener('pagehide',sessStop);
 // A driver with no signal still has to be able to open the app, start a trip and be
 // warned. The session may be unreadable offline, so the last identity the phone proved
@@ -270,11 +269,9 @@ async function init(fresh,who){
  // 10 minutes — getSession() is what makes supabase-js refresh it early.
  setInterval(()=>{if(!document.hidden)sb.auth.getSession().catch(()=>{})},10*60*1000);
  // Android can hand back the same page after killing the process while a trip was
- // running; the driver must not have to notice, and must not have to press Start again
- const tr=tripRead();
- enter();
- if(tr&&asg?.vehicle_id===tr.v&&window.CapPlugins)start(1);
- else if(tr)tripClear()}
+ // running, and it can hand back a fresh one; either way the driver must not have to
+ // notice, and must not have to press Start again
+ enter();maybeResume()}
 // ---- the outbox at work: open it, carry over anything the older build left in
 // localStorage, and push again whenever the phone hears from the network
 async function outInit(){
@@ -287,7 +284,8 @@ addEventListener('online',async()=>{netUi();lgHint();banner('<i class="fa-solid 
  // sign-in: the server has to accept it again before anything can be uploaded
  if(OFFL){let s=null;try{const r=await sb.auth.getSession();s=r.data&&r.data.session}catch(e){}
   if(s&&s.user){me=s.user;OFFL=false;$('err').textContent='';outUi()}
-  else $('err').textContent='Signal is back. The trip and every record are safe on this phone until you sign in again.'}});
+  else $('err').textContent='Signal is back. The trip and every record are safe on this phone until you sign in again.'}
+ maybeResume()});
 addEventListener('offline',()=>{netUi();lgHint();banner('<i class="fa-solid fa-wifi"></i> No internet: keeping records on the phone',5000)});
 // the login screen says out loud what it can do without a signal
 function lgHint(){const h=$('offh');if(h)h.classList.toggle('hide',navigator.onLine)}
@@ -299,7 +297,7 @@ function enter(){show('app');initMap();showLast()}
 let map,mrk,trail,tiles,sat=false,follow=true;
 const G=l=>'https://{s}.google.com/vt/lyrs='+l+'&x={x}&y={y}&z={z}';
 function initMap(){if(map)return;map=L.map('map',{zoomControl:false}).setView([23.6,58.5],12);map.on('dragstart',()=>{follow=false;pinUi()});
- document.addEventListener('fullscreenchange',()=>{const on=!!document.fullscreenElement,b=$('fsB');if(b){b.title=on?'Shrink back':'Full screen';const i=b.querySelector('i');if(i)i.className='fa-solid '+(on?'fa-minimize':'fa-expand')}setTimeout(()=>map.invalidateSize(),250)});
+ document.addEventListener('fullscreenchange',()=>{topLift();const on=!!document.fullscreenElement,b=$('fsB');if(b){b.title=on?'Shrink back':'Full screen';const i=b.querySelector('i');if(i)i.className='fa-solid '+(on?'fa-minimize':'fa-expand')}setTimeout(()=>map.invalidateSize(),250)});
  tiles=L.tileLayer(G('m'),{maxZoom:20,subdomains:['mt0','mt1','mt2','mt3'],attribution:'Map data © Google'}).addTo(map);trail=L.polyline([],{color:'#2f7fe6',weight:4}).addTo(map);zDraw();setTimeout(()=>map.invalidateSize(),200);
  // a tile that will not arrive while there is no signal is expected, but it has to
  // be explained: the picture comes from the cache this app keeps of the areas the
@@ -308,6 +306,21 @@ function initMap(){if(map)return;map=L.map('map',{zoomControl:false}).setView([2
  tiles.on('tileload',()=>{if(navigator.onLine)$('mn').classList.add('hide')})}
 function togMap(){sat=!sat;tiles.setUrl(G(sat?'y':'m'))}
 function fsMap(){document.fullscreenElement?document.exitFullscreen():$('map').requestFullscreen()}
+// A full-screen map is lifted out of the page into the browser's own top layer, so a
+// message that still hangs straight off the body - the alert banner and the error line -
+// paints UNDER the map and the driver never sees it until the map is shrunk again.
+// Handing those two to the full-screen element while it lasts, and back when it ends,
+// keeps every warning above the map he is looking at. A press on a banner that now sits
+// inside the map must not drag the map out of position with it.
+const TOPS=['alert','err'];
+function topLift(){const f=document.fullscreenElement;
+ TOPS.forEach(id=>{const el=$(id);if(!el)return;
+  if(!f){if(el._home&&el.parentElement!==el._home)el._home.appendChild(el);return}
+  if(el.parentElement===f)return;
+  if(!el._home)el._home=el.parentElement;
+  if(!el._tl){el._tl=1;['pointerdown','mousedown','touchstart','wheel','dblclick']
+   .forEach(ev=>el.addEventListener(ev,e=>e.stopPropagation(),{passive:true}))}
+  f.appendChild(el)})}
 function pinUi(){const b=$('pinB');b.classList.toggle('on',follow);
  b.title=follow?'Pin on: the map follows the vehicle. Drag the map to unpin.':'Pin off: press to follow the vehicle'}
 function togPin(){follow=!follow;pinUi();if(follow&&mrk)map.setView(mrk.getLatLng(),Math.max(map.getZoom(),16))}
@@ -329,7 +342,7 @@ function alertRing(){ALRM=Date.now()+8000;$('fr').classList.add('on');if(mrk)mrk
 async function pAsk(){try{const id=await CapPlugins.BG.addWatcher({requestPermissions:true,backgroundTitle:'Fleet Tracker',backgroundMessage:'Checking permissions'},()=>{});setTimeout(()=>CapPlugins.BG.removeWatcher({id}),3000)}catch(e){$('err').textContent='Location: '+(e.message||e)}
  await askNotif()}
 // ---- alerts on the phone
-let RUL={};const EVN={harsh_braking:'Harsh braking',harsh_acceleration:'Harsh acceleration',overspeed:'Overspeed',road_overspeed:'Road speed limit',zone_enter:'Entered zone',zone_exit:'Left zone',zone_overspeed:'Zone overspeed'};
+let RUL={};const EVN={harsh_braking:'Harsh braking',harsh_acceleration:'Harsh acceleration',overspeed:'Overspeed',zone_enter:'Entered zone',zone_exit:'Left zone',zone_overspeed:'Zone overspeed'};
 // Alerts must be audible even when the driver never opened the Permissions screen, so every
 // trip start re-asks for notification permission and registers the loud channel it posts to.
 let CHAN=false;
@@ -369,10 +382,10 @@ async function askNotif(){await logAct('Allowed permissions');
 // the on/off switches come from the dashboard Configuration page.
 const VLANG={en:['English','en-US'],ar:['Arabic','ar-SA'],hi:['Hindi','hi-IN'],ur:['Urdu','ur-PK']};
 const VMSG={
- en:{overspeed:'You are over the speed limit. Please slow down.',road_overspeed:'You are over the speed limit for this road. Please slow down.',harsh_braking:'Harsh braking detected. Keep a safe distance and brake gently.',harsh_acceleration:'Harsh acceleration detected. Please accelerate smoothly.',zone_enter:'You have entered a restricted zone.',zone_exit:'You have left the zone.',zone_overspeed:'You are over the speed limit for this zone. Please slow down.'},
- ar:{overspeed:'لقد تجاوزت حد السرعة. يرجى تخفيف السرعة.',road_overspeed:'لقد تجاوزت السرعة المحددة لهذا الطريق. يرجى تخفيف السرعة.',harsh_braking:'تم رصد فرملة قوية. حافظ على مسافة آمنة واضغط على الفرامل بهدوء.',harsh_acceleration:'تم رصد تسارع قوي. يرجى التسارع بسلاسة.',zone_enter:'لقد دخلت المنطقة المحددة.',zone_exit:'لقد غادرت المنطقة المحددة.',zone_overspeed:'لقد تجاوزت السرعة المحددة داخل هذه المنطقة. يرجى تخفيف السرعة.'},
- hi:{overspeed:'आप गति सीमा से ऊपर हैं। कृपया गति कम करें।',road_overspeed:'आप इस सड़क की गति सीमा से ऊपर हैं। कृपया गति कम करें।',harsh_braking:'तेज़ ब्रेक लगाया गया। सुरक्षित दूरी रखें और धीरे ब्रेक लगाएँ।',harsh_acceleration:'तेज़ रफ़्तार पकड़ी गई। कृपया धीरे-धीरे गति बढ़ाएँ।',zone_enter:'आप निर्धारित क्षेत्र में प्रवेश कर गए हैं।',zone_exit:'आप निर्धारित क्षेत्र से बाहर निकल गए हैं।',zone_overspeed:'इस क्षेत्र की गति सीमा से ऊपर चल रहे हैं। कृपया गति कम करें।'},
- ur:{overspeed:'آپ رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',road_overspeed:'آپ اس سڑک کی رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',harsh_braking:'سخت بریک لگائی گئی۔ محفوظ فاصلہ رکھیں اور آہستہ بریک لگائیں۔',harsh_acceleration:'تیز رفتاری پکڑی گئی۔ براہ کرم آہستہ آہستہ رفتار بڑھائیں۔',zone_enter:'آپ مقررہ علاقے میں داخل ہو گئے ہیں۔',zone_exit:'آپ مقررہ علاقے سے باہر نکل گئے ہیں۔',zone_overspeed:'اس علاقے کی رفتار کی حد سے اوپر جا رہے ہیں۔ براہ کرم رفتار کم کریں۔'}};
+ en:{overspeed:'You are over the speed limit. Please slow down.',harsh_braking:'Harsh braking detected. Keep a safe distance and brake gently.',harsh_acceleration:'Harsh acceleration detected. Please accelerate smoothly.',zone_enter:'You have entered a restricted zone.',zone_exit:'You have left the zone.',zone_overspeed:'You are over the speed limit for this zone. Please slow down.'},
+ ar:{overspeed:'لقد تجاوزت حد السرعة. يرجى تخفيف السرعة.',harsh_braking:'تم رصد فرملة قوية. حافظ على مسافة آمنة واضغط على الفرامل بهدوء.',harsh_acceleration:'تم رصد تسارع قوي. يرجى التسارع بسلاسة.',zone_enter:'لقد دخلت المنطقة المحددة.',zone_exit:'لقد غادرت المنطقة المحددة.',zone_overspeed:'لقد تجاوزت السرعة المحددة داخل هذه المنطقة. يرجى تخفيف السرعة.'},
+ hi:{overspeed:'आप गति सीमा से ऊपर हैं। कृपया गति कम करें।',harsh_braking:'तेज़ ब्रेक लगाया गया। सुरक्षित दूरी रखें और धीरे ब्रेक लगाएँ।',harsh_acceleration:'तेज़ रफ़्तार पकड़ी गई। कृपया धीरे-धीरे गति बढ़ाएँ।',zone_enter:'आप निर्धारित क्षेत्र में प्रवेश कर गए हैं।',zone_exit:'आप निर्धारित क्षेत्र से बाहर निकल गए हैं।',zone_overspeed:'इस क्षेत्र की गति सीमा से ऊपर चल रहे हैं। कृपया गति कम करें।'},
+ ur:{overspeed:'آپ رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',harsh_braking:'سخت بریک لگائی گئی۔ محفوظ فاصلہ رکھیں اور آہستہ بریک لگائیں۔',harsh_acceleration:'تیز رفتاری پکڑی گئی۔ براہ کرم آہستہ آہستہ رفتار بڑھائیں۔',zone_enter:'آپ مقررہ علاقے میں داخل ہو گئے ہیں۔',zone_exit:'آپ مقررہ علاقے سے باہر نکل گئے ہیں۔',zone_overspeed:'اس علاقے کی رفتار کی حد سے اوپر جا رہے ہیں۔ براہ کرم رفتار کم کریں۔'}};
 const vrMsg=(t,l)=>(VMSG[l]||VMSG.en)[t]||VMSG.en[t]||'';
 // the WebView's own speechSynthesis is unreliable on Android, so the native
 // text-to-speech plugin is tried first and the browser voice is the fallback.
@@ -438,35 +451,7 @@ function testAlert(){const R=RUL.overspeed||{};
 // ---- driving events and telemetry
 const MIN_MOVING_KMH=2;
 const sepm=(a,b)=>{const r=x=>x*Math.PI/180,dLa=r(b.latitude-a.latitude),dLo=r(b.longitude-a.longitude),x=Math.sin(dLa/2)**2+Math.cos(r(a.latitude))*Math.cos(r(b.latitude))*Math.sin(dLo/2)**2;return 12742000*Math.asin(Math.sqrt(x))};
-let V={voice_on:1,lang:'en',zones_on:1,bb_on:1,bb_days:3};const LIM={speed:100,brake:-3,accel:2.5,buf:0,warn:0,dist:0,rbuf:0,zbuf:0},HOLD={harsh_braking:0,harsh_acceleration:0,overspeed:0,road_overspeed:0,zone_overspeed:0},ON={},lastEv={},lastNotify={},VS={},ANN={};let prev=null,lastA=0,lastLoc=null,ODOM=0,pp=null,bat={},fl=false,batT,cfgT,MOV=10,STP=60;
-let ROAD=null,RT=0,RS=0,ROQP=false;
-// ---- the signed limit of the road being driven on. OpenStreetMap keeps a
-// maxspeed tag on mapped roads; Overpass is free and needs no key, so the phone
-// asks it at most every 20 s and only after moving 150 m. An unmapped or
-// untagged road leaves ROAD null, which simply means no road-limit event.
-const OSM=(a,b,c,d)=>{const r=x=>x*Math.PI/180,f=r(a),g=r(c),dl=r(b-a),h=Math.sin(f)*Math.sin(g)+Math.cos(f)*Math.cos(g)*Math.cos(dl);
- return 6371000*Math.acos(Math.min(1,h))+(d||0)};
-function toKmh(v){const m=/^(\d+(?:\.\d+)?)\s*(mph)?$/i.exec(String(v).trim());if(!m)return null;
- return Math.round(m[2]?+m[1]*1.60934:+m[1])}
-async function roadLimit(lat,lng){
- const q='[out:json][timeout:10];way(around:60,'+lat+','+lng+')[highway][maxspeed];out tags geom;';
- let j=null;
- for(const u of ['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter']){
-  try{const r=await fetch(u,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'data='+encodeURIComponent(q)});
-   if(r.ok){j=await r.json();break}}catch(e){}}
- let best=null,bd=1e9;
- ((j&&j.elements)||[]).forEach(el=>{const km=toKmh(el.tags&&el.tags.maxspeed);if(!km||km<5||km>200)return;
-  const g=(el.geometry||[]).map(x=>[x.lat,x.lng]);
-  for(let i=1;i<g.length;i++){const d=OSM(g[i-1][0],g[i-1][1],g[i][0],g[i][1],
-   OSM(g[i-1][0],g[i-1][1],lat,lng)+OSM(g[i][0],g[i][1],lat,lng)-OSM(g[i-1][0],g[i-1][1],g[i][0],g[i][1]));
-   if(d<bd){bd=d;best=km}}})
- // only trust a road within 30 m, otherwise a quieter side street's limit would
- // be blamed on the motorway the vehicle is really on
- if(ROAD!==best){ROAD=bd<=30?best:null;rlUi()}}
-function rlUi(){const s=$('rl');if(!s)return;
- if(ROAD==null){s.classList.add('hide');return}
- s.classList.remove('hide');s.textContent=Math.round(ROAD)}
-
+let V={voice_on:1,lang:'en',zones_on:1,bb_on:1,bb_days:3};const LIM={speed:100,brake:-3,accel:2.5,buf:0,warn:0,dist:0,zbuf:0},HOLD={harsh_braking:0,harsh_acceleration:0,overspeed:0,zone_overspeed:0},ON={},lastEv={},lastNotify={},VS={},ANN={};let prev=null,lastA=0,lastLoc=null,ODOM=0,pp=null,bat={},fl=false,batT,cfgT,MOV=10,STP=60;
 // ---- geofences. An admin draws these on the dashboard's Live Tracking map and
 // gives each one a speed limit; the phone reads the shapes, tests every fix against
 // them and reports driving in, driving out or passing the zone's own limit.
@@ -503,7 +488,7 @@ function zonesCheck(loc,kmh,t){
   // say nothing about a crossing that happened while the phone was quiet
   if(was===undefined)return;
   if(on&&!was){if(z.enter!==false)zEv('zone_enter',z,loc,kmh)}else if(!on&&was){if(z.exit!==false)zEv('zone_exit',z,loc,kmh)}});
- // overspeed inside a zone rides the same breach machinery as the road limit, so it
+ // overspeed inside a zone rides the same breach machinery as the fleet limit, so it
  // keeps the driver's alert, the tolerance window and the open/close event row
  ZNA=tight&&+tight.speed_limit>0?{lim:+tight.speed_limit,name:tight.name||'zone'}:null;
  hold('zone_overspeed',!!ZNA&&kmh>ZNA.lim+LIM.zbuf,loc,kmh,kmh,t)}
@@ -516,9 +501,6 @@ function detect(loc,kmh){
  if(loc.accuracy>25)return;
  if(pp){const d=sepm(pp,loc);if(d<200)ODOM+=d}
  pp=loc;
- // the signed limit of the road we are on, refreshed as the vehicle moves
- if(ON.road_overspeed&&kmh>10&&!ROQP&&kmh>=MIN_MOVING_KMH){const n=Date.now();
-  if(!RT||n-RT>20000){RT=n;RS=ODOM;ROQP=roadLimit(loc.latitude,loc.longitude).then(()=>{ROQP=false})}}
  if(ODOM<LIM.dist)return;
  const t=(loc.time||Date.now())/1000,v=kmh/3.6;
  if(prev&&t-prev.t>=0.8&&t-prev.t<=4){const a=(v-prev.v)/(t-prev.t);lastA=a;
@@ -526,7 +508,6 @@ function detect(loc,kmh){
   if(LIM.warn>0&&Math.abs(a)>=LIM.warn&&Math.abs(a)<(a<0?-LIM.brake:LIM.accel))warnMsg('Sharp '+(a<0?'braking':'acceleration')+' · '+Math.abs(a*3.6).toFixed(1)+' km/h/s')}
  if(!prev||t-prev.t>=0.8)prev={t,v};
  hold('overspeed',kmh>LIM.speed+LIM.buf,loc,kmh,kmh,t);
- if(ROAD)hold('road_overspeed',kmh>ROAD+LIM.rbuf,loc,kmh,kmh,t);
  if(ZONES.length)zonesCheck(loc,kmh,t);
  // write the row once the breach has outlasted its tolerance time
  Object.keys(VS).forEach(k=>{const b=VS[k];if(b&&RST[k]==null&&t-b.t>=(HOLD[k]||0))ev(k)})}
@@ -541,9 +522,8 @@ function hold(type,bad,loc,kmh,val,t){if(!ON[type])return;
   // so it is pushed and flushed instead of waiting for the next sampling tick
   lastLoc=loc;outAdd({t:'pos',p:row(loc,Math.round(kmh),true)});flush()}
  else if(Math.abs(val)>Math.abs(VS[type].peak))VS[type].peak=val}
-const isSp=t=>t==='overspeed'||t==='road_overspeed'||t==='zone_overspeed';
+const isSp=t=>t==='overspeed'||t==='zone_overspeed';
 const evLvl=type=>type==='overspeed'?Math.round(LIM.speed+LIM.buf)+' km/h':
- type==='road_overspeed'?(ROAD!=null?Math.round(ROAD+LIM.rbuf)+' km/h':'the road limit'):
  type==='zone_overspeed'?(ZNA?Math.round(ZNA.lim+LIM.zbuf)+' km/h in '+ZNA.name:'the zone limit'):
  Math.abs(+(type==='harsh_braking'?LIM.brake:LIM.accel)*3.6).toFixed(1)+' km/h/s';
 function evTxt(type,kmh,val,peak,lvl,dur){
@@ -552,7 +532,8 @@ function evTxt(type,kmh,val,peak,lvl,dur){
 // one duration format for the whole system: hh:mm:ss, hours can pass 24
 const hms=x=>{x=Math.max(0,Math.round(x||0));const p=n=>String(n).padStart(2,'0');return p(Math.floor(x/3600))+':'+p(Math.floor(x%3600/60))+':'+p(x%60)};
 function ev(type){const b=VS[type];if(!b)return;RST[type]='';
- const lvl=evLvl(type),loc=b.loc,road=type==='road_overspeed'?Math.round(ROAD||0):type==='zone_overspeed'?(ZNA?Math.round(ZNA.lim):null):null;
+ // the limit that applied to this breach: only a zone has one of its own now
+ const lvl=evLvl(type),loc=b.loc,lim=type==='zone_overspeed'?(ZNA?Math.round(ZNA.lim):null):null;
  if(!ANN[type])notify(type,b.kmh,lvl);ANN[type]=false;
  // every reading of the fix that opened the breach is stored with the event, so
  // the dashboard popup and report need no second query. The phone names the row
@@ -563,7 +544,7 @@ function ev(type){const b=VS[type];if(!b)return;RST[type]='';
   speed:Math.round(b.kmh),value:+(isSp(type)?b.kmh:b.val).toFixed(1),
   details:evTxt(type,b.kmh,b.val,b.peak,lvl),recorded_at:new Date(loc.time||b.t*1000).toISOString(),
   accuracy:loc.accuracy,altitude:loc.altitude,heading:loc.bearing,accel:+(lastA*3.6).toFixed(1),
-  battery_pct:bat.p,charging:bat.c,ignition:true,road_limit:road}});
+  battery_pct:bat.p,charging:bat.c,ignition:true,road_limit:lim}});
  RST[type]=id;flush()}
 function endEv(type,t){const b=VS[type];if(!b)return;VS[type]=null;
  const dur=Math.max(0,t-b.t),id=RST[type];
@@ -606,11 +587,13 @@ function applyCfg(a,r,t,g){
   if(x.type==='overspeed'){LIM.speed=v.speed_limit||x.threshold;LIM.buf=Math.max(0,+v.speed_buffer||0);HOLD.overspeed=h}
   if(x.type==='harsh_braking'){LIM.brake=-(v.brake_limit||x.threshold)/3.6;HOLD.harsh_braking=h}
   if(x.type==='harsh_acceleration'){LIM.accel=(v.accel_limit||x.threshold)/3.6;HOLD.harsh_acceleration=h}
-   if(x.type==='road_overspeed'){LIM.rbuf=Math.max(0,+x.threshold||0);HOLD.road_overspeed=h}
-   // a zone's own limit plus the km/h allowed over it, the same way a road limit works
+   // a zone's own limit plus the km/h allowed over it
    if(x.type==='zone_overspeed'){LIM.zbuf=Math.max(0,+x.threshold||0);HOLD.zone_overspeed=h}});
  LIM.warn=Math.max(0,+v.max_accel_warning||0);LIM.dist=Math.max(0,+v.min_moving_distance||0);
- MOV=Math.max(1,v.moving_interval||S.moving_interval||10);STP=Math.max(1,v.stopped_interval||S.stopped_interval||60)}
+ MOV=Math.max(1,v.moving_interval||S.moving_interval||10);STP=Math.max(1,v.stopped_interval||S.stopped_interval||60);
+ // the setup is what a resumed trip was waiting for: an app that restarted with no
+ // signal, or with the settings query still running, can only start again from here
+ if(map&&!watcher)maybeResume()}
 // a failed query answers, it never throws: PostgREST can reject, and offline the
 // fetch itself rejects, and neither may take the trip down with it
 const q=p=>p?Promise.resolve(p).then(x=>({data:x.data,error:x.error}),()=>({data:null,error:{message:'no network'}})):{data:null,error:null};
@@ -666,10 +649,27 @@ function netUi(why){const t=$('v_sent');if(!t)return;
  if(!navigator.onLine){t.textContent='⚠ '+(PEND||0);t.title='No internet - '+PEND+' records waiting on the phone';return}
  if(why)t.title=why;outUi()}
 // a trip the phone never got to finish: kept so that opening the app again after a
-// crash, an update or a swipe-away resumes tracking instead of waiting for the driver
-async function tripSave(){try{localStorage.trip=JSON.stringify({v:asg?.vehicle_id,t:Date.now()})}catch(e){}}
+// crash, an update, a phone call or a swipe-away resumes tracking instead of waiting
+// for the driver. `t` is when the trip began, `u` the last fix that reached it, and
+// `o` the distance already driven, so a resumed trip keeps its own odometer.
+let SRT=false,SGEN=0,TS_TRIP=0;
+async function tripSave(){try{const t=tripRead();
+ localStorage.trip=JSON.stringify({v:asg?.vehicle_id,t:t&&t.v===asg?.vehicle_id?+t.t||Date.now():Date.now(),u:Date.now(),o:ODOM})}catch(e){}}
 const tripRead=()=>{try{const t=JSON.parse(localStorage.trip||'null');return t&&t.v?t:null}catch(e){return null}};
 function tripClear(){localStorage.removeItem('trip')}
+// Android ends this app's process for a phone or video call, or simply to get the
+// memory back, and the driver used to come back to a finished-looking trip he had to
+// start again by hand. Nothing here stops a trip: the marker stays on the phone and
+// tracking restarts by itself as soon as the app can see its own setup again - after
+// a sign-in, after the settings load, when the signal returns, or when he comes back
+// to the app. Only an End trip press, another vehicle, or a trip untouched for 12
+// hours clears it.
+async function maybeResume(){
+ if(!map||!me||watcher||SRT||document.hidden||!window.CapPlugins||!asg?.vehicle_id)return;
+ const tr=tripRead();if(!tr)return;
+ if(asg.vehicle_id!==tr.v||Date.now()-(+tr.u||+tr.t||0)>12*3600e3){tripClear();return}
+ await start(1);
+ if(watcher)banner('<i class="fa-solid fa-road"></i> Trip picked back up - the phone closed the app while you were driving',7000)}
 // ---- blackbox. Every fix the location watcher delivers (about one per second on
 // the move) is stored on the handset in IndexedDB and never uploaded, so the server
 // keeps only the sampled stream. An admin asks for a window of time on the Vehicles
@@ -799,19 +799,26 @@ async function showLast(){if(!asg?.vehicle_id)return;
  if(map){if(follow)map.setView(ll,Math.max(map.getZoom(),15));trail.addLatLng(ll)}}
 async function start(quiet){
  if(!asg?.vehicle_id){$('err').textContent='No vehicle linked to this user. Ask your admin.';return}
- if(watcher)return;
+ if(watcher||SRT)return;
+ SRT=true;const myGen=++SGEN;
  try{
- await loadRules();pollBat();batT=setInterval(pollBat,30000);cfgT=setInterval(loadRules,300000);prev=null;pp=null;HSENT=null;ODOM=0;Object.keys(VS).forEach(k=>VS[k]=0);Object.keys(RST).forEach(k=>RST[k]=null);
- // a new trip starts from a clean map: no stale road limit or alert timer
- ROAD=null;RT=RS=0;rlUi();Object.keys(lastNotify).forEach(k=>lastNotify[k]=0);
+ await loadRules();pollBat();batT=setInterval(pollBat,30000);cfgT=setInterval(loadRules,300000);prev=null;pp=null;HSENT=null;ODOM=quiet?Math.max(0,+(tripRead()?.o||0)):0;TS_TRIP=0;Object.keys(VS).forEach(k=>VS[k]=0);Object.keys(RST).forEach(k=>RST[k]=null);
+ // a new trip starts from a clean slate: no alert left remembered as already buzzed
+ Object.keys(lastNotify).forEach(k=>lastNotify[k]=0);
  if(!window.CapPlugins)throw new Error('Plugin bridge missing: rebuild the APK with the latest build-apk.yml');
  watcher=await CapPlugins.BG.addWatcher({backgroundTitle:quiet?'Trip resumed':'Trip in progress',backgroundMessage:'Sending location to fleet dashboard',requestPermissions:true,stale:false,distanceFilter:0},
  async(loc,err)=>{
+  // a fix delivered by a watcher this page has already stopped must not write a
+  // position, and above all must not bring back the trip the driver ended
+  if(myGen!==SGEN)return;
   if(err){if(err.code==='NOT_AUTHORIZED')$('err').textContent='Allow location "All the time" in app settings (Permissions button).';return}
   const kmh=Math.max(0,(loc.speed||0)*3.6),moving=kmh>=MIN_MOVING_KMH,every=(moving?MOV:STP)*1000,n=Date.now();
   // the tone stops on its own deadline even if Android froze the timer that was
   // supposed to stop it, because these callbacks are what keep this page alive
   toneEnd();
+  // keep the trip marker fresh: it is the only thing that survives a process
+  // Android kills, and its timestamp is what says "this trip was still running"
+  if(n-TS_TRIP>60000){TS_TRIP=n;tripSave()}
   // the blackbox takes every fix, before the upload throttle below drops most
   bbPut(bbPack(loc,kmh));
   // detect first: the Accel. tile then shows the value that just triggered the alert
@@ -830,9 +837,9 @@ async function start(quiet){
  await askNotif();
  if(!navigator.onLine)banner('<i class="fa-solid fa-wifi"></i> No internet: records are kept on the phone and sent later',7000);
  }catch(e){$('err').textContent='Error: '+(e.message||e)}
-}
-async function stop(){stopTone();clearInterval(batT);clearInterval(cfgT);prev=null;pp=null;closeAll(Date.now()/1000);
- Object.keys(VS).forEach(k=>VS[k]=0);ROAD=null;RT=RS=0;rlUi();tripClear();
+ SRT=false}
+async function stop(){SGEN++;stopTone();clearInterval(batT);clearInterval(cfgT);prev=null;pp=null;closeAll(Date.now()/1000);
+ Object.keys(VS).forEach(k=>VS[k]=0);tripClear();
  if(lastLoc)outAdd({t:'pos',p:row(lastLoc,0,false)});flush();
  logAct('Ended trip',(asg?.vehicles?.name||'')+(lastLoc?' at '+lastLoc.latitude.toFixed(5)+', '+lastLoc.longitude.toFixed(5):''));
  if(watcher){await CapPlugins.BG.removeWatcher({id:watcher});watcher=null}
