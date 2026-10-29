@@ -73,7 +73,8 @@ td select{height:36px}#evt,#rep,#trip,#cfg,#hist{height:auto;min-height:100%}.cg
 .mk{width:32px;height:32px;border-radius:50%;border:3px solid #fff;box-shadow:0 1px 6px #0006;display:grid;place-items:center;color:#fff;font-size:13px}
 #login{margin:auto;width:340px;padding:28px;display:flex;flex-direction:column;gap:14px;text-align:center}.lgname{font-weight:900;font-size:22px;letter-spacing:.2px}
 .err{color:var(--rd);min-height:18px;margin:0;font-weight:600}
-#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:10px 18px;border-radius:10px;color:#fff;font-weight:700;opacity:0;pointer-events:none;transition:opacity .2s}#toast.show{opacity:1}#toast.ok{background:var(--gr)}#toast.bad{background:var(--rd)}
+.zgo{background:none;border:0;padding:0;color:var(--bl);cursor:pointer;text-align:left;text-decoration:underline}
+#toast{position:fixed;z-index:4100;bottom:20px;left:50%;transform:translateX(-50%);padding:10px 18px;border-radius:10px;color:#fff;font-weight:700;opacity:0;pointer-events:none;transition:opacity .2s}#toast.show{opacity:1}#toast.ok{background:var(--gr)}#toast.bad{background:var(--rd)}
 @media(max-width:820px){#app{flex-direction:column}aside{width:auto;flex-direction:row;overflow-x:auto;padding:8px}.brand,.nb span{display:none}.split{grid-template-columns:1fr;grid-template-rows:230px 1fr}#me{display:none}}
 /* Configuration holds two wide editing tables. Below this width their fixed-size
    inputs and selects shrink rather than pushing the page sideways, because a
@@ -156,7 +157,7 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <button class="nb adm" data-t="usr" data-h="Users"><i class="fa-solid fa-users-gear"></i><span>Users</span></button>
 <button class="nb adm" data-t="act" data-h="Activity Log"><i class="fa-solid fa-user-clock"></i><span>Activity Log</span></button>
 <button class="pinb" id="pinB" onclick="pin()"><i class="fa-solid fa-thumbtack"></i><span>Keep menu open</span></button></aside>
-<div class="wrap"><header><h1 id="title">Live Tracking</h1><span class="pill" id="conn"><i class="fa-solid fa-circle" style="font-size:8px"></i> <span id="connT">Connecting</span></span><button class="btn gh sm" id="muteB" onclick="muteTog()"><i class="fa-solid fa-volume-high"></i> <span id="muteT">Sound on</span></button>
+<div class="wrap"><header><h1 id="title">Live Tracking</h1><span class="pill" id="conn"><i class="fa-solid fa-circle" style="font-size:8px"></i> <span id="connT">Connecting</span></span>
 <div id="accWrap"><button id="accB" onclick="accMenu()" title="Account"><i class="fa-solid fa-circle-user" style="font-size:18px"></i><span id="me"></span><i class="fa-solid fa-chevron-down" style="font-size:10px"></i></button>
 <div class="mm hide" id="accM"><div id="accWho"></div><button id="themeB" onclick="theme()"></button><button onclick="accHide();pwForm()"><i class="fa-solid fa-key"></i><span>Change password</span></button><hr><button class="out" onclick="accHide();signOut()"><i class="fa-solid fa-right-from-bracket"></i><span>Sign out</span></button></div></div></header>
 <main>
@@ -191,8 +192,9 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <tr><td>Zone detection <span class="hp" data-tip="Turns zone checking off for the whole fleet without deleting any shape. Draw, name and limit your zones in the Zones table below.">?</span></td><td><label class="ck"><input id="s_z" type="checkbox"> Report entry, exit and overspeed</label></td><td><small>Each zone's own limit and alerts are set in the Zones table below.</small></td></tr></table></div></div>
 <div class="card"><div class="csh"><i class="fa-solid fa-triangle-exclamation"></i><div><b>Events (defaults for all vehicles) <span class="hp" data-tip="&lt;b&gt;Tolerance&lt;/b&gt; is how long the driver must keep breaking the rule before it is written to the database. The buzzer and the on-screen alert fire immediately; the event is only recorded once the violation lasts longer than the tolerance. Use 2 s for harsh braking/acceleration and 10 s for overspeed. &lt;b&gt;Trigger limit&lt;/b&gt; is the fleet default that a vehicle uses unless it has its own value below.">?</span></b><small>The limit, the buzzer and the spoken message the whole fleet starts from.</small></div></div><div class="tw" id="ruleT" style="margin-top:10px"></div></div>
 <div class="card"><div class="csh"><i class="fa-solid fa-truck"></i><div><b>Settings per vehicle <span class="hp" data-tip="A vehicle marked &lt;b&gt;custom&lt;/b&gt; keeps its own values; leave a box empty to follow the fleet default above. Phones apply changes within 5 minutes or at the next trip start. &lt;b&gt;Overspeed buffer&lt;/b&gt; is added on top of the limit before the alert starts. &lt;b&gt;Warning level&lt;/b&gt; buzzes the phone without recording an event. &lt;b&gt;Min. distance&lt;/b&gt; suppresses events until the vehicle has actually moved that far. Tick the box beside a vehicle and press Reset to send it back to the fleet defaults.">?</span></b><small>Overrides for one vehicle. Tick the box beside it to include it in Reset.</small></div><button class="btn o sm" onclick="resetSelV()" title="Clears the own values of every vehicle you ticked in the table below, so it follows the fleet defaults on this page again. Unticked vehicles are left exactly as they are. Phones apply the change within 5 minutes."><i class="fa-solid fa-rotate-left"></i>Reset selected</button></div><div class="tw" id="cfgV" style="margin-top:10px"></div></div>
-<div class="card"><div class="csh"><i class="fa-solid fa-draw-polygon"></i><div><b>Zones (geofences) <span class="hp" data-tip="A zone is a shape you draw on the Live Tracking map. Every phone tests each position against it, so driving in, driving out or passing the zone's own speed limit makes an event - and each of those three has its own alert, buzzer, voice and tolerance in the Events table above. &lt;b&gt;Leave a limit empty&lt;/b&gt; and the zone only reports entries and exits. Phones reload the shapes within 5 minutes.">?</span></b><small>The areas the whole fleet is watched against, and what each one reports. Press Edit, or click the shape on a map, to change its name, limit, alerts, colour or outline.</small></div><button class="btn b sm" onclick="switchTab('live');setTimeout(()=>{if(!DRAW)drawZone(mapL)},200)" title="Switches to Live Tracking and starts the drawing tool"><i class="fa-solid fa-draw-polygon"></i>Draw a zone</button></div>
-<div class="tw" id="zT" style="margin-top:10px"></div></div>
+<div class="card"><div class="csh"><i class="fa-solid fa-draw-polygon"></i><div><b>Zones (geofences) <span class="hp" data-tip="A zone is a shape you draw on the Live Tracking map. Every phone tests each position against it, so driving in, driving out or passing the zone's own speed limit makes an event - and each of those three has its own alert, buzzer, voice and tolerance in the Events table above. &lt;b&gt;Leave a limit empty&lt;/b&gt; and the zone only reports entries and exits. Phones reload the shapes within 5 minutes.">?</span></b><small>The areas the whole fleet is watched against, and what each one reports. Type in the box below to search by name, or press a name to open that shape on the Live Tracking map. Press Edit, or click the shape on a map, to change its name, limit, alerts, colour or outline.</small></div><button class="btn b sm" onclick="switchTab('live');setTimeout(()=>{if(!DRAW)drawZone(mapL)},200)" title="Switches to Live Tracking and starts the drawing tool"><i class="fa-solid fa-draw-polygon"></i>Draw a zone</button></div>
+<div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap"><input id="zQ" placeholder="Search zones by name" oninput="zFilter(this.value)" style="width:260px;max-width:100%"><small id="zC" style="opacity:.65"></small></div>
+<div class="tw" id="zT" style="margin-top:8px"></div></div>
 <div class="card"><div class="csh"><i class="fa-solid fa-signature"></i><div><b>Saved place names <span class="hp" data-tip="Map services name a place from their own data, so a private or newly built address often shows the wrong label - a neighbour's building, or just a street number. A saved name here wins over every map service: any position inside its radius is reported with this name in trip popups, the trip list and every report. Names already shown on screen are corrected as soon as the page reloads.">?</span></b><small>Names you choose yourself, overriding what the map services call a place.</small></div><button class="btn b sm" onclick="plAdd()"><i class="fa-solid fa-plus"></i>Add a place</button></div>
 <div class="tw" id="plT" style="margin-top:10px"></div></div>
 <div class="card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><small style="flex:1;min-width:220px;color:var(--mut)">Everything on this page is saved together. Phones apply the changes within 5 minutes, or at the next trip start.</small><button class="btn g" onclick="saveCfg()"><i class="fa-solid fa-floppy-disk"></i>Save</button></div></section>
@@ -393,10 +395,25 @@ async function zSave(){if(!ADMIN||!ZED)return;const p=zRing(ZED);
  toast('Zone "'+was+'" saved'+(lim?' with a '+lim+' km/h limit':'')+'. Phones pick it up within 5 minutes.',1);
  logAct(id?'Edited zone':'Drew zone',was+' - '+p.length+' corners - '+(lim?lim+' km/h':'no zone limit'))}
 async function zRefs(){const {data}=await sb.from('geofences').select('*').order('name');zones=data||[];zPaint();zTable()}
+let ZQ='';
+function zFilter(v){ZQ=(v||'').trim().toLowerCase();zTable()}
+// The list lives on Configuration and the shape lives on Live Tracking, so the name
+// is the handle that carries you from one to the other.
+function zGoto(id){const z=zones.find(x=>x.id===id);if(!z)return;
+ const p=zPts(z.shape);if(!p.length)return toast('This zone has no shape to show yet');
+ switchTab('live');
+ if(!ZSHOW){ZSHOW=true;localStorage.zones_show='1';zPaint()}
+ setTimeout(()=>{if(!mapL)return;mapL.invalidateSize();
+  mapL.fitBounds(L.latLngBounds(p),{padding:[60,60],maxZoom:17});
+  toast('Showing "'+(z.name||'zone')+'" on the Live Tracking map',1)},60)}
 function zTable(){const t=$('zT');if(!t)return;
- t.innerHTML=ADMIN?`<table><tr><th>Zone</th><th>Corners</th><th>Area km2</th><th>Speed limit km/h</th><th>Alert on entry</th><th>Alert on exit</th><th>Alert on overspeed</th><th>Watched <span class="hp" data-tip="Ticked: the phones report entry, exit and overspeed for this zone. Empty: the shape stays on the map but nothing is reported - switch a zone off instead of deleting it while it is being moved or rebuilt.">?</span></th><th></th></tr>${zones.map(z=>{const p=zPts(z.shape);
-  return `<tr><td><b>${esc(z.name)}</b></td><td>${p.length}</td><td>${p.length>2?zArea(p).toFixed(3):'-'}</td><td><input type="number" min="5" max="250" value="${z.speed_limit==null?'':z.speed_limit}" style="width:78px" onchange="zSet('${z.id}','speed_limit',this.value===''?null:+this.value)"></td>${['enter','exit','overspeed'].map(k=>`<td style="text-align:center"><input type="checkbox" ${z[k]!==false?'checked':''} onchange="zSet('${z.id}','${k}',this.checked)"></td>`).join('')}<td style="text-align:center"><input type="checkbox" ${z.enabled!==false?'checked':''} onchange="zSet('${z.id}','enabled',this.checked)"></td><td style="text-align:right;white-space:nowrap"><button class="btn b sm" onclick="zEdit('${z.id}')" title="Change this zone's name, speed limit, alerts, colour, whether it is watched, or its shape"><i class="fa-solid fa-pen"></i>Edit</button> <button class="btn r sm" onclick="zDelById('${z.id}')"><i class="fa-solid fa-trash"></i>Delete</button></td></tr>`}).join('')||'<tr><td colspan="9">No zones yet. Press <b>Draw zone</b> on the Live Tracking map to add one.</td></tr>'}</table>`
-  :`<table><tr><th>Zone</th><th>Speed limit km/h</th><th>Area km2</th></tr>${zones.filter(z=>z.enabled!==false).map(z=>{const p=zPts(z.shape);return `<tr><td><b>${esc(z.name)}</b></td><td>${z.speed_limit==null?'-':z.speed_limit}</td><td>${p.length>2?zArea(p).toFixed(3):'-'}</td></tr>`}).join('')||'<tr><td colspan="3">No zone is being watched.</td></tr>'}</table>`}
+ const ZS=zones.filter(z=>!ZQ||String(z.name||'').toLowerCase().includes(ZQ));
+ const c=$('zC');if(c)c.textContent=zones.length?(ZQ?ZS.length+' of '+zones.length+' zones match':zones.length+' zones'):'';
+ const nm=z=>`<td><button class="zgo" onclick="zGoto('${z.id}')" title="Show this zone on the Live Tracking map">${esc(z.name)}</button></td>`;
+ const none=(n,m)=>`<tr><td colspan="${n}">${m}</td></tr>`;
+ t.innerHTML=ADMIN?`<table><tr><th>Zone</th><th>Corners</th><th>Area km2</th><th>Speed limit km/h</th><th>Alert on entry</th><th>Alert on exit</th><th>Alert on overspeed</th><th>Watched <span class="hp" data-tip="Ticked: the phones report entry, exit and overspeed for this zone. Empty: the shape stays on the map but nothing is reported - switch a zone off instead of deleting it while it is being moved or rebuilt.">?</span></th><th></th></tr>${ZS.map(z=>{const p=zPts(z.shape);
+  return `<tr>${nm(z)}<td>${p.length}</td><td>${p.length>2?zArea(p).toFixed(3):'-'}</td><td><input type="number" min="5" max="250" value="${z.speed_limit==null?'':z.speed_limit}" style="width:78px" onchange="zSet('${z.id}','speed_limit',this.value===''?null:+this.value)"></td>${['enter','exit','overspeed'].map(k=>`<td style="text-align:center"><input type="checkbox" ${z[k]!==false?'checked':''} onchange="zSet('${z.id}','${k}',this.checked)"></td>`).join('')}<td style="text-align:center"><input type="checkbox" ${z.enabled!==false?'checked':''} onchange="zSet('${z.id}','enabled',this.checked)"></td><td style="text-align:right;white-space:nowrap"><button class="btn b sm" onclick="zEdit('${z.id}')" title="Change this zone's name, speed limit, alerts, colour, whether it is watched, or its shape"><i class="fa-solid fa-pen"></i>Edit</button> <button class="btn r sm" onclick="zDelById('${z.id}')"><i class="fa-solid fa-trash"></i>Delete</button></td></tr>`}).join('')||none(9,ZQ?'No zone matches "'+esc(ZQ)+'".':'No zones yet. Press <b>Draw zone</b> on the Live Tracking map to add one.')}</table>`
+  :`<table><tr><th>Zone</th><th>Speed limit km/h</th><th>Area km2</th></tr>${ZS.filter(z=>z.enabled!==false).map(z=>{const p=zPts(z.shape);return `<tr>${nm(z)}<td>${z.speed_limit==null?'-':z.speed_limit}</td><td>${p.length>2?zArea(p).toFixed(3):'-'}</td></tr>`}).join('')||none(3,ZQ?'No watched zone matches "'+esc(ZQ)+'".':'No zone is being watched.')}</table>`}
 async function zSet(id,k,v){if(!ADMIN)return;
  const u={updated_at:new Date().toISOString()};u[k]=k==='speed_limit'?(v==null||v===''?null:+v):!!v;
  const {error}=await sb.from('geofences').update(u).eq('id',id);
@@ -489,9 +506,9 @@ async function boot(fresh){
  if(!KA)KA=setInterval(keepAlive,10*60*1000);
  const {data:p}=await sb.from('profiles').select('role').eq('id',session.user.id).single();
  ADMIN=p?.role==='admin';UID=session.user.id;document.body.classList.toggle('usr',!ADMIN);
- $('login').classList.add('hide');$('app').classList.remove('hide');UNAME=(session.user.email||'').replace('@fleet.local','');$('me').textContent=UNAME;$('accWho').textContent='Welcome, '+UNAME+'!';if(localStorage.pin==='1')document.querySelector('aside').classList.add('pin');pinBtn();themeBtn();muteUi();
+ $('login').classList.add('hide');$('app').classList.remove('hide');UNAME=(session.user.email||'').replace('@fleet.local','');$('me').textContent=UNAME;$('accWho').textContent='Welcome, '+UNAME+'!';if(localStorage.pin==='1')document.querySelector('aside').classList.add('pin');pinBtn();themeBtn();
  logAct(fresh?'Signed in':'Opened dashboard','Role: '+(ADMIN?'admin':'user'));sessStart();
- mapL=mkMap('mapLive',fitAll,[['fa-thumbtack','Pin: keep the selected vehicle in the centre of the map while it moves',pinV,'pin'],['fa-draw-polygon','Draw zone: click the map for each corner of a geofence, then double-click to finish',()=>drawZone(mapL),'zone']]);mapH=mkMap('mapHist',hFit);
+ mapL=mkMap('mapLive',fitAll,[['fa-thumbtack','Pin: keep the selected vehicle in the centre of the map while it moves',pinV,'pin'],['fa-draw-polygon','Draw zone: click the map for each corner of a geofence, then double-click to finish',()=>drawZone(mapL),'zone'],['fa-volume-high','Mute the alert buzzer',muteTog,'mute']]);mapH=mkMap('mapHist',hFit);muteUi();
  initDates();
  await refs();await getSet();await zRefs();await loadLive();loadRules();evInit();
  sb.channel('pos').on('postgres_changes',{event:'INSERT',schema:'public',table:'positions'},e=>{if(e.new)upsert(e.new)}).subscribe(s=>{const ok=s==='SUBSCRIBED';$('conn').className='pill'+(ok?'':' bad');$('connT').textContent=ok?'Live':'Reconnecting'});
@@ -885,15 +902,15 @@ function playTone(a,type,dur,vol){if(!a)return;stopTone();if(type==='off')return
   default:rep(.5,s=>note(880,s,s+.25))}}
 function beep(R){R=R||{};if(MUTE)return;try{playTone(actx(),R.beep_type,Math.max(1,+R.beep_duration||5),.15)}catch(e){}}
 function tryTone(k){const t=$('bt_'+k).value;if(t==='off')return toast('Buzzer alert is Off for this event');
- if(MUTE)return toast('Alert sounds are muted on this page. Press the speaker in the top bar to hear it.');
+ if(MUTE)return toast('Alert sounds are muted on this computer. Press the speaker on the Live Tracking map to hear it.');
  try{playTone(actx(),t,Math.min(4,Math.max(1,+$('bd_'+k).value||3)),.15)}catch(e){}}
 // ---- alert sound switch. A fleet watch screen left open all day needs to be
 // silenced without losing the on-screen alert, so this stops only the buzzer.
 let MUTE=localStorage.mute==='1';
-function muteUi(){const b=$('muteB');if(!b)return;const i=b.querySelector('i'),t=$('muteT');
+function muteUi(){const b=mapL&&mapL._btn&&mapL._btn.mute;if(!b)return;const i=b.querySelector('i');
  if(i)i.className='fa-solid '+(MUTE?'fa-volume-xmark':'fa-volume-high');
- if(t)t.textContent=MUTE?'Muted':'Sound on';
- b.title=MUTE?'Alert sounds are off on this computer. Press to hear the buzzer again.':
+ b.classList.toggle('on',MUTE);
+ b.title=MUTE?'The alert buzzer is off on this computer. Press to hear it again.':
   'Press to silence the alert buzzer on this computer. The on-screen alert, the map pulse and the saved events are untouched.'}
 function muteTog(){MUTE=!MUTE;localStorage.mute=MUTE?'1':'0';if(MUTE)stopTone();muteUi();
  toast(MUTE?'Alert buzzer is off - the on-screen alert still shows':'Alert buzzer is on again',1);
@@ -918,7 +935,7 @@ function say(lg,txt){const S=window.speechSynthesis;if(!S||!window.SpeechSynthes
  if(!v&&lg!=='en')toast('This computer has no '+(VLANG[lg]||['that language'])[0]+' voice. Add it in Windows Settings > Time & language > Speech & recognition > Add voices; the phone speaks it anyway.',1)}
 function tryVoice(t){const sel=$('vl_'+t);if(!sel)return;const lg=sel.value;
  if(lg==='off')return toast('Voice alert is Off for this event');
- if(MUTE)return toast('Alert sounds are muted on this page. Press the speaker in the top bar to hear it.');
+ if(MUTE)return toast('Alert sounds are muted on this computer. Press the speaker on the Live Tracking map to hear it.');
  const m=(VMSG[lg]||VMSG.en)[t];if(!m)return toast('There is no spoken message for this event');say(lg,m)}
 
 // ---- live alerts. Realtime can silently miss an insert, so evPoll() also
