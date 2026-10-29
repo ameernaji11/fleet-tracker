@@ -33,6 +33,13 @@
 --   app_settings offline_after_h, the hours of silence after which Live Tracking
 --   greys a vehicle out as Offline.
 --
+-- New in v18 (account lockout and password reset) -- adds:
+--   profiles.fails, locked_at and must_change, plus login_gate / login_fail /
+--   login_ok / clear_pw_flag: five wrong passwords lock that account out of both
+--   apps until an administrator presses Unlock on the Users page, and a password
+--   the administrator sets for someone else has to be replaced by the user on
+--   their next sign-in.
+--
 -- The "admin seed" block makes ameer@fleettrack.com role=admin, so the separate
 -- Admin.sql saved query in Supabase is no longer needed — delete it once this
 -- file has run and you have confirmed: select email, role from profiles;
@@ -589,6 +596,59 @@ drop policy if exists "activity insert own" on user_activity;
 create policy "activity insert own" on user_activity for insert to authenticated
   with check (user_id = auth.uid() and action is not null and length(action) <= 80);
 
+-- --------------------------------------------------------- v18 lockout ----
+-- Five wrong passwords in a row lock that account until an administrator unlocks
+-- it on the Users page. The counter has to be reachable from the sign-in screen,
+-- where nobody is logged in yet, so these functions are security definer: each
+-- touches one row of profiles by its own address and nothing else. They answer
+-- identically for an address that has never signed in here, so the sign-in screen
+-- cannot be walked through to find out which users exist.
+alter table profiles add column if not exists fails int not null default 0,
+  add column if not exists locked_at timestamptz,
+  add column if not exists must_change boolean not null default false;
+
+-- asked before a sign-in is attempted: is this account already locked?
+create or replace function login_gate(p_email text) returns table(locked boolean, tries_left int)
+language sql security definer set search_path = public as $$
+  -- the aggregates keep one row on the screen even when nothing matches, which is
+  -- what makes an unknown address answer exactly like an unlocked one
+  select coalesce(bool_or(locked_at is not null), false),
+         coalesce(greatest(5 - max(fails), 0), 5)
+  from profiles where lower(email) = lower(p_email)
+$$;
+
+-- one wrong password. Returns what the screen should say next.
+create or replace function login_fail(p_email text) returns table(locked boolean, tries_left int)
+language plpgsql security definer set search_path = public as $$
+declare n int;
+begin
+  update profiles set fails = fails + 1 where lower(email) = lower(p_email) returning fails into n;
+  if n is null then return query select false, 5; return; end if;
+  if n >= 5 then
+    update profiles set locked_at = now() where lower(email) = lower(p_email) and locked_at is null;
+    return query select true, 0;
+  end if;
+  return query select false, greatest(5 - n, 0);
+end $$;
+
+-- a sign-in that worked clears the count. It never clears a lock: only the
+-- administrator's Unlock button does, so a lock cannot be typed away.
+create or replace function login_ok(p_email text) returns void
+language sql security definer set search_path = public as $$
+  update profiles set fails = 0 where lower(email) = lower(p_email)
+$$;
+
+-- the account itself, and only the account itself, puts down the "the
+-- administrator reset my password" flag once it has chosen a new password. An
+-- ordinary user has no update policy on profiles, so this is the one narrow way.
+create or replace function clear_pw_flag() returns void
+language sql security definer set search_path = public as $$
+  update profiles set must_change = false, fails = 0 where id = auth.uid()
+$$;
+
+revoke all on function login_gate(text), login_fail(text), login_ok(text), clear_pw_flag() from public;
+grant execute on function login_gate(text), login_fail(text), login_ok(text), clear_pw_flag() to anon, authenticated, service_role;
+
 -- ------------------------------------------------------------- realtime ----
 -- the dashboard listens for position and event inserts; both must be in the
 -- publication. Guarded so re-running this file does not error.
@@ -782,4 +842,21 @@ end $$;
 --   events insert policy                                                 -> 'road_overspeed' is no longer an accepted
 --        type. Rows an older build already stored are read, reported and exported exactly as before.
 --   Overspeed (the vehicle's own limit) and Zone overspeed (a geofence's limit) are untouched and keep working.
+--
+-- v18, on top of the above (account lockout and password reset):
+--   profiles.fails (0), locked_at (null), must_change (false)             -> the five-wrong-password lock. fails
+--        counts the wrong passwords typed against this address, locked_at is the moment it reached five, and
+--        must_change is raised when an administrator sets a password for somebody else so that password has to be
+--        replaced on the next sign-in.
+--   login_gate / login_fail / login_ok                                    -> the three calls the sign-in screens
+--        make: ask before attempting, record a wrong password, clear the count after a good one. Definer functions
+--        because the sign-in screen is not logged in yet, and written so an address that has never signed in here
+--        answers exactly like an unlocked account.
+--   clear_pw_flag()                                                       -> the only update an ordinary account may
+--        make to its own profile: put down the must_change flag once it has chosen its new password.
+--   Unlock needs no new rights — the existing "profiles admin" policy already lets an administrator clear
+--   fails/locked_at. Setting a NEW password for another account does: the public key cannot do that, so the Users
+--   page calls the fleet-admin Edge function (functions/fleet-admin/index.ts), which checks that the caller really
+--   is an administrator before it uses the server-only key Supabase gives it. Deploy that function or the button
+--   reports that the service is missing; everything else in the lock works without it.
 -- ============================================================================
