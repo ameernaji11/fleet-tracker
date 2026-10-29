@@ -199,6 +199,18 @@ alter table events add column if not exists ended_at timestamptz, add column if 
   add column if not exists battery_pct real, add column if not exists charging boolean,
   add column if not exists ignition boolean, add column if not exists road_limit int;
 
+-- v16: a breach opened while the phone has no signal still has to be closable later,
+-- and the handset cannot know the server's row id until the insert lands. So the phone
+-- names each event itself, in this column, and its closing update is looked up by that
+-- name instead of by id. Additive and nullable: rows written by older builds simply
+-- have none, and every existing id, report and policy keeps working.
+alter table events add column if not exists cid uuid;
+do $$ begin
+  if not exists (select 1 from pg_indexes where schemaname='public' and tablename='events' and indexname='events_cid') then
+    create unique index events_cid on events (cid);
+  end if;
+end $$;
+
 alter table event_rules add column if not exists beep boolean default true,
   add column if not exists beep_duration int default 5,
   add column if not exists beep_type text default 'discontinuous',
@@ -548,6 +560,7 @@ create or replace function guard_events() returns trigger language plpgsql as $$
 begin
   if is_admin() then return new; end if;
   if new.id          is distinct from old.id
+  or new.cid         is distinct from old.cid
   or new.user_id     is distinct from old.user_id
   or new.vehicle_id  is distinct from old.vehicle_id
   or new.driver_id   is distinct from old.driver_id
@@ -741,4 +754,14 @@ end $$;
 --        cannot be moved onto another vehicle or rewritten after the fact.
 --   user_activity insert policy                                           -> an entry must be about the account
 --        writing it and the action label kept short. The trail is still append-only for everyone, admin included.
+--
+-- v16, on top of the above (one new column, nothing rewritten):
+--   events.cid (uuid, unique, nullable)                                  -> the name a handset gives its own
+--        breach. A phone that opened an event while it had no signal cannot know the server's row id, so it writes
+--        this uuid with the insert and looks the row up by it when the breach ends. Rows from older builds have
+--        none and are read, reported and closed exactly as before.
+--   guard_events trigger                                                 -> also pins cid, so a close cannot
+--        re-point an event at another name.
+--   Run this file BEFORE installing the rebuilt phone app: the new build writes cid, and an insert would be
+--   refused by a database that does not have the column yet.
 -- ============================================================================
