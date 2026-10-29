@@ -1,9 +1,9 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://overpass-api.de https://overpass.kumi.systems; media-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://overpass-api.de https://overpass.kumi.systems; media-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" crossorigin="anonymous" integrity="sha384-c6Rcwz4e4CITMbu/NBmnNS8yN2sC3cUElMEMfP3vqqKFp7GOYaaBBCqmaWBjmkjb">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" integrity="sha384-t1nt8BQoYMLFN5p42tRAtuAAFQaCQODekUVeKKZrEnEyp4H2R0RHFz0KWpmj7i8g">
+<link rel="stylesheet" href="vendor/leaflet.css" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'">
+<link rel="stylesheet" href="vendor/fa/css/all.min.css" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css'">
 <link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icon.svg">
 <style>
 :root{--bg:#fff7ee;--ink:#26323a;--mut:#6b7a85;--line:#efe3d4;--or:#f28c28;--orl:#ffe9d2;--gr:#27a46a;--grl:#ddf4e8;--bl:#2f7fe6;--bll:#dcebfd;--rd:#d9534f;--rdl:#fde4e2}
@@ -46,6 +46,10 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.grid3 div{background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px 8px;min-width:0}.grid3 small{display:block;color:var(--mut);font-size:10px}.grid3 b{font-size:12px;white-space:nowrap}.grid3 .w2{grid-column:span 2}
 .btns{display:flex;gap:8px}.btns .btn{margin:0;height:48px}
 .mcl{position:absolute;z-index:999;right:8px;top:8px;display:flex;flex-direction:column;gap:6px}.mcl button{width:38px;height:38px;border:0;border-radius:10px;background:#fff;box-shadow:0 1px 6px #0004;color:var(--ink)}
+/* grey squares with no signal are the map waiting for a tile, not a broken app:
+   the driver is told, and the route, the zones and the vehicle still draw */
+.mn{position:absolute;z-index:998;left:8px;bottom:8px;max-width:calc(100% - 60px);background:#16222ce6;color:#fff;
+ font-size:11px;font-weight:600;line-height:1.3;padding:5px 8px;border-radius:8px}
 #err{position:fixed;bottom:66px;left:12px;right:12px;font-size:12px;pointer-events:none;margin:0;z-index:1001}
 /* Short screens (a phone held sideways, a small window): every screen has to fit
    without scrolling, so the login artwork and the step spacing give way first. */
@@ -70,6 +74,7 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 <div style="position:relative"><input id="pw" type="password" placeholder="Password" autocomplete="current-password"><button type="button" class="eye" onclick="eye()"><i class="fa-solid fa-eye" id="eyei"></i></button></div>
 <label style="display:flex;gap:8px;align-items:center;margin:8px 0;font-weight:600"><input type="checkbox" id="rem" style="width:20px;height:20px;margin:0"> Remember me</label>
 <button class="btn b" id="sib" onclick="signIn()"><i class="fa-solid fa-right-to-bracket"></i>Sign in</button>
+<small id="offh" class="hide" style="display:block;color:var(--mut);text-align:center">No internet: this phone signs in from the copy of your last sign-in. It cannot open for a user it has never signed in with a signal.</small>
 <div class="foot">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</div></div>
 <div id="pm" class="screen hide"><h2><i class="fa-solid fa-shield-halved" style="color:var(--bl)"></i> Permissions</h2>
 <p>The app needs these to track your trips reliably, even when the screen is off.</p>
@@ -85,7 +90,7 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 <div class="top"><div><small>Welcome,</small> <b id="wn"></b><b>!</b></div><div><button class="ib hide" id="dash" onclick="openDash()" title="Open dashboard"><i class="fa-solid fa-chart-line"></i></button><button class="ib" onclick="testAlert()" title="Test the buzzer and the voice alert"><i class="fa-solid fa-bell"></i></button><button class="ib" onclick="pwUi()" title="Change password"><i class="fa-solid fa-key"></i></button><button class="ib" onclick="signOut()" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i></button></div></div>
 <div class="card id"><div class="av" style="width:38px;height:38px;font-size:17px"><i id="vi" class="fa-solid fa-car"></i></div><div><b id="vn"></b><br><small><i class="fa-solid fa-id-card"></i> <span id="dn"></span></small><br><select id="pk" class="hide" onchange="pickV()" style="margin-top:6px;max-width:190px"></select></div><span class="chip" id="stc">Parking</span></div>
 <div class="card spd"><div style="position:relative"><b id="sp">0</b><span>km/h</span><div class="rl hide" id="rl" title="Speed limit of this road"><b></b></div></div><div class="pr"><small>Position</small><b id="v_pos">-</b><br><small id="lt">No record yet</small></div></div>
-<div id="map"><div id="fr"></div><div class="mcl"><button id="muteB" onclick="muteTog()" title="Mute the alerts"><i class="fa-solid fa-volume-high"></i></button><button onclick="togMap()" title="Satellite / map"><i class="fa-solid fa-layer-group"></i></button><button id="fsB" onclick="fsMap()" title="Full screen"><i class="fa-solid fa-expand"></i></button><button id="pinB" class="on" onclick="togPin()" title="Pin: keep the vehicle in the centre"><i class="fa-solid fa-thumbtack"></i></button></div></div>
+<div id="map"><div id="fr"></div><div class="mn hide" id="mn"><i class="fa-solid fa-wifi"></i> No signal: this area was not cached, the route and zones are still drawn</div><div class="mcl"><button id="muteB" onclick="muteTog()" title="Mute the alerts"><i class="fa-solid fa-volume-high"></i></button><button onclick="togMap()" title="Satellite / map"><i class="fa-solid fa-layer-group"></i></button><button id="fsB" onclick="fsMap()" title="Full screen"><i class="fa-solid fa-expand"></i></button><button id="pinB" class="on" onclick="togPin()" title="Pin: keep the vehicle in the centre"><i class="fa-solid fa-thumbtack"></i></button></div></div>
 <div class="grid3" id="vals"></div>
 <div class="btns"><button id="go" class="btn g" onclick="start()"><i class="fa-solid fa-play"></i>Start trip</button><button id="stp" class="btn r hide" onclick="stop()"><i class="fa-solid fa-stop"></i>End trip</button></div>
 <div class="foot">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</div>
@@ -99,12 +104,17 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 <script>
 const $=i=>document.getElementById(i);
 window.onerror=(m,s,l)=>{$('err').textContent='Error: '+m+' (line '+l+')'};
-window.addEventListener('unhandledrejection',e=>{$('err').textContent='Error: '+(e.reason&&e.reason.message||e.reason)});
+// offline, a rejected network call is the plan working, not a fault: the outbox is
+// holding the records until the signal returns, so it must not scare the driver
+window.addEventListener('unhandledrejection',e=>{if(!navigator.onLine)return;
+ $('err').textContent='Error: '+(e.reason&&e.reason.message||e.reason)});
 </script>
 <script src="config.js"></script>
 <script src="bridge.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous" integrity="sha384-NElt3Op+9NBMCYaef5HxeJmU4Xeard/Lku8ek6hoPTvYkQPh3zLIrJP7KiRocsxO"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" crossorigin="anonymous" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug"></script>
+<script src="vendor/leaflet.js"></script>
+<script>window.L||document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous" integrity="sha384-NElt3Op+9NBMCYaef5HxeJmU4Xeard/Lku8ek6hoPTvYkQPh3zLIrJP7KiRocsxO"><\/script>')</script>
+<script src="vendor/supabase.js"></script>
+<script>window.supabase||document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" crossorigin="anonymous" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug"><\/script>')</script>
 <script>
 const DASH=(typeof DASH_URL==='string'&&/^https:\/\/.+\/$/.test(DASH_URL.trim()))?DASH_URL.trim():'https://ameernaji11.github.io/fleet-tracker/dashboard/';
 const mail=u=>u.includes('@')?u.trim():u.trim().toLowerCase()+'@fleet.local';
@@ -138,13 +148,67 @@ const mk=r=>supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storage:r?loc
 try{if(!/^https:\/\/[a-z0-9]{15,30}\.supabase\.co$/.test(SUPABASE_URL)||!String(SUPABASE_KEY).startsWith('eyJ'))throw new Error('config.js has a wrong address or key');sb=mk(REM)}catch(e){$('err').textContent='Setup error: '+(e.message||e)}
 const show=s=>{['lg','pm','app'].forEach(x=>$(x).classList.toggle('hide',x!==s));if(s==='app'&&map)setTimeout(()=>map.invalidateSize(),100)};
 function eye(){const i=$('pw');i.type=i.type==='password'?'text':'password';$('eyei').className='fa-solid '+(i.type==='password'?'fa-eye':'fa-eye-slash')}
+// ---- signing in with no signal. The server cannot be reached from a basement, a
+// tunnel or a dead spot, so the phone keeps its own way of checking the driver's
+// password: PBKDF2 (120 000 rounds, SHA-256) over a random per-device salt. The
+// password itself is never stored, only this one-way copy. Checking it takes a
+// fraction of a second here and a very long time for anyone who has the handset.
+// Signing out deletes it, and it is only accepted while it is less than 30 days
+// old, so an account the admin has closed cannot keep opening a phone forever.
+const OKI=12e4,OKMAX=30*864e5;
+const obuf=b=>btoa(String.fromCharCode.apply(null,new Uint8Array(b)));
+const oget=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function ohash(pw,salt){if(!window.crypto||!crypto.subtle||!crypto.subtle.deriveBits)return null;
+ try{const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']);
+  return obuf(await crypto.subtle.deriveBits({name:'PBKDF2',salt:oget(salt),iterations:OKI,hash:'SHA-256'},k,256))}catch(e){return null}}
+// called after a sign-in the server itself accepted
+async function credSave(pw){try{if(!pw||!me||!me.id)return;
+ const s=obuf(crypto.getRandomValues(new Uint8Array(16))),h=await ohash(pw,s);if(!h)return;
+ localStorage.offl=JSON.stringify({s,h,e:me.email,i:me.id,at:Date.now()})}catch(e){}}
+async function credCheck(pw){try{const c=JSON.parse(localStorage.offl||'null');
+ if(!c||!c.s||!c.h||!c.i||!c.e||Date.now()-(+c.at||0)>OKMAX)return null;
+ if(c.e!==mail($('em').value))return null;
+ const h=await ohash(pw,c.s);return h&&h===c.h?c:null}catch(e){return null}}
+// does this phone know this user at all? picks which of the two offline messages
+// the driver is given
+function credKnown(){try{const c=JSON.parse(localStorage.offl||'null');
+ return !!(c&&c.e===mail($('em').value))}catch(e){return false}}
+// a phone in a dead spot can still say it is online, and a request to a server
+// that never answers can spin for half a minute. A rejected sign-in carries a
+// status code and a plain message ("Invalid login credentials"); anything that
+// looks like a broken pipe does not, so the two are told apart here.
+function noNet(e){try{if(!e||e.statusCode||e.code)return false;
+ return /failed to fetch|fetch failed|networkerror|network request failed|load failed|err_\w+|did not answer|timed out|timeout/i
+  .test(String(e.message||e))}catch(x){return false}}
+// used when the server could not be reached: the same local check the no-signal
+// path uses, so nobody waits for a "Failed to fetch" that never resolves
+async function localEnter(){const c=await credCheck($('pw').value);
+ if(!c)throw new Error(credKnown()?'The server did not answer, and this password does not match the sign-in this phone remembers.'
+  :'The server did not answer, and this phone has not signed in as '+($('em').value.trim()||'that user')+' before. Sign in once while the server can be reached, then the phone can let you in without it.');
+ await init(1,{id:c.i,email:c.e})}
 async function signIn(){
  if(!sb)return;const want=$('rem').checked;if(want!==REM){REM=want;localStorage.rem=want?'1':'0';sb=mk(REM)}
  const b=$('sib');b.disabled=true;b.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i>Signing in...';$('err').textContent='';
- try{const {error}=await sb.auth.signInWithPassword({email:mail($('em').value),password:$('pw').value});if(error)throw error;
-  want?localStorage.user=$('em').value.trim():localStorage.removeItem('user');await init(1)}catch(e){$('err').textContent='Error: '+(e.message||e)}
+ try{
+  if(!navigator.onLine){const c=await credCheck($('pw').value);
+   // the two cases say different things to the driver: this phone knows this user
+   // and disagrees with the password, or it has never seen this user at all
+   if(!c)throw new Error(credKnown()?'Wrong password: with no internet this phone checks it against the sign-in you last made on it.'
+    :'No internet, and this phone has not signed in as '+($('em').value.trim()||'that user')+' before. Sign in once with a signal, then it can let you in offline.');
+   await init(1,{id:c.i,email:c.e});return}
+  let r;try{r=await Promise.race([sb.auth.signInWithPassword({email:mail($('em').value),password:$('pw').value}),
+   new Promise((_,rej)=>{setTimeout(()=>rej(new Error('The server did not answer in time')),8e3)})])}
+  // a late answer from a request that already timed out must not be read as a
+  // second sign-in
+  catch(e){r={error:e}}
+  if(r.error&&noNet(r.error)){await localEnter();return}
+  if(r.error)throw r.error;
+  want?localStorage.user=$('em').value.trim():localStorage.removeItem('user');
+  await credSave($('pw').value);await init(1)}
+ catch(e){$('err').textContent='Error: '+(e.message||e)}
  b.disabled=false;b.innerHTML='<i class="fa-solid fa-right-to-bracket"></i>Sign in'}
-async function signOut(){sessStop();await logAct('Signed out','Phone');await sb.auth.signOut();location.reload()}
+async function signOut(){sessStop();await logAct('Signed out','Phone');
+ localStorage.removeItem('offl');try{await sb.auth.signOut()}catch(e){}location.reload()}
 function pwUi(){const c=$('pwcard');c.classList.toggle('hide');const open=!c.classList.contains('hide');
  // the app screen is fixed-height, so the map gives up its space while the panel is open
  $('map').classList.toggle('hide',open);
@@ -156,6 +220,8 @@ async function changePw(){if(!sb)return;const a=$('np1').value,b=$('np2').value;
  if(a!==b)return $('err').textContent='The two new passwords do not match';
  const {error}=await sb.auth.updateUser({password:a});
  if(error)return $('err').textContent='Error: '+(error.message||error);
+ // the offline copy has to be the one that matches the new password
+ await credSave(a);
  pwUi();$('err').textContent='Password changed.';logAct('Changed own password')}
 // Audit trail for the admin-only Activity Log. Silently ignored if the table is
 // not there yet, because a logging failure must never stop a driver's trip.
@@ -177,12 +243,16 @@ addEventListener('pagehide',sessStop);
 // warned. The session may be unreadable offline, so the last identity the phone proved
 // is kept as a fallback and the app re-checks it the moment the network is back.
 function cachedWho(){try{const c=JSON.parse(localStorage.cfg||'null');return c&&c.who&&c.who.id?c.who:null}catch(e){return null}}
-async function init(fresh){
+async function init(fresh,who){
  if(!sb)return;
  let s=null;
- try{const r=await sb.auth.getSession();s=r.data&&r.data.session}catch(e){}
- if(!s&&!navigator.onLine){const w=cachedWho();if(w)s={user:w,offline:true}}
- if(!s)return;me=s.user;
+ // With no signal there is nothing to ask: the identity this phone already proved is
+ // used straight away. Waiting for a server the handset cannot reach is what made
+ // signing in take so long offline. `who` is a password this phone checked itself.
+ if(navigator.onLine){if(who)s={user:who,offline:true};
+  else{try{const r=await sb.auth.getSession();s=r.data&&r.data.session}catch(e){}}}
+ else{const w=who||cachedWho();if(w)s={user:w,offline:true}}
+ if(!s)return;me=s.user;OFFL=!!s.offline;
  await outInit();
  await loadRules();
  const nm=(me.email||'').replace('@fleet.local','');$('wn').textContent=nm;
@@ -195,7 +265,7 @@ async function init(fresh){
  // records a previous session left in the queue go up as soon as the phone can
  // reach the server, without waiting for the driver to press Start
  if(PEND&&navigator.onLine)flush();
- if(!navigator.onLine)banner('<i class="fa-solid fa-wifi"></i> Offline: everything is kept on the phone until the signal returns',6000);
+ if(!navigator.onLine)banner('<i class="fa-solid fa-wifi"></i> Offline: signed in from this phone - tracks, alerts and records all work, and they are sent when the signal returns',8000);
  // a driver keeps this app open for a whole shift, so touch the session every
  // 10 minutes — getSession() is what makes supabase-js refresh it early.
  setInterval(()=>{if(!document.hidden)sb.auth.getSession().catch(()=>{})},10*60*1000);
@@ -212,8 +282,15 @@ async function outInit(){
  try{const old=JSON.parse(localStorage.q||'[]');
   if(old.length){old.forEach(p=>outAdd({t:'pos',p}));localStorage.removeItem('q');flush()}}catch(e){}
  outUi()}
-addEventListener('online',()=>{netUi();banner('<i class="fa-solid fa-cloud-arrow-up"></i> Back online: sending '+(PEND||0)+' saved records',5000);flush();bbAnswer()});
-addEventListener('offline',()=>{netUi();banner('<i class="fa-solid fa-wifi"></i> No internet: keeping records on the phone',5000)});
+addEventListener('online',async()=>{netUi();lgHint();banner('<i class="fa-solid fa-cloud-arrow-up"></i> Back online: sending '+(PEND||0)+' saved records',5000);flush();bbAnswer();
+ // an app that opened with no signal may be running on the phone's own copy of the
+ // sign-in: the server has to accept it again before anything can be uploaded
+ if(OFFL){let s=null;try{const r=await sb.auth.getSession();s=r.data&&r.data.session}catch(e){}
+  if(s&&s.user){me=s.user;OFFL=false;$('err').textContent='';outUi()}
+  else $('err').textContent='Signal is back. The trip and every record are safe on this phone until you sign in again.'}});
+addEventListener('offline',()=>{netUi();lgHint();banner('<i class="fa-solid fa-wifi"></i> No internet: keeping records on the phone',5000)});
+// the login screen says out loud what it can do without a signal
+function lgHint(){const h=$('offh');if(h)h.classList.toggle('hide',navigator.onLine)}
 // a queue that stops being written to still has to drain: the trip callback only
 // fires while the vehicle is moving
 setInterval(()=>{if(!document.hidden&&PEND&&!fl)flush()},60000);
@@ -223,7 +300,12 @@ let map,mrk,trail,tiles,sat=false,follow=true;
 const G=l=>'https://{s}.google.com/vt/lyrs='+l+'&x={x}&y={y}&z={z}';
 function initMap(){if(map)return;map=L.map('map',{zoomControl:false}).setView([23.6,58.5],12);map.on('dragstart',()=>{follow=false;pinUi()});
  document.addEventListener('fullscreenchange',()=>{const on=!!document.fullscreenElement,b=$('fsB');if(b){b.title=on?'Shrink back':'Full screen';const i=b.querySelector('i');if(i)i.className='fa-solid '+(on?'fa-minimize':'fa-expand')}setTimeout(()=>map.invalidateSize(),250)});
- tiles=L.tileLayer(G('m'),{maxZoom:20,subdomains:['mt0','mt1','mt2','mt3'],attribution:'Map data © Google'}).addTo(map);trail=L.polyline([],{color:'#2f7fe6',weight:4}).addTo(map);zDraw();setTimeout(()=>map.invalidateSize(),200)}
+ tiles=L.tileLayer(G('m'),{maxZoom:20,subdomains:['mt0','mt1','mt2','mt3'],attribution:'Map data © Google'}).addTo(map);trail=L.polyline([],{color:'#2f7fe6',weight:4}).addTo(map);zDraw();setTimeout(()=>map.invalidateSize(),200);
+ // a tile that will not arrive while there is no signal is expected, but it has to
+ // be explained: the picture comes from the cache this app keeps of the areas the
+ // driver has already driven through with internet
+ tiles.on('tileerror',()=>{if(!navigator.onLine)$('mn').classList.remove('hide')});
+ tiles.on('tileload',()=>{if(navigator.onLine)$('mn').classList.add('hide')})}
 function togMap(){sat=!sat;tiles.setUrl(G(sat?'y':'m'))}
 function fsMap(){document.fullscreenElement?document.exitFullscreen():$('map').requestFullscreen()}
 function pinUi(){const b=$('pinB');b.classList.toggle('on',follow);
@@ -465,9 +547,10 @@ const evLvl=type=>type==='overspeed'?Math.round(LIM.speed+LIM.buf)+' km/h':
  type==='zone_overspeed'?(ZNA?Math.round(ZNA.lim+LIM.zbuf)+' km/h in '+ZNA.name:'the zone limit'):
  Math.abs(+(type==='harsh_braking'?LIM.brake:LIM.accel)*3.6).toFixed(1)+' km/h/s';
 function evTxt(type,kmh,val,peak,lvl,dur){
- if(isSp(type))return `${Math.round(kmh)} km/h against a ${lvl} alert level${HOLD[type]?' held over '+HOLD[type]+' s':''}${dur?' · lasted '+hm(dur):''}${peak&&peak>kmh?' · peak '+Math.round(peak)+' km/h':''}`;
- return `${Math.abs(val).toFixed(1)} km/h/s ${type==='harsh_braking'?'deceleration':'acceleration'} against a ${lvl} limit${HOLD[type]?' held over '+HOLD[type]+' s':''}${dur?' · lasted '+hm(dur):''}${peak&&Math.abs(peak)>Math.abs(val)?' · peak '+Math.abs(peak).toFixed(1)+' km/h/s':''}`}
-const hm=x=>Math.floor(x/3600)+'h '+String(Math.floor(x%3600/60)).padStart(2,'0')+'m '+String(Math.round(x%60)).padStart(2,'0')+'s';
+ if(isSp(type))return `${Math.round(kmh)} km/h against a ${lvl} alert level${HOLD[type]?' held over '+HOLD[type]+' s':''}${dur?' · lasted '+hms(dur):''}${peak&&peak>kmh?' · peak '+Math.round(peak)+' km/h':''}`;
+ return `${Math.abs(val).toFixed(1)} km/h/s ${type==='harsh_braking'?'deceleration':'acceleration'} against a ${lvl} limit${HOLD[type]?' held over '+HOLD[type]+' s':''}${dur?' · lasted '+hms(dur):''}${peak&&Math.abs(peak)>Math.abs(val)?' · peak '+Math.abs(peak).toFixed(1)+' km/h/s':''}`}
+// one duration format for the whole system: hh:mm:ss, hours can pass 24
+const hms=x=>{x=Math.max(0,Math.round(x||0));const p=n=>String(n).padStart(2,'0');return p(Math.floor(x/3600))+':'+p(Math.floor(x%3600/60))+':'+p(x%60)};
 function ev(type){const b=VS[type];if(!b)return;RST[type]='';
  const lvl=evLvl(type),loc=b.loc,road=type==='road_overspeed'?Math.round(ROAD||0):type==='zone_overspeed'?(ZNA?Math.round(ZNA.lim):null):null;
  if(!ANN[type])notify(type,b.kmh,lvl);ANN[type]=false;
@@ -591,44 +674,74 @@ function tripClear(){localStorage.removeItem('trip')}
 // the move) is stored on the handset in IndexedDB and never uploaded, so the server
 // keeps only the sampled stream. An admin asks for a window of time on the Vehicles
 // page; this answers that request by pushing exactly the stored fixes in it, each
-// stamped with the moment it was taken.
+// stamped with the moment it was taken. One second is stored once, and once a
+// second has reached the server it is never pushed again.
 let BB=null,BBW=0,BBN=+(localStorage.bbn||0),bbBusy=false,BBT=null;
 const bbDays=()=>Math.min(14,Math.max(1,+V.bb_days||3));
 // 240 000 fixes is a little over two days at one per second. Stored in the compact
 // form below that is roughly 30 MB, which a handset can hold without being evicted.
 const BBM=240000;
+// Version 2 keys each fix by the second it was taken, so two readings for one
+// second overwrite each other and the handset physically cannot hold a duplicate.
+// The old auto-increment store had no such key and is replaced on the upgrade.
 function bbOpen(){return new Promise(res=>{if(!window.indexedDB||!indexedDB.open)return res(false);let req;
- try{req=indexedDB.open('fleetbb',1)}catch(e){return res(false)}
- req.onupgradeneeded=()=>{const db=req.result;
-  if(!db.objectStoreNames.contains('bb'))db.createObjectStore('bb',{keyPath:'k',autoIncrement:true}).createIndex('at','at')};
+ try{req=indexedDB.open('fleetbb',2)}catch(e){return res(false)}
+ req.onupgradeneeded=e=>{const db=req.result;
+  if(e.oldVersion>=1&&db.objectStoreNames.contains('bb'))db.deleteObjectStore('bb');
+  db.createObjectStore('bb',{keyPath:'at'})};
  req.onsuccess=()=>{BB=req.result;res(!!BB&&BB.objectStoreNames.contains('bb'))};
  req.onerror=()=>res(false);setTimeout(()=>res(false),5000)})}
 const bbSt=m=>{try{return BB&&BB.transaction('bb',m).objectStore('bb')}catch(e){return null}};
+// a stored row is identified by the whole second it belongs to
+const bbf=x=>Math.floor(+x/1000);
 // compact form: [taken ms, lat, lng, km/h, heading, accuracy, altitude, battery, charging]
 const bbPack=(loc,kmh)=>[loc.time||Date.now(),loc.latitude,loc.longitude,Math.round(kmh*10)/10,
  loc.bearing==null?null:Math.round(loc.bearing),loc.accuracy==null?null:Math.round(loc.accuracy),
  loc.altitude==null?null:Math.round(loc.altitude),bat.p||null,bat.c?1:0];
-function bbPut(arr){if(!V.bb_on||!BB||!arr)return;
- if(!bbSt('readwrite'))return;
- try{bbSt('readwrite').add({at:arr[0],d:arr});BBN++;BBW++;
-  if(BBW%200===0){localStorage.bbn=BBN;bbPrune()}
+function bbPut(arr){if(!V.bb_on||!BB||!arr)return;const s=bbSt('readwrite');if(!s)return;
+ try{s.put({at:bbf(arr[0]),d:arr});BBW++;
+  if(BBW%200===0)bbCount();
   bbUi('')}catch(e){}}
+// counting the store is one read per 200 writes, which is cheaper than asking on
+// every fix whether this second was already taken; the count is what pruning uses
+function bbCount(){const s=bbSt('readonly');if(!s)return;try{const r=s.count();
+ r.onsuccess=()=>{BBN=+r.result||0;localStorage.bbn=BBN;bbUi('');bbPrune()}}catch(e){}}
 // drop what aged out, then the oldest surplus if the handset went over the cap.
-// BBN is an estimate held in localStorage — counting the store on every fix would
-// cost more than the write itself.
 function bbPrune(){const s=bbSt('readwrite');if(!s)return;
- try{let gone=0;const cut=Date.now()-bbDays()*864e5;
-  s.index('at').openCursor(IDBKeyRange.upperBound(cut)).onsuccess=e=>{const c=e.target.result;if(!c)return;
+ try{let gone=0;const cut=bbf(Date.now()-bbDays()*864e5);
+  s.openCursor(IDBKeyRange.upperBound(cut)).onsuccess=e=>{const c=e.target.result;if(!c)return;
    c.delete();c.continue();if(++gone===400){BBN=Math.max(0,BBN-gone);localStorage.bbn=BBN;gone=0}};
   let over=Math.max(0,+(localStorage.bbn||BBN)-BBM),cut2=0;
-  if(over>4000){const cu=s.index('at').openCursor();cu.onsuccess=e=>{const c=e.target.result;if(!c||over<=0)return;
+  if(over>4000){const cu=s.openCursor();cu.onsuccess=e=>{const c=e.target.result;if(!c||over<=0)return;
    c.delete();over--;cut2++;c.continue();
    if(over<=0){BBN=Math.max(0,BBN-cut2);localStorage.bbn=BBN}}}}catch(e){}}
+// the seconds this handset has already pushed, per vehicle, as merged windows.
+// Without this a second request that overlaps an earlier one, or a retry after one
+// batch failed, would send the same seconds again and the tacho report would show
+// each of them twice.
+let BSP={};try{BSP=JSON.parse(localStorage.bb_sent||'{}')||{}}catch(e){}
+const bbSave=()=>{try{localStorage.bb_sent=JSON.stringify(BSP)}catch(e){}};
+const bbMerge=ws=>{ws.sort((a,b)=>a[0]-b[0]);const o=[];ws.forEach(w=>{const l=o[o.length-1];
+ if(l&&w[0]<=l[1]+1)l[1]=Math.max(l[1],w[1]);else o.push(w.slice())});return o};
+// the parts of one window that no delivered window covers
+function bbOut(ws,a,b){let out=[[a,b]];
+ (ws||[]).forEach(w=>{const n=[];out.forEach(o=>{
+  if(w[1]<o[0]||w[0]>o[1]){n.push(o);return}
+  if(o[0]<w[0])n.push([o[0],w[0]-1]);if(w[1]<o[1])n.push([w[1]+1,o[1]])});out=n});
+ return out}
+function bbMark(v,a,b){if(!v||!(b>=a))return;const ws=BSP[v]||(BSP[v]=[]);
+ ws.push([a,b]);BSP[v]=bbMerge(ws).slice(-120);bbSave()}
+// windows older than anything the handset can still hold are dropped with the fixes
+function bbTrim(){const cut=bbf(Date.now()-bbDays()*864e5);
+ Object.keys(BSP).forEach(v=>{const w=bbMerge(BSP[v]||[]).filter(x=>x[1]>=cut);
+  if(w.length)BSP[v]=w;else delete BSP[v]});bbSave()}
+// read the whole seconds of a window, ends included
 function bbRange(from,to){return new Promise(res=>{const s=bbSt('readonly');if(!s)return res([]);
- try{s.index('at').getAll(IDBKeyRange.bound(from,to)).onsuccess=e=>res(e.target.result||[])}catch(e){res([])}})}
-// the compact rows become position rows the server already accepts
-function bbRows(list){const v=asg&&asg.vehicles||{};
- return (list||[]).map(x=>{const d=x.d||[];return {user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,
+ try{s.getAll(IDBKeyRange.bound(from,to)).onsuccess=e=>res(e.target.result||[])}catch(e){res([])}})}
+// the compact rows become position rows the server already accepts, one per second
+function bbRows(list){const v=asg&&asg.vehicles||{},seen={};
+ return (list||[]).filter(x=>{const s=bbf((x.d||[])[0]);if(seen[s])return false;seen[s]=1;return true})
+  .map(x=>{const d=x.d||[];return {user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,
   vehicle_name:v.name,driver_name:asg.drivers&&asg.drivers.name,lat:d[1],lng:d[2],speed:d[3]||0,
   heading:d[4]==null?null:d[4],accuracy:d[5]==null?null:d[5],altitude:d[6]==null?null:d[6],
   ignition:true,battery_pct:d[7]==null?null:d[7],charging:!!d[8],blackbox:true,
@@ -637,20 +750,28 @@ function bbUi(pre){const t=$('v_bbox');if(t)t.textContent=(pre||'')+BBN.toLocale
 async function bbDone(id,status,n,error){try{await sb.from('bb_requests').update({status,n_rows:n,
  error:error||null,answered_at:new Date().toISOString()}).eq('id',id)}catch(e){}}
 // answer every pending request about a vehicle this login is assigned to
-async function bbAnswer(){if(bbBusy||!BB||!me||!ASGS.length)return;bbBusy=true;
+async function bbAnswer(){if(bbBusy||!BB||!me||!ASGS.length||!navigator.onLine)return;bbBusy=true;
  try{const ids=ASGS.map(x=>x.vehicle_id);
   const {data:qs}=await sb.from('bb_requests').select('*').eq('status','pending').in('vehicle_id',ids).order('requested_at');
   for(const q of qs||[]){
-   const from=Date.parse(q.from_ts),to=Date.parse(q.to_ts);
+   const from=bbf(Date.parse(q.from_ts)),to=bbf(Date.parse(q.to_ts));
    if(isNaN(from)||isNaN(to)){await bbDone(q.id,'failed',0,'The period in the request is not a date');continue}
-   const rows=bbRows(await bbRange(from,to));
-   if(!rows.length){await bbDone(q.id,'sent',0,'Nothing stored for that period');continue}
+   // only the seconds never delivered before are read off the store and pushed
+   const parts=bbOut(BSP[q.vehicle_id],from,to),full=parts.length===1&&parts[0][0]===from&&parts[0][1]===to;
+   let rows=[];for(const p of parts)rows=rows.concat(bbRows(await bbRange(p[0],p[1])));
+   if(!rows.length){await bbDone(q.id,'sent',0,parts.length===0?'Already downloaded for that period':
+     full?'Nothing stored for that period':'Nothing stored for the part that was not sent before');continue}
    banner('<i class="fa-solid fa-cloud-arrow-up"></i> Blackbox: sending '+rows.length.toLocaleString()+' fixes',9000);
    let sent=0,err='';
    for(let i=0;i<rows.length&&!err;i+=300){const b=rows.slice(i,i+300);
-    const {error}=await sb.from('positions').insert(b);if(error)err=error.message;else sent+=b.length;bbUi('↑ ')}
+    const {error}=await sb.from('positions').insert(b);
+    // credit each batch the moment it lands, so a retry of a broken pull starts
+    // where the last one stopped instead of pushing the whole window again
+    if(error)err=error.message;else{sent+=b.length;
+     bbMark(q.vehicle_id,bbf(Date.parse(b[0].recorded_at)),bbf(Date.parse(b[b.length-1].recorded_at)))}
+    bbUi('↑ ')}
    await bbDone(q.id,err?'failed':'sent',sent,err);bbUi('');
-   logAct('Blackbox sent',(q.vehicle_name||'')+' '+new Date(from).toLocaleString()+' to '+new Date(to).toLocaleString()+
+   logAct('Blackbox sent',(q.vehicle_name||'')+' '+new Date(from*1000).toLocaleString()+' to '+new Date(to*1000).toLocaleString()+
     ' - '+sent+' fixes'+(err?' - '+err:''))}
  }catch(e){$('err').textContent='Blackbox: '+(e.message||e)}
  bbBusy=false}
@@ -661,7 +782,7 @@ function bbWatch(){clearInterval(BBT);BBT=setInterval(()=>{if(!document.hidden)b
 // open the store once at startup; a handset without IndexedDB simply shows "off"
 async function bbInit(){if(!await bbOpen()){bbUi('off');return}
  try{if(navigator.storage&&navigator.storage.persist)await navigator.storage.persist()}catch(e){}
- bbPrune();bbUi(V.bb_on?'':'⏸ ')}
+ bbTrim();bbCount();bbUi(V.bb_on?'':'⏸ ')}
 function upd(loc,kmh,moving){const c=$('stc');c.textContent=moving?'Moving':'Idling';c.style.background=moving?'var(--grl)':'var(--orl)';c.style.color=moving?'var(--gr)':'var(--or)';
  $('sp').textContent=Math.round(kmh);const V=(k,v)=>$('v_'+k).textContent=v;
  V('pos',loc.latitude.toFixed(5)+', '+loc.longitude.toFixed(5));V('acc',loc.accuracy!=null?Math.round(loc.accuracy)+' m':'-');V('alt',loc.altitude!=null?Math.round(loc.altitude)+' m':'-');V('dir',loc.bearing!=null?Math.round(loc.bearing)+'°':'-');V('ac',(lastA*3.6).toFixed(1)+' km/h/s');V('trip',(ODOM/1000).toFixed(1)+' km');$('lt').textContent='Last record '+new Date().toLocaleTimeString('en-GB');mpos(loc,moving)}
@@ -721,6 +842,14 @@ async function openDash(){const {data:{session}}=await sb.auth.getSession();if(!
  const u=DASH+'#access_token='+session.access_token+'&refresh_token='+session.refresh_token+'&expires_in=3600&token_type=bearer';
  try{await CapPlugins.Browser.open({url:u})}catch(e){window.open(u,'_blank')}}
 muteUi();
+// The pages, the map library and the sounds all travel inside the APK, so the only
+// thing a phone cannot read without a signal is the map picture. This small worker
+// keeps the tiles that already loaded, which is how the area a driver drove through
+// this morning is still drawn tonight with no internet. It is a bonus, never a
+// requirement: registering it offline, or failing to, changes nothing else.
+if('serviceWorker'in navigator&&/^https?:$/.test(location.protocol))addEventListener('load',()=>{
+ try{navigator.serviceWorker.register('sw.js',{scope:'./'}).catch(()=>{})}catch(e){}});
+lgHint();
 if(localStorage.user){$('em').value=localStorage.user;$('rem').checked=true}
 if(localStorage.perm!=='1')show('pm');
 init();
