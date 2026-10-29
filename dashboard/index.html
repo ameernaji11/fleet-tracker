@@ -71,7 +71,7 @@ td select{height:36px}#evt,#rep,#trip,#cfg,#hist{height:auto;min-height:100%}.cg
 .seg{display:flex;background:var(--card);border-radius:10px;box-shadow:0 1px 6px #0003;padding:3px;gap:2px}.seg button{border:0;background:none;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;color:var(--mut);font-size:12px}
 .seg button.on{background:var(--bl);color:#fff}
 .mk{width:32px;height:32px;border-radius:50%;border:3px solid #fff;box-shadow:0 1px 6px #0006;display:grid;place-items:center;color:#fff;font-size:13px}
-.mk.pl{width:24px;height:24px;border-width:2px;font-size:10px;background:var(--or)}
+.mk.pl{width:18px;height:18px;border-width:2px;font-size:8px;background:var(--or)}
 .leaflet-tooltip.pltip{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 6px #0003;padding:3px 8px;font-weight:700;font-size:11px;line-height:1.3;white-space:nowrap}
 .leaflet-tooltip.pltip::before{display:none}
 #login{margin:auto;width:340px;padding:28px;display:flex;flex-direction:column;gap:14px;text-align:center}.lgname{font-weight:900;font-size:22px;letter-spacing:.2px}
@@ -94,11 +94,10 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 .eye{position:absolute;right:6px;top:6px;border:0;background:none;color:var(--mut);cursor:pointer;height:28px;width:30px}
 .mt{display:flex;flex-direction:column;gap:6px;align-items:flex-end}.mt button{background:var(--card);color:var(--ink);border:0;border-radius:8px;box-shadow:0 1px 6px #0003;padding:7px 10px;font-weight:700;cursor:pointer;font-size:12px}.mt .ic{width:34px}
 .mm{background:var(--card);border-radius:10px;box-shadow:0 2px 10px #0004;display:flex;flex-direction:column;padding:4px}.mm button{box-shadow:none;text-align:left}.mm.hide{display:none!important}
-// the zone finder: search, tick which shapes this map draws, and jump to one
+/* the zone finder: search, tick which shapes this map draws, and jump to one */
 .zmenu{width:250px;max-width:70vw;background:var(--card);border-radius:10px;box-shadow:0 2px 10px #0004;padding:6px;font-size:12px;text-align:left}
 .zmenu.hide{display:none!important}
 .zmenu input{width:100%;box-sizing:border-box;height:30px;margin-bottom:6px}
-.zbar{display:flex;gap:4px;margin-bottom:6px}
 .zmenu button{box-shadow:none}
 .zlist{max-height:38vh;overflow:auto}
 .zrow{display:flex;gap:4px;align-items:center;border-radius:6px;padding:1px 2px}
@@ -106,8 +105,19 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 .zrow label{flex:1;min-width:0;display:flex;gap:6px;align-items:center;cursor:pointer;font-weight:400;padding:2px 0}
 .zrow span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .zrow .go{background:none;border:0;color:var(--bl);cursor:pointer;width:22px;height:22px;padding:0;font-size:11px}
+.zrow .ed{background:none;border:0;color:var(--mut);cursor:pointer;width:22px;height:22px;padding:0;font-size:11px}
+.zrow .ed:hover{color:var(--ink)}.zrow .ed.rm:hover{color:var(--rd)}
+/* the one Geofences panel holds a title row, a search box, the list and the write
+ actions, so it needs its own spacing and a way to hide the write actions from
+ anyone who is not an admin (the panel is built before the role is known) */
+.zhd{display:flex;gap:4px;align-items:center;margin-bottom:5px}
+.zhd b{flex:1;min-width:0;font-size:12px;letter-spacing:.2px}
+.zsw{display:flex;gap:6px;align-items:center;font-weight:400;margin-bottom:5px;cursor:pointer;color:var(--ink)}
+.zmenu input[type=checkbox]{width:auto;height:auto;flex:none;margin:0}
+.zadd{width:100%;margin-top:6px;justify-content:center}
+.zmenu.noadmin .zw{display:none!important}
 .zmenu .empty{padding:6px 4px;color:var(--mut)}
-// handles for changing a zone outline in place
+/* handles for changing a zone outline in place */
 .zg{cursor:grab}.zg.leaflet-marker-dragging{cursor:grabbing}
 .zv{width:12px;height:12px;border:2px solid #fff;background:#27a46a;border-radius:3px;box-shadow:0 1px 4px #0008}
 .zv.mid{width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid #27a46a;box-shadow:0 1px 3px #0007}
@@ -213,7 +223,7 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <tr><td>Zone detection <span class="hp" data-tip="Turns zone checking off for the whole fleet without deleting any shape. Draw, name and limit your zones in the Zones table below.">?</span></td><td><label class="ck"><input id="s_z" type="checkbox"> Report entry, exit and overspeed</label></td><td><small>Each zone's own limit and alerts are set in the Zones table below.</small></td></tr></table></div></div>
 <div class="card"><div class="csh"><i class="fa-solid fa-triangle-exclamation"></i><div><b>Events (defaults for all vehicles) <span class="hp" data-tip="&lt;b&gt;Tolerance&lt;/b&gt; is how long the driver must keep breaking the rule before it is written to the database. The buzzer and the on-screen alert fire immediately; the event is only recorded once the violation lasts longer than the tolerance. Use 2 s for harsh braking/acceleration and 10 s for overspeed. &lt;b&gt;Trigger limit&lt;/b&gt; is the fleet default that a vehicle uses unless it has its own value below. Zone entered and Zone exited have no trigger limit: crossing the line is itself the event.">?</span></b><small>The limit, the buzzer and the spoken message the whole fleet starts from.</small></div></div><div class="tw" id="ruleT" style="margin-top:10px"></div></div>
 <div class="card"><div class="csh"><i class="fa-solid fa-truck"></i><div><b>Settings per vehicle <span class="hp" data-tip="A vehicle marked &lt;b&gt;custom&lt;/b&gt; keeps its own values; leave a box empty to follow the fleet default above. Phones apply changes within 5 minutes or at the next trip start. &lt;b&gt;Overspeed buffer&lt;/b&gt; is added on top of the limit before the alert starts. &lt;b&gt;Warning level&lt;/b&gt; buzzes the phone without recording an event. &lt;b&gt;Min. distance&lt;/b&gt; suppresses events until the vehicle has actually moved that far. Tick the box beside a vehicle and press Reset to send it back to the fleet defaults.">?</span></b><small>Overrides for one vehicle. Tick the box beside it to include it in Reset.</small></div><button class="btn o sm" onclick="resetSelV()" title="Clears the own values of every vehicle you ticked in the table below, so it follows the fleet defaults on this page again. Unticked vehicles are left exactly as they are. Phones apply the change within 5 minutes."><i class="fa-solid fa-rotate-left"></i>Reset selected</button></div><div class="tw" id="cfgV" style="margin-top:10px"></div></div>
-<div class="card"><div class="csh"><i class="fa-solid fa-draw-polygon"></i><div><b>Zones (geofences) <span class="hp" data-tip="A zone is a shape you draw on the Live Tracking map. Every phone tests each position against it, so driving in, driving out or passing the zone's own speed limit makes an event - and each of those three has its own alert, buzzer, voice and tolerance in the Events table above. &lt;b&gt;Leave a limit empty&lt;/b&gt; and the zone only reports entries and exits. Phones reload the shapes within 5 minutes.">?</span></b><small>The areas the whole fleet is watched against, and what each one reports. Type in the box below to search by name, or press a name to open that shape on the Live Tracking map. Press Edit, or click the shape on a map, to change its name, limit, alerts, colour, or to move, add and drop single corners without drawing the whole zone again.</small></div><button class="btn b sm" onclick="switchTab('live');setTimeout(()=>{if(!DRAW)drawZone(mapL)},200)" title="Switches to Live Tracking and starts the drawing tool"><i class="fa-solid fa-draw-polygon"></i>Draw a zone</button></div>
+<div class="card"><div class="csh"><i class="fa-solid fa-draw-polygon"></i><div><b>Zones (geofences) <span class="hp" data-tip="A zone is a shape you draw on the Live Tracking map. Every phone tests each position against it, so driving in, driving out or passing the zone's own speed limit makes an event - and each of those three has its own alert, buzzer, voice and tolerance in the Events table above. &lt;b&gt;Leave a limit empty&lt;/b&gt; and the zone only reports entries and exits. Phones reload the shapes within 5 minutes.">?</span></b><small>The areas the whole fleet is watched against, and what each one reports. Type in the box below to search by name, or press a name to open that shape on the Live Tracking map. Press Edit, or click the shape on a map, to change its name, limit, alerts, colour, or to move, add and drop single corners without drawing the whole zone again.</small></div><button class="btn b sm" onclick="switchTab('live');setTimeout(()=>zAdd(mapL),200)" title="Switches to Live Tracking and starts the drawing tool"><i class="fa-solid fa-draw-polygon"></i>Draw a zone</button></div>
 <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap"><input id="zQ" placeholder="Search zones by name" oninput="zFilter(this.value)" style="width:260px;max-width:100%"><small id="zC" style="opacity:.65"></small></div>
 <div class="tw" id="zT" style="margin-top:8px"></div></div>
 <div class="card"><div class="csh"><i class="fa-solid fa-signature"></i><div><b>Saved place names <span class="hp" data-tip="Map services name a place from their own data, so a private or newly built address often shows the wrong label - a neighbour's building, or just a street number. A saved name here wins over every map service: any position inside its radius is reported with this name in trip popups, the trip list and every report. Names already shown on screen are corrected as soon as the page reloads.">?</span></b><small>Names you choose yourself, overriding what the map services call a place. Each one is drawn on the maps: press a name to edit or delete it, or press the bookmark on a map and click the spot to add one.</small></div><button class="btn b sm" onclick="plAdd()"><i class="fa-solid fa-plus"></i>Add a place</button></div>
@@ -245,7 +255,7 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <div class="field"><label>From</label><input id="ac_f" type="text"></div><div class="field"><label>To</label><input id="ac_to" type="text"></div>
 <button class="btn b" onclick="loadAct()"><i class="fa-solid fa-play"></i>Generate</button></div>
 <div class="card"><i class="fa-solid fa-circle-info" style="color:var(--bl)"></i> <b>Who did what, and when.</b> Every sign-in, saved configuration, vehicle, driver or user change, trip start or end and exported report is listed here. <span class="hp" data-tip="Entries are written by the account they describe, so an anonymous or signed-out visit never appears. The log cannot be edited or deleted by anyone, including admins - it is the proof a change was not made by you. Use the search box or the User filter to read one person's history, then CSV, Excel or PDF to hand it over.">?</span> Only admins can see this page.</div>
-<div class="kpis" id="acK"></div><div class="tw" id="acT"></div></section>
+<div id="acFl" style="display:flex;gap:8px;align-items:center;min-height:30px"></div><div class="kpis" id="acK"></div><div class="tw" id="acT"></div></section>
 </main><footer class="pagefoot">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</footer></div></div><div id="toast"></div><div id="tip"></div>
 <div id="zHint" class="hide"></div>
 <div id="zdlg" class="mdl"><div><div id="zTitle" style="font-size:15px;font-weight:800;margin-bottom:8px"></div>
@@ -319,9 +329,9 @@ function mkMap(id,fit,extra){
   const tb=(ic,t,f,k)=>{const b=L.DomUtil.create('button','ic',d);b.innerHTML='<i class="fa-solid '+ic+'"></i>';b.title=t;b.onclick=f;if(k)m._btn[k]=b};
   tb('fa-expand','Full screen',()=>document.fullscreenElement===m.getContainer()?document.exitFullscreen():m.getContainer().requestFullscreen(),'fs');
   tb('fa-crosshairs','Zoom to all',()=>fit&&fit());tb('fa-ruler','Measure distance',()=>measure(m));
-  tb('fa-shapes','Show or hide the geofences',zTog,'zshow');
   zPanel(d,m);
-  tb('fa-bookmark','Add a saved place: press this, then click the spot on the map',()=>plArm(m),'pl');(extra||[]).forEach(x=>tb(...x));return d};
+  tb('fa-bookmark','Add a saved place: press this, then click the spot on the map',()=>plArm(m),'pl');
+  tb('fa-signature','Show the saved place names beside their markers',plTog,'pln');(extra||[]).forEach(x=>tb(...x));return d};
  c.addTo(m);L.control.scale({imperial:false}).addTo(m);document.addEventListener('fullscreenchange',()=>{const b=m._btn&&m._btn.fs;if(b){const on=document.fullscreenElement===m.getContainer(),i=b.querySelector('i');
    b.title=on?'Shrink back':'Full screen';if(i)i.className='fa-solid '+(on?'fa-minimize':'fa-expand')}setTimeout(()=>m.invalidateSize(),250)});return m}
 function measure(m){if(m._meas){m.off('click',m._meas.h);m._meas.g.remove();m._meas=null;m.getContainer().style.cursor='';return}
@@ -348,7 +358,7 @@ const zRing=z=>z.pts&&z.pts.length?z.pts:zPts(z.shape);
 function switchTab(t){const b=document.querySelector('.nb[data-t="'+t+'"]');if(b)b.click()}
 function zPaint(){[mapL,mapH].forEach(m=>{if(!m)return;const id=m.getContainer().id;
  if(zG[id]){m.removeLayer(zG[id]);delete zG[id]}
- const b=m._btn&&m._btn.zshow;if(b){b.classList.toggle('on',ZSHOW);b.title=(ZSHOW?'Hide':'Show')+' the geofences drawn on this map'}
+ zSync(m);
  if(!ZSHOW){zList(m);return}
  zList(m);
  const g=L.layerGroup().addTo(m);
@@ -359,32 +369,64 @@ function zPaint(){[mapL,mapH].forEach(m=>{if(!m)return;const id=m.getContainer()
   if(ADMIN)poly.on('click',()=>{if(!DRAW&&!ZSH)zEdit(z.id)});
   poly.addTo(g)});
  zG[id]=g})}
-function zTog(){ZSHOW=!ZSHOW;localStorage.zones_show=ZSHOW?'1':'0';zPaint();
- toast(ZSHOW?'Geofences are shown on the maps':'Geofences are hidden on the maps',1)}
 // Once there are more shapes than colours, the map needs a way to pick out the one
 // you mean: search by name, then tick the zones this map should draw. Only the
 // hidden ones are remembered, so a zone drawn later appears without any setting.
 let ZOFF=new Set();try{(JSON.parse(localStorage.zones_hide||'[]')||[]).forEach(id=>ZOFF.add(id))}catch(e){}
 const zOn=id=>!ZOFF.has(id);
 function zHide(){localStorage.zones_hide=JSON.stringify([...ZOFF]);zPaint()}
+// One button does every geofence job on this map - draw a new zone, change or
+// delete one, search the list, and pick which shapes the map draws. It used to be
+// three buttons side by side (a show/hide switch, a finder and a draw tool) that
+// only made sense together.
 function zPanel(d,m){const b=L.DomUtil.create('button','ic',d);
- b.innerHTML='<i class="fa-solid fa-list-check"></i>';b.title='Find a zone, tick the ones this map shows';
+ b.innerHTML='<i class="fa-solid fa-shapes"></i>';
  const p=L.DomUtil.create('div','zmenu hide',d);
- const q=L.DomUtil.create('input','',p);q.placeholder='Search zones by name';q.maxLength=60;q.oninput=()=>zList(m);
- const bar=L.DomUtil.create('div','zbar',p);
- [['All',()=>{ZOFF.clear();zHide()},'Show every zone on this map again'],
-  ['None',()=>{zones.forEach(z=>ZOFF.add(z.id));zHide()},'Clear the shapes off the map, then tick the ones you want']].forEach(x=>{
-   const k=L.DomUtil.create('button','gh sm',bar);k.textContent=x[0];k.title=x[2];k.onclick=x[1]});
- const list=L.DomUtil.create('div','zlist',p);
+ p.innerHTML='<div class="zhd"><b>Geofences</b><button type="button" class="gh sm" data-x="all">All</button>'
+  +'<button type="button" class="gh sm" data-x="none">None</button></div>'
+  +'<label class="zsw"><input type="checkbox" data-x="show"> Show geofences on this map</label>'
+  +'<input type="text" data-x="q" placeholder="Search zones by name" maxlength="60">'
+  +'<div class="zlist" data-x="list"></div>'
+  +'<button type="button" class="btn o sm zw" data-x="add"><i class="fa-solid fa-draw-polygon"></i> Draw a new zone</button>';
+ const g=x=>p.querySelector('[data-x="'+x+'"]');
+ m._zq=g('q');m._zl=g('list');m._zp=p;m._zsw=g('show');m._zb=b;
+ g('all').title='Show every zone on this map';g('none').title='Take every shape off this map, then tick the ones you want';
+ m._zq.oninput=()=>zList(m);
+ g('all').onclick=()=>{if(!zones.length)return toast('No zones have been drawn yet');ZOFF.clear();zHide()};
+ g('none').onclick=()=>{if(!zones.length)return toast('No zones have been drawn yet');zones.forEach(z=>ZOFF.add(z.id));zHide()};
+ m._zsw.onchange=()=>{ZSHOW=m._zsw.checked;localStorage.zones_show=ZSHOW?'1':'0';zPaint();
+  toast(ZSHOW?'Geofences are shown on the maps':'Geofences are hidden on the maps',1)};
+ g('add').onclick=()=>{zClosePanel(m);zAdd(m)};
  // arrow keys typed into the search box must not slide the map about
  p.addEventListener('keydown',e=>e.stopPropagation());
- m._zq=q;m._zl=list;m._zp=p;
  b.onclick=()=>{const sh=p.classList.toggle('hide');b.classList.toggle('on',!sh);if(!sh)zList(m)};
- return b}
+ // the panel sits over the map corner, so clicking the map - to place a zone point
+ // or pick a vehicle - gets rid of it instead of leaving it in the way
+ m.on('click',()=>zClosePanel(m));
+ document.addEventListener('keydown',e=>{if(e.key==='Escape')zClosePanel(m)});
+ zSync(m);return b}
+function zClosePanel(m){if(!m._zb)return;m._zp.classList.add('hide');m._zb.classList.remove('on')}
+// what this one button is worth right now, said out loud in its tooltip
+function zSync(m){if(!m._zb)return;const n=zones.filter(z=>zOn(z.id)).length;
+ m._zb.title='Geofences: '+(zones.length?(ZSHOW?n+' of '+zones.length+' shown on this map':'all '+zones.length+' hidden')
+  :'none drawn yet')+' - press to draw, change, hide or delete a zone';
+ if(m._zsw)m._zsw.checked=ZSHOW}
+// Adding draws on the Live map, the one surface the shape editor works on, so a
+// zone started from the Historical map lands where it can be finished.
+function zAdd(m){if(!ADMIN)return toast('Only an admin can draw zones');
+ if(ZSH)return toast('Apply or cancel the zone shape you are changing first',1);
+ if(DRAW){zCancel();return}
+ if(m&&m!==mapL)switchTab('live');
+ if(!ZSHOW){ZSHOW=true;localStorage.zones_show='1'}
+ zPaint();drawZone(mapL)}
 function zList(m){if(!m||!m._zl)return;const q=(m._zq.value||'').trim().toLowerCase();
  const S=zones.filter(z=>!q||String(z.name||'').toLowerCase().includes(q));
- m._zl.innerHTML=S.map(z=>`<div class="zrow"><label title="${zOn(z.id)?'Untick to hide this zone on the maps':'Tick to show this zone on the maps'}"><input type="checkbox" ${zOn(z.id)?'checked':''} onchange="zTick('${z.id}',this.checked)"><span>${esc(z.name)}</span></label><button class="go" title="Centre the map on this zone" onclick="zFocus('${z.id}','${m.getContainer().id}')"><i class="fa-solid fa-crosshairs"></i></button></div>`).join('')
-  ||`<div class="empty">${zones.length?'No zone matches &quot;'+esc(q)+'&quot;':'No zones drawn yet'}</div>`}
+ // the panel is built before the signed-in role is known, so the write actions
+ // are hidden from everyone who cannot use them
+ if(m._zp)m._zp.classList.toggle('noadmin',!ADMIN);
+ m._zl.innerHTML=S.map(z=>`<div class="zrow"><label title="${zOn(z.id)?'Untick to hide this zone on the maps':'Tick to show this zone on the maps'}"><input type="checkbox" ${zOn(z.id)?'checked':''} onchange="zTick('${z.id}',this.checked)"><span>${esc(z.name)}</span></label><button class="ed zw" title="Change this zone: name, speed limit, alerts, colour or shape" onclick="zEdit('${z.id}')"><i class="fa-solid fa-pen"></i></button><button class="ed rm zw" title="Delete this zone" onclick="zDelById('${z.id}')"><i class="fa-solid fa-trash"></i></button><button class="go" title="Centre the map on this zone" onclick="zFocus('${z.id}','${m.getContainer().id}')"><i class="fa-solid fa-crosshairs"></i></button></div>`).join('')
+  ||`<div class="empty">${zones.length?'No zone matches &quot;'+esc(q)+'&quot;':'No zones drawn yet. Press "Draw a new zone" below.'}</div>`;
+ zSync(m)}
 function zTick(id,on){const was=zOn(id);if(on)ZOFF.delete(id);else ZOFF.add(id);
  if(on&&!ZSHOW){ZSHOW=true;localStorage.zones_show='1'}
  if(was!==!!on)zHide()}
@@ -478,7 +520,7 @@ function zTable(){const t=$('zT');if(!t)return;
  const nm=z=>`<td><button class="zgo" onclick="zGoto('${z.id}')" title="Show this zone on the Live Tracking map">${esc(z.name)}</button></td>`;
  const none=(n,m)=>`<tr><td colspan="${n}">${m}</td></tr>`;
  t.innerHTML=ADMIN?`<table><tr><th>Zone</th><th>Corners</th><th>Area km2</th><th>Speed limit km/h</th><th>Alert on entry</th><th>Alert on exit</th><th>Alert on overspeed</th><th>Watched <span class="hp" data-tip="Ticked: the phones report entry, exit and overspeed for this zone. Empty: the shape stays on the map but nothing is reported - switch a zone off instead of deleting it while it is being moved or rebuilt.">?</span></th><th></th></tr>${ZS.map(z=>{const p=zPts(z.shape);
-  return `<tr>${nm(z)}<td>${p.length}</td><td>${p.length>2?zArea(p).toFixed(3):'-'}</td><td><input type="number" min="5" max="250" value="${z.speed_limit==null?'':z.speed_limit}" style="width:78px" onchange="zSet('${z.id}','speed_limit',this.value===''?null:+this.value)"></td>${['enter','exit','overspeed'].map(k=>`<td style="text-align:center"><input type="checkbox" ${z[k]!==false?'checked':''} onchange="zSet('${z.id}','${k}',this.checked)"></td>`).join('')}<td style="text-align:center"><input type="checkbox" ${z.enabled!==false?'checked':''} onchange="zSet('${z.id}','enabled',this.checked)"></td><td style="text-align:right;white-space:nowrap"><button class="btn b sm" onclick="zEdit('${z.id}')" title="Change this zone's name, speed limit, alerts, colour, whether it is watched, or its shape"><i class="fa-solid fa-pen"></i>Edit</button> <button class="btn r sm" onclick="zDelById('${z.id}')"><i class="fa-solid fa-trash"></i>Delete</button></td></tr>`}).join('')||none(9,ZQ?'No zone matches "'+esc(ZQ)+'".':'No zones yet. Press <b>Draw zone</b> on the Live Tracking map to add one.')}</table>`
+  return `<tr>${nm(z)}<td>${p.length}</td><td>${p.length>2?zArea(p).toFixed(3):'-'}</td><td><input type="number" min="5" max="250" value="${z.speed_limit==null?'':z.speed_limit}" style="width:78px" onchange="zSet('${z.id}','speed_limit',this.value===''?null:+this.value)"></td>${['enter','exit','overspeed'].map(k=>`<td style="text-align:center"><input type="checkbox" ${z[k]!==false?'checked':''} onchange="zSet('${z.id}','${k}',this.checked)"></td>`).join('')}<td style="text-align:center"><input type="checkbox" ${z.enabled!==false?'checked':''} onchange="zSet('${z.id}','enabled',this.checked)"></td><td style="text-align:right;white-space:nowrap"><button class="btn b sm" onclick="zEdit('${z.id}')" title="Change this zone's name, speed limit, alerts, colour, whether it is watched, or its shape"><i class="fa-solid fa-pen"></i>Edit</button> <button class="btn r sm" onclick="zDelById('${z.id}')"><i class="fa-solid fa-trash"></i>Delete</button></td></tr>`}).join('')||none(9,ZQ?'No zone matches "'+esc(ZQ)+'".':'No zones yet. Press the <b>Geofences</b> button on the Live Tracking map, then <b>Draw a new zone</b>.')}</table>`
   :`<table><tr><th>Zone</th><th>Speed limit km/h</th><th>Area km2</th></tr>${ZS.filter(z=>z.enabled!==false).map(z=>{const p=zPts(z.shape);return `<tr>${nm(z)}<td>${z.speed_limit==null?'-':z.speed_limit}</td><td>${p.length>2?zArea(p).toFixed(3):'-'}</td></tr>`}).join('')||none(3,ZQ?'No watched zone matches "'+esc(ZQ)+'".':'No zone is being watched.')}</table>`}
 async function zSet(id,k,v){if(!ADMIN)return;
  const u={updated_at:new Date().toISOString()};u[k]=k==='speed_limit'?(v==null||v===''?null:+v):!!v;
@@ -487,6 +529,7 @@ async function zSet(id,k,v){if(!ADMIN)return;
  await zRefs();const z=zones.find(x=>x.id===id);logAct('Zone setting',(z&&z.name||'')+' - '+k+' = '+(v==null?'off':v))}
 function zEdit(id){const z=zones.find(x=>x.id===id);if(z)zDlg(Object.assign({},z))}
 function zDelById(id){const z=zones.find(x=>x.id===id);if(!z)return;
+ if(!ADMIN)return toast('Only an admin can delete a zone');
  if(!confirm('Delete the zone "'+z.name+'"? Events already recorded in it stay.'))return;
  sb.from('geofences').delete().eq('id',id).then(()=>{zRefs();toast('Zone deleted');logAct('Deleted zone',z.name)})}
 // ---- changing an outline in place. Re-clicking all eighteen corners of a depot
@@ -635,7 +678,7 @@ async function boot(fresh){
  ADMIN=p?.role==='admin';UID=session.user.id;document.body.classList.toggle('usr',!ADMIN);
  $('login').classList.add('hide');$('app').classList.remove('hide');UNAME=(session.user.email||'').replace('@fleet.local','');$('me').textContent=UNAME;$('accWho').textContent='Welcome, '+UNAME+'!';if(localStorage.pin==='1')document.querySelector('aside').classList.add('pin');pinBtn();themeBtn();
  logAct(fresh?'Signed in':'Opened dashboard','Role: '+(ADMIN?'admin':'user'));sessStart();
- mapL=mkMap('mapLive',fitAll,[['fa-thumbtack','Pin: keep the selected vehicle in the centre of the map while it moves',pinV,'pin'],['fa-draw-polygon','Draw zone: click the map for each corner of a geofence, then double-click to finish',()=>drawZone(mapL),'zone'],['fa-volume-high','Mute the alert buzzer',muteTog,'mute']]);mapH=mkMap('mapHist',hFit);muteUi();
+ mapL=mkMap('mapLive',fitAll,[['fa-thumbtack','Pin: keep the selected vehicle in the centre of the map while it moves',pinV,'pin'],['fa-volume-high','Mute the alert buzzer',muteTog,'mute']]);mapH=mkMap('mapHist',hFit);muteUi();
  initDates();
  await refs();await getSet();await zRefs();await loadLive();loadRules();evInit();
  sb.channel('pos').on('postgres_changes',{event:'INSERT',schema:'public',table:'positions'},e=>{if(e.new)upsert(e.new)}).subscribe(s=>{const ok=s==='SUBSCRIBED';$('conn').className='pill'+(ok?'':' bad');$('connT').textContent=ok?'Live':'Reconnecting'});
@@ -690,22 +733,37 @@ async function link(id){const role=$('r_'+id).value;if(id===UID&&role!=='admin')
 // dashboard and the driver phone write, so the filter offers every kind of
 // entry even when the current period happens to contain none of it.
 const ACTS=['Signed in','Signed out','Session time','Opened dashboard','Opened app','Opened dashboard from app','Allowed permissions','Switched vehicle','Changed own password','Added vehicle','Edited vehicle','Deleted vehicle','Added driver','Edited driver','Deleted driver','Created user','Saved user access','Saved configuration','Reset vehicles to fleet defaults','Exported report','Printed trip','Started trip','Ended trip'];
-let ACT=[],ACTU=null;
+let ACT=[],ACTU=null,ACF='';
 async function loadAct(){if(!ADMIN)return;
  if(!ACTU){const {data}=await sb.from('profiles').select('id,email').order('email');
   ACTU=data||[];$('ac_u').innerHTML='<option value="">All users</option>'+ACTU.map(p=>`<option value="${p.id}">${esc((p.email||'').replace('@fleet.local',''))}</option>`).join('')}
  $('ac_t').innerHTML='<option value="">All activities</option>'+ACTS.map(a=>`<option value="${a}">${a}</option>`).join('');
  const u=$('ac_u').value,t=$('ac_t').value,f=new Date($('ac_f').value).toISOString(),to=new Date($('ac_to').value).toISOString();
  ACT=await fetchAll(()=>{let q=sb.from('user_activity').select('*').gte('recorded_at',f).lte('recorded_at',to).order('recorded_at',{ascending:false});if(u)q=q.eq('user_id',u);if(t)q=q.eq('action',t);return q});
- const byU=cnt(ACT,r=>r.user_name),byA=cnt(ACT,r=>r.action);
+ // a tile filter already picked stays across a reload, so changing the user or
+ // the period does not silently widen the table back to everything
+ renderAct()}
+const ACF_L={ph:'From phones',pc:'From computers',ss:'Sessions with a time on screen'};
+// pressing a tile narrows the table to that group; pressing it again clears it.
+function acSet(k){ACF=ACF===k?'':k;renderAct()}
+function renderAct(){
+ const fx=r=>!ACF||(ACF==='ph'?r.device==='phone':ACF==='pc'?r.device!=='phone':r.duration_s!=null),
+  rows=ACT.filter(fx),byU=cnt(rows,r=>r.user_name),byA=cnt(rows,r=>r.action),
+  ph=ACT.filter(r=>r.device==='phone').length,SEC=rows.reduce((s,r)=>s+(+r.duration_s||0),0);
  // 'Session time' rows are the only ones that carry duration_s, so the tile is
- // the total the picked people actually spent inside the dashboard or the app.
- const SEC=ACT.reduce((s,r)=>s+(+r.duration_s||0),0);
- $('acK').innerHTML=tile('gy','fa-user-clock',ACT.length,'Entries')+tile('bl','fa-users',Object.keys(byU).length,'People active')+tile('gr','fa-list',Object.keys(byA).length,'Activity types')+tile('or','fa-mobile-screen',ACT.filter(r=>r.device==='phone').length,'From phones')+tile('bl','fa-stopwatch',hms(SEC),'Time on screen');
+ // the total the people in the table actually spent inside the dashboard or the app.
+ const ct=(c,i,v,l,js,on,tp)=>tile(c,i,v,l).replace('class="card kpi ',`onclick="${js}" title="${tp||(on?'Click again to show every entry':'Click to show only these')}" class="card kpi click${on?' on':''} `);
+ $('acK').innerHTML=ct('gy','fa-user-clock',ACT.length,'Entries',"ACF='';renderAct()",!ACF,'Click to clear the filter below and show every entry again')
+  +tile('bl','fa-users',Object.keys(byU).length,'People active')
+  +tile('gr','fa-list',Object.keys(byA).length,'Activity types')
+  +ct('or','fa-mobile-screen',ph,'From phones',"acSet('ph')",ACF==='ph')
+  +ct('bl','fa-laptop',ACT.length-ph,'From computers',"acSet('pc')",ACF==='pc')
+  +ct('gr','fa-stopwatch',hms(SEC),'Time on screen',"acSet('ss')",ACF==='ss');
+ $('acFl').innerHTML=ACF?`<span class="chip" style="background:var(--bll);color:var(--bl)">${ACF_L[ACF]}</span> <button class="btn gh sm" onclick="acSet('')"><i class="fa-solid fa-rotate-left"></i>Reset filter</button>`:'';
  const H=['Date and time','User','Activity','Details','Time on screen','From'];
  const R=r=>[new Date(r.recorded_at).toLocaleString('en-GB'),r.user_name||'-',r.action||'',r.details||'',r.duration_s==null?'':hms(+r.duration_s),r.device==='phone'?'Phone':'Computer'];
- $('acT').innerHTML=`<table><tr>${H.map(h=>`<th>${h}</th>`).join('')}</tr>${ACT.map(r=>`<tr>${R(r).map(v=>`<td>${esc(v)}</td>`).join('')}</tr>`).join('')||'<tr><td colspan="6">Nothing recorded in this period.</td></tr>'}</table>`;
- tools($('acT'),{title:'Activity Log',full:()=>({head:H,rows:ACT.map(R)})})}
+ $('acT').innerHTML=`<table><tr>${H.map(h=>`<th>${h}</th>`).join('')}</tr>${rows.map(r=>`<tr>${R(r).map(v=>`<td>${esc(v)}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="6">${ACT.length?'No entry matches this filter — press Reset.':'Nothing recorded in this period.'}</td></tr>`}</table>`;
+ tools($('acT'),{title:'Activity Log',full:()=>({head:H,rows:rows.map(R)})})}
 // ---- live
 const TI={Car:'fa-car',Sedan:'fa-car-side',Hatchback:'fa-car',SUV:'fa-car-rear',Pickup:'fa-truck-pickup',Van:'fa-van-shuttle',Minibus:'fa-van-shuttle',Bus:'fa-bus',Truck:'fa-truck','Heavy Truck':'fa-truck-moving',Tanker:'fa-truck-droplet',Taxi:'fa-taxi',Ambulance:'fa-truck-medical',Motorbike:'fa-motorcycle',Tractor:'fa-tractor',Trailer:'fa-trailer',Equipment:'fa-tractor'};
 const vt=p=>TI[(vehicles.find(v=>v.id===p.vehicle_id)||{}).type]||'fa-location-dot';
@@ -726,7 +784,7 @@ function pinV(){if(PINV){PINV=null;mapL._btn.pin&&mapL._btn.pin.classList.remove
  const uid=SELV||(Object.keys(last).length===1?Object.keys(last)[0]:null);
  if(!uid||!last[uid])return toast('Select a vehicle on the map or in the list first, then press Pin');
  PINV=uid;mapL.setView([last[uid].lat,last[uid].lng],Math.max(mapL.getZoom(),17));mapL._btn.pin&&mapL._btn.pin.classList.add('on');toast('Pinned to '+(last[uid].vehicle_name||'vehicle')+' — the map follows it',1)}
-function setF(f){FILT=f;document.querySelectorAll('.kpi.click').forEach(k=>k.classList.toggle('on',k.dataset.f===f));renderList();fitAll()}
+function setF(f){FILT=f;document.querySelectorAll('#live .kpi.click').forEach(k=>k.classList.toggle('on',k.dataset.f===f));renderList();fitAll()}
 function fitAll(){const a=Object.values(last).filter(shown);if(a.length)mapL.fitBounds(a.map(p=>[p.lat,p.lng]),{maxZoom:15,padding:[40,40]})}
 async function loadLive(){(await fetchAll(()=>sb.from('latest_positions').select('*'))).filter(okFix).forEach(upsert);fitAll()}
 function upsert(p){last[p.user_id]=p;const ll=[p.lat,p.lng];
@@ -1147,13 +1205,26 @@ function plTable(){const t=$('plT');if(!t)return;
 // A name is chosen on the ground, so it is edited there too: the marker opens the
 // same dialog the table row does, and the bookmark arms a click anywhere on the map.
 let PLG={},PLARM=null;
+// A saved name is a label, not a billboard: the marker stays small and sits under
+// the vehicle, and the name is read by pressing it. The toolbar switch is for the
+// times every name has to be seen at once.
+let PLNAME=localStorage.places_names==='1';
+function plTog(){PLNAME=!PLNAME;localStorage.places_names=PLNAME?'1':'0';plPaint();
+ toast(PLNAME?'Saved place names are shown on the maps':'Saved place names are hidden - press a marker to read one',1)}
 function plPaint(){[mapL,mapH].forEach(m=>{if(!m)return;const id=m.getContainer().id;
  if(PLG[id]){m.removeLayer(PLG[id]);delete PLG[id]}
+ // a name that was painted on the map belongs to a marker that no longer exists:
+ // Leaflet leaves an open tooltip in its pane, so clear them before drawing again
+ m.getContainer().querySelectorAll('.leaflet-tooltip.pltip').forEach(t=>t.remove());
+ const b=m._btn&&m._btn.pln;if(b)b.classList.toggle('on',PLNAME);
  const g=L.layerGroup().addTo(m);
- PLACES.forEach((x,i)=>{const mk=L.marker([+x.la,+x.lo],{zIndexOffset:700,interactive:ADMIN,keyboard:false,
-   icon:L.divIcon({className:'',html:'<div class="mk pl"><i class="fa-solid fa-bookmark"></i></div>',iconSize:[24,24],iconAnchor:[12,12]})})
-   .bindTooltip(x.n,{permanent:true,direction:'right',offset:[14,0],className:'pltip'});
-  if(ADMIN)mk.on('click',()=>plEdit(i));
+ PLACES.forEach((x,i)=>{const mk=L.marker([+x.la,+x.lo],{zIndexOffset:-200,keyboard:false,
+   icon:L.divIcon({className:'',html:'<div class="mk pl"><i class="fa-solid fa-bookmark"></i></div>',iconSize:[18,18],iconAnchor:[9,9]})})
+   .bindTooltip(x.n,{permanent:PLNAME,direction:'right',offset:[10,0],className:'pltip'});
+  // pressing a marker reads or opens the name, but never swallows a click the map
+  // is waiting for: saving a place, a zone corner, or nothing while a shape is held
+  mk.on('click',e=>{if(PLARM){PLARM.h(e);return}if(DRAW){DRAW.click(e);return}if(ZSH)return;
+   if(ADMIN)plEdit(i);else mk.openTooltip()});
   mk.addTo(g)});
  PLG[id]=g})}
 function plArm(m){if(!ADMIN)return toast('Only an admin can save place names');
