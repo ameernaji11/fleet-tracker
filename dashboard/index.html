@@ -348,16 +348,15 @@ const st=p=>off(p)?'off':(p.ignition===false||Date.now()-new Date(p.recorded_at)
 // tile sources, shared by every map on the page and by the trip print-out window.
 // Every name says who draws the picture. Google leads because that is the style
 // drivers and managers recognise; the two Esri rows are Esri's own street and
-// imagery tiles. OpenStreetMap sits last on purpose - it is the server that answered
-// this app with a 403 "not following the tile usage policy" block when it was the
-// default street view, so if it starts blocking again this entry is the only line
-// to delete and nothing else changes.
+// imagery tiles. OpenStreetMap is gone from here for good - its tile server
+// answers this app with a 403 "not following the tile usage policy" block, so the
+// style cannot be relied on and there is no point offering it. Nominatim, which is
+// a different OpenStreetMap service, still gives place names and is unaffected.
 const BASES={'Google Map':['https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}','Map data © Google',20,{subdomains:['mt0','mt1','mt2','mt3']}],
  'Google Hybrid':['https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}','Map data © Google',20,{subdomains:['mt0','mt1','mt2','mt3']}],
  'Google Satellite':['https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}','Map data © Google',20,{subdomains:['mt0','mt1','mt2','mt3']}],
  'Esri Street Map':['https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}','Tiles © Esri',19,{}],
- 'Esri Satellite':['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}','Tiles © Esri',20,{}],
- 'OpenStreetMap':['https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png','© OpenStreetMap contributors',19,{subdomains:['a','b','c']}]};
+ 'Esri Satellite':['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}','Tiles © Esri',20,{}]};
 const baseN=()=>BASES[localStorage.base]?localStorage.base:'Google Map';
 const baseL=n=>{const b=BASES[n||baseN()];return L.tileLayer(b[0],{attribution:b[1],maxZoom:b[2],...b[3]})};
 function mkMap(id,fit,extra){
