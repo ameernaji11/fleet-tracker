@@ -91,10 +91,10 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 <div class="grid3" id="vals"></div>
 <div class="btns"><button id="go" class="btn g" onclick="start()"><i class="fa-solid fa-play"></i>Start trip</button><button id="stp" class="btn r hide" onclick="stop()"><i class="fa-solid fa-stop"></i>End trip</button></div>
 <div class="foot">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</div>
-<div class="card hide" id="pwcard"><small style="display:block;color:var(--mut)">New password — at least 6 characters</small>
+<div class="card hide" id="pwcard"><small id="pwnote" style="display:none;color:var(--or)">The administrator set the password you signed in with. Choose your own now.</small><small style="display:block;color:var(--mut)">New password — at least 6 characters</small>
 <input type="password" id="np1" placeholder="New password" autocomplete="new-password">
 <input type="password" id="np2" placeholder="Repeat new password" autocomplete="new-password">
-<div class="btns"><button class="btn g" onclick="changePw()">Save</button><button class="btn o" onclick="pwUi()">Cancel</button></div></div></div>
+<div class="btns"><button class="btn g" onclick="changePw()">Save</button><button class="btn o" id="pwcx" onclick="pwUi()">Cancel</button></div></div></div>
 <p class="err" id="err"></p>
 <div id="alert" class="hide"></div>
 
@@ -180,48 +180,81 @@ function noNet(e){try{if(!e||e.statusCode||e.code)return false;
 // used when the server could not be reached: the same local check the no-signal
 // path uses, so nobody waits for a "Failed to fetch" that never resolves
 async function localEnter(){const c=await credCheck($('pw').value);
- if(!c)throw new Error(credKnown()?'The server did not answer, and this password does not match the sign-in this phone remembers.'
-  :'The server did not answer, and this phone has not signed in as '+($('em').value.trim()||'that user')+' before. Sign in once while the server can be reached, then the phone can let you in without it.');
+ if(!c)throw new Error(credKnown()?offFail():'The server did not answer, and this phone has not signed in as '+($('em').value.trim()||'that user')+' before. Sign in once while the server can be reached, then the phone can let you in without it.');
+ OFFFAIL=0;localStorage.offfail='0';
  await init(1,{id:c.i,email:c.e})}
+// ---- account lockout (v18). The same five-wrong-password rule as the dashboard,
+// and the count is kept in the database rather than here, so a driver cannot get
+// around it by reloading the app or clearing its storage. With no signal there is
+// no database to ask, so the handset keeps its own count of wrong tries against the
+// sign-in it remembers and stops offering the offline way in until it next reaches
+// the server — where the real count, and any lock, is waiting.
+const LOCK_AT=5;let OFFFAIL=+(localStorage.offfail||0);
+const lockCall=(f,e)=>sb.rpc(f,{p_email:e}).then(({data,error})=>!error&&data&&data[0]||null).catch(()=>null);
+function offFail(){OFFFAIL++;localStorage.offfail=String(OFFFAIL);
+ return OFFFAIL>=LOCK_AT?'This phone has been locked after '+LOCK_AT+' wrong passwords. Connect to the internet and sign in once, or ask the administrator to unlock the account.'
+ :'Wrong password. '+(LOCK_AT-OFFFAIL>1?LOCK_AT-OFFFAIL+' attempts left':'One attempt left')+' before this phone stops letting you in without a signal.'}
 async function signIn(){
  if(!sb)return;const want=$('rem').checked;if(want!==REM){REM=want;localStorage.rem=want?'1':'0';sb=mk(REM)}
  const b=$('sib');b.disabled=true;b.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i>Signing in...';$('err').textContent='';
+ const em=mail($('em').value);
+ // the app's own sentences are written for the driver, so they are shown as they
+ // are; anything that comes from the server keeps the "Error:" label
+ const soft=t=>{throw Object.assign(new Error(t),{soft:1})};
  try{
-  if(!navigator.onLine){const c=await credCheck($('pw').value);
+  if(!navigator.onLine){if(OFFFAIL>=LOCK_AT)soft(offFail());
+   const c=await credCheck($('pw').value);
    // the two cases say different things to the driver: this phone knows this user
    // and disagrees with the password, or it has never seen this user at all
-   if(!c)throw new Error(credKnown()?'Wrong password: with no internet this phone checks it against the sign-in you last made on it.'
+   if(!c)soft(credKnown()?offFail()
     :'No internet, and this phone has not signed in as '+($('em').value.trim()||'that user')+' before. Sign in once with a signal, then it can let you in offline.');
-   await init(1,{id:c.i,email:c.e});return}
-  let r;try{r=await Promise.race([sb.auth.signInWithPassword({email:mail($('em').value),password:$('pw').value}),
+   OFFFAIL=0;localStorage.offfail='0';await init(1,{id:c.i,email:c.e});return}
+  const g=await lockCall('login_gate',em);
+  if(g&&g.locked)soft('Your account is locked after '+LOCK_AT+' wrong passwords. Please contact the administrator.');
+  let r;try{r=await Promise.race([sb.auth.signInWithPassword({email:em,password:$('pw').value}),
    new Promise((_,rej)=>{setTimeout(()=>rej(new Error('The server did not answer in time')),8e3)})])}
   // a late answer from a request that already timed out must not be read as a
   // second sign-in
   catch(e){r={error:e}}
   if(r.error&&noNet(r.error)){await localEnter();return}
-  if(r.error)throw r.error;
+  if(r.error){const m=r.error.message||String(r.error);
+   if(/invalid login credentials/i.test(m)){const x=await lockCall('login_fail',em);
+    if(x&&x.locked)soft('That was the '+LOCK_AT+'th wrong password: your account is now locked. Please contact the administrator.');
+    if(x)soft('Wrong password. '+(x.tries_left>1?x.tries_left+' attempts left':'One attempt left')+' before this account is locked.')}
+   if(/too many requests|rate limit/i.test(m))soft('Too many attempts just now. Wait a minute, then try again.');
+   throw r.error}
+  await lockCall('login_ok',em);OFFFAIL=0;localStorage.offfail='0';
   want?localStorage.user=$('em').value.trim():localStorage.removeItem('user');
   await credSave($('pw').value);await init(1)}
- catch(e){$('err').textContent='Error: '+(e.message||e)}
+ catch(e){$('err').textContent=(e.soft?'':'Error: ')+(e.message||e)}
  b.disabled=false;b.innerHTML='<i class="fa-solid fa-right-to-bracket"></i>Sign in'}
 async function signOut(){sessStop();await logAct('Signed out','Phone');
  localStorage.removeItem('offl');try{await sb.auth.signOut()}catch(e){}location.reload()}
-function pwUi(){const c=$('pwcard');c.classList.toggle('hide');const open=!c.classList.contains('hide');
+let PWFORCE=0;
+// force=1 opens the panel and takes the Cancel button away: a password the
+// administrator set for somebody else is only ever temporary, so the driver who
+// signed in with it has to replace it before the app carries on.
+function pwUi(force){const c=$('pwcard');const open=force?true:c.classList.contains('hide');
+ PWFORCE=open?1:0;c.classList.toggle('hide',!open);
  // this panel takes the map's place on the screen, so a full-screen map steps back first
  if(open&&document.fullscreenElement)document.exitFullscreen().catch(()=>{});
  // the app screen is fixed-height, so the map gives up its space while the panel is open
  $('map').classList.toggle('hide',open);
+ $('pwnote').style.display=force?'block':'none';$('pwcx').style.display=force?'none':'';
  if(open){$('np1').focus();return}
  if(map)setTimeout(()=>map.invalidateSize(),80);
  $('np1').value=$('np2').value=''}
-async function changePw(){if(!sb)return;const a=$('np1').value,b=$('np2').value;
+async function changePw(){if(!sb)return;const a=$('np1').value,b=$('np2').value,was=PWFORCE;
  if(a.length<6)return $('err').textContent='The new password must be at least 6 characters';
  if(a!==b)return $('err').textContent='The two new passwords do not match';
  const {error}=await sb.auth.updateUser({password:a});
  if(error)return $('err').textContent='Error: '+(error.message||error);
+ // put down the "this password was set for you" flag; the database lets an account
+ // clear only that flag about itself, and only through this function
+ await sb.rpc('clear_pw_flag');
  // the offline copy has to be the one that matches the new password
  await credSave(a);
- pwUi();$('err').textContent='Password changed.';logAct('Changed own password')}
+ pwUi();$('err').textContent='Password changed.';logAct('Changed own password',was?'after an administrator reset':'')}
 // Audit trail for the admin-only Activity Log. Silently ignored if the table is
 // not there yet, because a logging failure must never stop a driver's trip.
 function logAct(action,details,duration_s){if(!me)return;(async()=>{
@@ -252,6 +285,13 @@ async function init(fresh,who){
   else{try{const r=await sb.auth.getSession();s=r.data&&r.data.session}catch(e){}}}
  else{const w=who||cachedWho();if(w)s={user:w,offline:true}}
  if(!s)return;me=s.user;OFFL=!!s.offline;
+ // the two things the administrator can do to an account from the Users page have
+ // to be noticed here as well: a lock set while this phone was already signed in
+ // ends the session on the spot, and a password they typed for the driver has to be
+ // replaced before the app carries on. With no signal neither can be asked.
+ if(!OFFL)try{const {data:a}=await sb.from('profiles').select('locked_at,must_change').eq('id',me.id).single();
+  if(a&&a.locked_at){await sb.auth.signOut();show('lg');$('err').textContent='Your account is locked. Please contact the administrator.';return}
+  if(a&&a.must_change)pwUi(1)}catch(e){}
  await outInit();
  await loadRules();
  const nm=(me.email||'').replace('@fleet.local','');$('wn').textContent=nm;
