@@ -1,5 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://geocode.arcgis.com https://photon.komoot.io https://nominatim.openstreetmap.org https://api.bigdatacloud.net https://overpass-api.de https://overpass.kumi.systems; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://geocode.arcgis.com https://photon.komoot.io https://nominatim.openstreetmap.org https://api.bigdatacloud.net; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="referrer" content="no-referrer">
 <title>Fleet Tracker</title>
@@ -18,7 +18,7 @@
 .wrap{flex:1;display:flex;flex-direction:column;min-width:0}
 header{display:flex;align-items:center;gap:10px;padding:9px 16px;background:var(--card);border-bottom:1px solid var(--line)}
 header h1{font-size:19px;margin:0;flex:1;font-weight:800}#me{color:var(--mut)}
-#accWrap{position:relative}
+#accWrap{position:relative;z-index:2100}
 #accB{display:flex;align-items:center;gap:8px;background:var(--gyl);border:1px solid var(--line);border-radius:10px;padding:6px 10px;cursor:pointer;font-weight:700;color:var(--ink)}#accB:hover{filter:brightness(.97)}
 #accM{position:absolute;right:0;top:calc(100% + 6px);z-index:2000;min-width:230px}#accM button{border:0;background:none;color:var(--ink);padding:9px 10px;border-radius:8px;cursor:pointer;font-weight:600;display:flex;gap:10px;align-items:center;text-align:left;width:100%}#accM button:hover{background:var(--gyl)}#accM button i{width:18px;text-align:center}#accM button.out{color:var(--rd)}#accM hr{border:0;border-top:1px solid var(--line);margin:4px 0}#accWho{padding:8px 10px;font-weight:800;border-bottom:1px solid var(--line)}
 .pinb{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:10px;font-weight:600;color:var(--mut);margin-top:auto}.pinb i{width:20px;text-align:center;transition:transform .2s}.pinb:hover{background:var(--gyl)}.pinb:focus-visible{outline:2px solid var(--bl)}.pinb:not(.on) i{transform:rotate(135deg);opacity:.5}.pinb.on{background:var(--bll);color:var(--bl)}
@@ -99,13 +99,19 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 .zmenu.hide{display:none!important}
 .zmenu input{width:100%;box-sizing:border-box;height:30px;margin-bottom:6px}
 .zmenu button{box-shadow:none}
-.zlist{max-height:38vh;overflow:auto}
-.zrow{display:flex;gap:4px;align-items:center;border-radius:6px;padding:1px 2px}
+.zlist{max-height:38vh;overflow:auto;padding:2px 2px 0 0}
+.zrow{display:flex;gap:5px;align-items:center;border:1px solid transparent;border-radius:8px;padding:2px 3px 2px 6px;margin-bottom:2px}
 .zrow:hover{background:var(--bll)}
-.zrow label{flex:1;min-width:0;display:flex;gap:6px;align-items:center;cursor:pointer;font-weight:400;padding:2px 0}
-.zrow span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.zrow .go{background:none;border:0;color:var(--bl);cursor:pointer;width:22px;height:22px;padding:0;font-size:11px}
-.zrow .ed{background:none;border:0;color:var(--mut);cursor:pointer;width:22px;height:22px;padding:0;font-size:11px}
+.zrow.sel{background:var(--bll);border-color:var(--bl)}
+.zrow.hid .zn,.zrow.hid .zdot{opacity:.45}
+.zrow input[type=checkbox]{accent-color:var(--bl);cursor:pointer}
+.zrow .zn{flex:1;min-width:0;display:flex;gap:6px;align-items:center;background:none;border:0;color:var(--ink);text-align:left;cursor:pointer;padding:4px 0;font-size:12px;font-weight:600}
+.zrow .zn b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.zrow .zn.dim b{color:var(--mut);font-weight:400}
+.zdot{flex:none;width:9px;height:9px;border-radius:50%;box-shadow:0 0 0 2px #fff6}
+.zrow .zn em{flex:none;font-style:normal;font-size:10px;font-weight:700;color:var(--bl);background:var(--bll);border-radius:5px;padding:1px 5px}
+.zrow .zn em.no{color:var(--mut)}
+.zrow .ed{background:none;border:0;color:var(--mut);cursor:pointer;width:24px;height:24px;padding:0;font-size:11px;border-radius:6px}
 .zrow .ed:hover{color:var(--ink)}.zrow .ed.rm:hover{color:var(--rd)}
 /* the one Geofences panel holds a title row, a search box, the list and the write
  actions, so it needs its own spacing and a way to hide the write actions from
@@ -126,7 +132,9 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 .tbar{display:flex;gap:6px;align-items:center;padding:8px;flex-wrap:wrap}.tbar input{width:220px;height:34px}.tbar .btn{height:34px}.tw th{cursor:pointer;user-select:none}
 .pgr{margin-left:auto;display:flex;gap:6px;align-items:center}.pgr select{height:34px}.pgr .btn{min-width:34px}.pc{font-size:12px;color:var(--mut);min-width:130px;text-align:center}
 .pt{position:absolute;top:6px;right:8px;display:flex;gap:4px;opacity:.45;z-index:3}.cgrid .card:hover .pt{opacity:1}.pt button{border:0;background:var(--gyl);color:var(--ink);border-radius:6px;width:24px;height:24px;cursor:pointer;font-size:11px}
-.cgrid .card.big{position:fixed!important;inset:4vh 4vw;z-index:2000;height:auto!important;box-shadow:0 0 0 100vmax #0008}
+/* an enlarged chart is held above the page but below every message box, and always
+   starts under the header so its own Shrink button is never hidden behind it */
+.cgrid .card.big{position:fixed!important;inset:max(4vh,52px) 4vw 4vh;z-index:2000;height:auto!important;box-shadow:0 0 0 100vmax #0008}
 .pbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.pbar .chip{cursor:pointer;background:var(--bll);color:var(--bl)}
 .ibtn{border:1px solid var(--line);border-radius:50%;width:18px;height:18px;font-size:11px;font-weight:800;background:var(--card);color:var(--bl);cursor:pointer;padding:0}
 .mk.sm{width:20px;height:20px;font-size:9px;border-width:2px}
@@ -226,7 +234,7 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <div class="card"><div class="csh"><i class="fa-solid fa-draw-polygon"></i><div><b>Zones (geofences) <span class="hp" data-tip="A zone is a shape you draw on the Live Tracking map. Every phone tests each position against it, so driving in, driving out or passing the zone's own speed limit makes an event - and each of those three has its own alert, buzzer, voice and tolerance in the Events table above. &lt;b&gt;Leave a limit empty&lt;/b&gt; and the zone only reports entries and exits. Phones reload the shapes within 5 minutes.">?</span></b><small>The areas the whole fleet is watched against, and what each one reports. Type in the box below to search by name, or press a name to open that shape on the Live Tracking map. Press Edit, or click the shape on a map, to change its name, limit, alerts, colour, or to move, add and drop single corners without drawing the whole zone again.</small></div><button class="btn b sm" onclick="switchTab('live');setTimeout(()=>zAdd(mapL),200)" title="Switches to Live Tracking and starts the drawing tool"><i class="fa-solid fa-draw-polygon"></i>Draw a zone</button></div>
 <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap"><input id="zQ" placeholder="Search zones by name" oninput="zFilter(this.value)" style="width:260px;max-width:100%"><small id="zC" style="opacity:.65"></small></div>
 <div class="tw" id="zT" style="margin-top:8px"></div></div>
-<div class="card"><div class="csh"><i class="fa-solid fa-signature"></i><div><b>Saved place names <span class="hp" data-tip="Map services name a place from their own data, so a private or newly built address often shows the wrong label - a neighbour's building, or just a street number. A saved name here wins over every map service: any position inside its radius is reported with this name in trip popups, the trip list and every report. Names already shown on screen are corrected as soon as the page reloads.">?</span></b><small>Names you choose yourself, overriding what the map services call a place. Each one is drawn on the maps: press a name to edit or delete it, or press the bookmark on a map and click the spot to add one.</small></div><button class="btn b sm" onclick="plAdd()"><i class="fa-solid fa-plus"></i>Add a place</button></div>
+<div class="card"><div class="csh"><i class="fa-solid fa-signature"></i><div><b>Saved place names <span class="hp" data-tip="Map services name a place from their own data, so a private or newly built address often shows the wrong label - a neighbour's building, or just a street number. A saved name here wins over every map service: any position inside its radius is reported with this name in trip popups, the trip list and every report. Names already shown on screen are corrected as soon as the page reloads.">?</span></b><small>Names you choose yourself, overriding what the map services call a place. Each one is a small bookmark on the maps - hover it to read the name, press it to edit or delete, or press the bookmark button on a map and click the spot to add one.</small></div><button class="btn b sm" onclick="plAdd()"><i class="fa-solid fa-plus"></i>Add a place</button></div>
 <div class="tw" id="plT" style="margin-top:10px"></div></div>
 <div class="card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><small style="flex:1;min-width:220px;color:var(--mut)">Everything on this page is saved together. Phones apply the changes within 5 minutes, or at the next trip start.</small><button class="btn g" onclick="saveCfg()"><i class="fa-solid fa-floppy-disk"></i>Save</button></div></section>
 <section id="trip"><div class="card frow"><div class="field"><label>Vehicle</label><select id="tr_v"></select></div><div class="field"><label>From</label><input id="tr_f" type="text"></div><div class="field"><label>To</label><input id="tr_t" type="text"></div>
@@ -331,16 +339,40 @@ function mkMap(id,fit,extra){
   tb('fa-crosshairs','Zoom to all',()=>fit&&fit());tb('fa-ruler','Measure distance',()=>measure(m));
   zPanel(d,m);
   tb('fa-bookmark','Add a saved place: press this, then click the spot on the map',()=>plArm(m),'pl');
-  tb('fa-signature','Show the saved place names beside their markers',plTog,'pln');(extra||[]).forEach(x=>tb(...x));return d};
+  (extra||[]).forEach(x=>tb(...x));return d};
  c.addTo(m);L.control.scale({imperial:false}).addTo(m);document.addEventListener('fullscreenchange',()=>{const b=m._btn&&m._btn.fs;if(b){const on=document.fullscreenElement===m.getContainer(),i=b.querySelector('i');
    b.title=on?'Shrink back':'Full screen';if(i)i.className='fa-solid '+(on?'fa-minimize':'fa-expand')}setTimeout(()=>m.invalidateSize(),250)});return m}
+// A full-screen map is lifted out of the page into the browser's own top layer, so
+// anything still hanging straight off the body - both editors, the drawing hint, the
+// message box, the tooltip and the toast - paints UNDER the map and stays invisible
+// until the map is shrunk again. Passing those nodes to the full-screen element while it
+// lasts, and back to where they came from when it ends, keeps every message above the
+// map it belongs to. Every surface with an enlarge option is covered by this one rule.
+const TOPS=['toast','tip','zHint','zdlg','pdlg','modal'];
+function topLift(){const f=document.fullscreenElement;
+ TOPS.forEach(id=>{const el=$(id);if(!el)return;
+  if(!f){if(el._home&&el.parentElement!==el._home)el._home.appendChild(el);return}
+  if(el.parentElement===f)return;
+  if(!el._home)el._home=el.parentElement;
+  // the box now sits inside the map, so a press or a wheel over it must not pan or zoom
+  // the map behind it; stopping propagation here leaves the box's own handlers working
+  if(!el._tl){el._tl=1;['pointerdown','mousedown','touchstart','wheel','dblclick','contextmenu']
+   .forEach(ev=>el.addEventListener(ev,e=>e.stopPropagation(),{passive:true}))}
+  f.appendChild(el)})}
+document.addEventListener('fullscreenchange',topLift);
+// a full-screen map fills the page, so switching to another page would hide the very
+// element being shown and leave nothing but black
+function shrink(to){const f=document.fullscreenElement;
+ if(!f||!f.classList.contains('map'))return;
+ const own=f.closest('section');if(own&&own.id===to)return;
+ document.exitFullscreen().catch(()=>{})}
 function measure(m){if(m._meas){m.off('click',m._meas.h);m._meas.g.remove();m._meas=null;m.getContainer().style.cursor='';return}
  const g=L.layerGroup().addTo(m),pts=[];let line=null;
  const h=e=>{pts.push(e.latlng);L.circleMarker(e.latlng,{radius:4,color:'#2f7fe6'}).addTo(g);if(line)line.remove();line=L.polyline(pts,{color:'#2f7fe6',dashArray:'6 4'}).addTo(g);let d=0;for(let i=1;i<pts.length;i++)d+=pts[i-1].distanceTo(pts[i]);line.bindTooltip((d/1000).toFixed(2)+' km',{permanent:true,direction:'top'}).openTooltip()};
  m.on('click',h);m._meas={h,g};m.getContainer().style.cursor='crosshair';toast('Click points on the map to measure. Press the ruler again to clear.',1)}
 // ---- geofences. An admin draws the ring here; the phone reads the same rows and
 // turns a crossing, or speeding inside a zone, into an event of its own.
-let zones=[],zG={},DRAW=null,ZED=null;
+let zones=[],zG={},DRAW=null,ZED=null,ZSEL=null;
 // one switch for both maps: the shapes an admin is watching belong in the same
 // place whether the fleet is being followed live or a trip is being replayed
 let ZSHOW=localStorage.zones_show!=='0';
@@ -400,9 +432,14 @@ function zPanel(d,m){const b=L.DomUtil.create('button','ic',d);
  // arrow keys typed into the search box must not slide the map about
  p.addEventListener('keydown',e=>e.stopPropagation());
  b.onclick=()=>{const sh=p.classList.toggle('hide');b.classList.toggle('on',!sh);if(!sh)zList(m)};
- // the panel sits over the map corner, so clicking the map - to place a zone point
- // or pick a vehicle - gets rid of it instead of leaving it in the way
- m.on('click',()=>zClosePanel(m));
+ // the panel sits over the map corner, so clicking the map itself - to place a zone
+ // point or pick a vehicle - gets rid of it instead of leaving it in the way. A
+ // click that started in the panel must never close it, so several zones can be
+ // visited one after another: the rows are re-drawn while the click is still
+ // travelling, so remember where each click came from instead of testing the
+ // target afterwards.
+ let hit=0;p.addEventListener('click',()=>{hit=Date.now()},true);
+ m.on('click',()=>{if(Date.now()-hit>400)zClosePanel(m)});
  document.addEventListener('keydown',e=>{if(e.key==='Escape')zClosePanel(m)});
  zSync(m);return b}
 function zClosePanel(m){if(!m._zb)return;m._zp.classList.add('hide');m._zb.classList.remove('on')}
@@ -424,23 +461,30 @@ function zList(m){if(!m||!m._zl)return;const q=(m._zq.value||'').trim().toLowerC
  // the panel is built before the signed-in role is known, so the write actions
  // are hidden from everyone who cannot use them
  if(m._zp)m._zp.classList.toggle('noadmin',!ADMIN);
- m._zl.innerHTML=S.map(z=>`<div class="zrow"><label title="${zOn(z.id)?'Untick to hide this zone on the maps':'Tick to show this zone on the maps'}"><input type="checkbox" ${zOn(z.id)?'checked':''} onchange="zTick('${z.id}',this.checked)"><span>${esc(z.name)}</span></label><button class="ed zw" title="Change this zone: name, speed limit, alerts, colour or shape" onclick="zEdit('${z.id}')"><i class="fa-solid fa-pen"></i></button><button class="ed rm zw" title="Delete this zone" onclick="zDelById('${z.id}')"><i class="fa-solid fa-trash"></i></button><button class="go" title="Centre the map on this zone" onclick="zFocus('${z.id}','${m.getContainer().id}')"><i class="fa-solid fa-crosshairs"></i></button></div>`).join('')
+ m._zl.innerHTML=S.map(z=>{const off=z.enabled===false;
+  return `<div class="zrow${z.id===ZSEL?' sel':''}${zOn(z.id)?'':' hid'}"><input type="checkbox" ${zOn(z.id)?'checked':''} title="${zOn(z.id)?'Untick to hide this zone on the maps':'Tick to show this zone on the maps'}" onchange="zTick('${z.id}',this.checked)">`
+   +`<button class="zn${off?' dim':''}" title="Centre the map on this zone" onclick="zPick('${z.id}','${m.getContainer().id}')"><i class="zdot" style="background:${esc(z.color||'#2f7fe6')}"></i><b>${esc(z.name)}</b>${z.speed_limit?`<em>${z.speed_limit}</em>`:''}${off?'<em class="no">not watched</em>':''}</button>`
+   +`<button class="ed zw" title="Change this zone: name, speed limit, alerts, colour or shape" onclick="zEdit('${z.id}')"><i class="fa-solid fa-pen"></i></button><button class="ed rm zw" title="Delete this zone" onclick="zDelById('${z.id}')"><i class="fa-solid fa-trash"></i></button></div>`}).join('')
   ||`<div class="empty">${zones.length?'No zone matches &quot;'+esc(q)+'&quot;':'No zones drawn yet. Press "Draw a new zone" below.'}</div>`;
  zSync(m)}
+// Picking a name is how a zone is found: the row is marked and the map it was
+// pressed on flies to that shape. A zone with no outline cannot be flown to, so it
+// is not marked either.
+function zPick(id,mid){if(zFocus(id,mid)!==false){ZSEL=id;zList(mapL);zList(mapH)}}
 function zTick(id,on){const was=zOn(id);if(on)ZOFF.delete(id);else ZOFF.add(id);
  if(on&&!ZSHOW){ZSHOW=true;localStorage.zones_show='1'}
  if(was!==!!on)zHide()}
 // A name pressed on the map panel has to deliver the shape, so a hidden zone is
 // brought back before the map flies to it.
-function zFocus(id,mid){const z=zones.find(x=>x.id===id);if(!z)return;
- const p=zPts(z.shape);if(p.length<3)return toast('This zone has no shape to show yet');
- const m=mid==='mapHist'?mapH:mapL;if(!m)return;
+function zFocus(id,mid){const z=zones.find(x=>x.id===id);if(!z)return false;
+ const p=zPts(z.shape);if(p.length<3)return toast('This zone has no shape to show yet'),false;
+ const m=mid==='mapHist'?mapH:mapL;if(!m)return false;
  let chg=ZOFF.delete(id);
  if(!ZSHOW){ZSHOW=true;localStorage.zones_show='1';chg=true}
  if(chg)zHide();
  switchTab(mid==='mapHist'?'hist':'live');
  setTimeout(()=>{m.invalidateSize();m.fitBounds(L.latLngBounds(p),{padding:[60,60],maxZoom:17});
-  toast('Showing "'+(z.name||'zone')+'" on the map',1)},60)}
+  toast('Showing "'+(z.name||'zone')+'" on the map',1)},60);return true}
 function zCancel(){if(!DRAW)return;const m=DRAW.m,rp=DRAW.replace;
  m.off('click',DRAW.click);m.off('dblclick',DRAW.fin);m.doubleClickZoom.enable();m.getContainer().style.cursor='';
  m.removeLayer(DRAW.g);$('zHint').classList.add('hide');DRAW=null;
@@ -500,20 +544,14 @@ async function zSave(){if(!ADMIN||!ZED)return;const p=zRing(ZED);
  zClose();await zRefs();
  toast('Zone "'+was+'" saved'+(lim?' with a '+lim+' km/h limit':'')+'. Phones pick it up within 5 minutes.',1);
  logAct(id?'Edited zone':'Drew zone',was+' - '+p.length+' corners - '+(lim?lim+' km/h':'no zone limit'))}
-async function zRefs(){const {data}=await sb.from('geofences').select('*').order('name');zones=data||[];zPaint();zTable()}
+async function zRefs(){const {data}=await sb.from('geofences').select('*').order('name');zones=data||[];
+ if(ZSEL&&!zones.some(z=>z.id===ZSEL))ZSEL=null;zPaint();zTable()}
 let ZQ='';
 function zFilter(v){ZQ=(v||'').trim().toLowerCase();zTable()}
 // The list lives on Configuration and the shape lives on Live Tracking, so the name
-// is the handle that carries you from one to the other.
-function zGoto(id){const z=zones.find(x=>x.id===id);if(!z)return;
- const p=zPts(z.shape);if(!p.length)return toast('This zone has no shape to show yet');
- switchTab('live');
- let chg=ZOFF.delete(id);
- if(!ZSHOW){ZSHOW=true;localStorage.zones_show='1';chg=true}
- if(chg)zHide();
- setTimeout(()=>{if(!mapL)return;mapL.invalidateSize();
-  mapL.fitBounds(L.latLngBounds(p),{padding:[60,60],maxZoom:17});
-  toast('Showing "'+(z.name||'zone')+'" on the Live Tracking map',1)},60)}
+// is the handle that carries you from one to the other - the same path the map panel
+// uses, so the zone ends up marked in the panel either way.
+function zGoto(id){zPick(id,'mapLive')}
 function zTable(){const t=$('zT');if(!t)return;
  const ZS=zones.filter(z=>!ZQ||String(z.name||'').toLowerCase().includes(ZQ));
  const c=$('zC');if(c)c.textContent=zones.length?(ZQ?ZS.length+' of '+zones.length+' zones match':zones.length+' zones'):'';
@@ -692,7 +730,7 @@ async function boot(fresh){
  setInterval(evPoll,20000);
  setInterval(renderList,15000);
 }
-document.querySelectorAll('.nb[data-t]').forEach(b=>b.onclick=()=>{
+document.querySelectorAll('.nb[data-t]').forEach(b=>b.onclick=()=>{shrink(b.dataset.t);
  document.querySelectorAll('.nb').forEach(x=>x.classList.remove('on'));b.classList.add('on');$('title').textContent=b.dataset.h;
  document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===b.dataset.t));
  setTimeout(()=>{mapL?.invalidateSize();mapH?.invalidateSize()},50);
@@ -944,17 +982,17 @@ function hKpi(){localStorage.hk=localStorage.hk==='0'?'1':'0';hKpiSet()}
 hKpiSet();
 
 // ---- events + reports + charts
-const EV={harsh_braking:['Harsh braking','fa-hand','#d9534f','rd'],harsh_acceleration:['Harsh acceleration','fa-bolt','#f28c28','or'],overspeed:['Overspeed','fa-gauge-high','#2f7fe6','bl'],road_overspeed:['Road speed limit','fa-road','#9b51e0','pu'],
+const EV={harsh_braking:['Harsh braking','fa-hand','#d9534f','rd'],harsh_acceleration:['Harsh acceleration','fa-bolt','#f28c28','or'],overspeed:['Overspeed','fa-gauge-high','#2f7fe6','bl'],
  zone_enter:['Zone entered','fa-location-crosshairs','#27a46a','gr'],zone_exit:['Zone exited','fa-door-open','#0b9fb3','bl'],zone_overspeed:['Zone overspeed','fa-gauge-simple-high','#b85d00','or']};
 const EVX=t=>EV[t]||[t||'Event','fa-triangle-exclamation','#6b7a85','gy'];
 const evIcon=t=>L.divIcon({className:'',html:`<div class="mk sm" style="background:${EVX(t)[2]}"><i class="fa-solid ${EVX(t)[1]}"></i></div>`,iconSize:[20,20],iconAnchor:[10,10]});
 const evDur=x=>x.ended_at?(new Date(x.ended_at)-new Date(x.recorded_at))/1000:null;
 function evPop(x){const E=EVX(x.type),d=evDur(x),n=(a,u)=>a!=null&&a!==''?a+u:'-',
- val=x.type==='overspeed'||x.type==='road_overspeed'?'':`<br><i class="fa-solid fa-gauge"></i> ${(+x.value||0).toFixed(1)} km/h/s`;
+ val=x.type==='harsh_braking'||x.type==='harsh_acceleration'?`<br><i class="fa-solid fa-gauge"></i> ${(+x.value||0).toFixed(1)} km/h/s`:'';
  return `<div style="min-width:240px"><b style="font-size:15px;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</b>${HR}
  <i class="fa-solid fa-car"></i> <b>${esc(x.vehicle_name||'-')}</b><br><i class="fa-solid fa-id-card"></i> ${esc(x.driver_name||'-')}<br>
  <i class="fa-regular fa-clock"></i> ${new Date(x.recorded_at).toLocaleString()}${x.ended_at?'<br><i class="fa-regular fa-clock"></i> Ended '+new Date(x.ended_at).toLocaleTimeString()+' · <b>'+hms(d)+'</b>':''}<br>
- <i class="fa-solid fa-gauge-high"></i> ${Math.round(x.speed||0)} km/h${x.road_limit?' · road limit '+x.road_limit+' km/h':''}${val}${x.details?'<br>'+esc(x.details):''}${HR}
+ <i class="fa-solid fa-gauge-high"></i> ${Math.round(x.speed||0)} km/h${x.road_limit?' · limit '+x.road_limit+' km/h':''}${val}${x.details?'<br>'+esc(x.details):''}${HR}
  <i class="fa-solid fa-location-dot"></i> ${(+x.lat).toFixed(5)}, ${(+x.lng).toFixed(5)}<br>Accuracy ${n(x.accuracy,' m')} · Elev. ${x.altitude!=null?Math.round(x.altitude)+' m':'-'} · Dir ${x.heading!=null?Math.round(x.heading)+'°':'-'}<br>Accel ${n(x.accel,' km/h/s')} · Ignition ${x.ignition===false?'off':x.ignition?'on':'-'}<br><i class="fa-solid fa-battery-half"></i> ${x.battery_pct!=null?Math.round(x.battery_pct)+'%':'-'}${x.charging?' ⚡':''}</div>`}
 async function fetchAll(q){let a=[];for(let i=0;i<30;i++){const {data,error}=await q().range(i*1000,i*1000+999);if(error){toast(error.message);break}a=a.concat(data);if(data.length<1000)break}return a}
 function chart(id,type,labels,sets,o={}){const cs=getComputedStyle(document.documentElement);Chart.defaults.color=cs.getPropertyValue('--mut');Chart.defaults.borderColor=cs.getPropertyValue('--line');charts[id]?.destroy();
@@ -964,7 +1002,14 @@ function chart(id,type,labels,sets,o={}){const cs=getComputedStyle(document.docu
   ctx.fillText(o.mark.t,p.x+(ctx.textAlign==='right'?-9:9),p.y-9);ctx.restore()}}]:[];
  // index mode with intersect off: hovering anywhere above a time shows every value
  // there, instead of needing the cursor exactly on a 1.5 px line
- const dn=type==='doughnut',click=o.click&&((e,el,c)=>{const hit=dn?el:c.getElementsAtEventForMode(e,'nearest',{intersect:true},true);o.click(e,hit.length?hit:el)});
+ // A click on a chart re-renders the report, which destroys that very chart. Chart.js
+ // is still inside its own event dispatch at that moment and afterwards lets the
+ // legend plugin read chart.legend, which the destroy has just deleted — so the
+ // callback has to wait for one task or the library throws "Cannot read properties of
+ // undefined (reading 'handleEvent')" on the way out. The hit list only carries
+ // indexes, so it stays valid across that tick.
+ const dn=type==='doughnut',click=o.click&&((e,el,c)=>{const hit=dn?el:c.getElementsAtEventForMode(e,'nearest',{intersect:true},true);
+  const t=hit.length?hit:el;if(t.length)setTimeout(()=>o.click(e,t),0)});
  charts[id]=new Chart($(id),{type,data:{labels,datasets:sets},options:{maintainAspectRatio:false,onClick:click,indexAxis:o.h?'y':'x',interaction:dn?{mode:'nearest',intersect:true}:{mode:'index',intersect:false,axis:o.h?'y':'x'},plugins:{title:{display:true,text:o.t},legend:{display:sets.length>1||dn}},scales:dn?{}:{x:{stacked:!!o.s},y:{stacked:!!o.s,beginAtZero:true}}},plugins:pl})}
 const cnt=(rows,f)=>rows.reduce((o,r)=>{const k=f(r)||'-';o[k]=(o[k]||0)+1;return o},{});
 async function loadEvt(){
@@ -984,7 +1029,9 @@ function renderEvt(){
  chart('c2','bar',days,K.map(k=>({label:EV[k][0],backgroundColor:EV[k][2],data:days.map(d=>rows.filter(r=>r.type===k&&dayOf(r)===d).length)})),{t:'Events per Day',s:1,click:(e,el)=>el.length&&evSet('day',days[el[0].index])});
  const dr=Object.entries(cnt(rows,r=>r.driver_name)).sort((a,b)=>b[1]-a[1]).slice(0,8).map(x=>x[0]);
  chart('c3','bar',dr,K.map(k=>({label:EV[k][0],backgroundColor:EV[k][2],data:dr.map(n=>rows.filter(r=>(r.driver_name||'-')===n&&r.type===k).length)})),{t:'Violator Drivers',s:1,h:1,click:(e,el)=>{if(!el.length)return;EVF.driver=dr[el[0].index];EVF.type=K[el[0].datasetIndex];renderEvt()}});
- const acc=r=>r.type==='overspeed'||r.type==='road_overspeed'?'-':(+r.value).toFixed(1);
+ // only the two acceleration events hold a km/h/s reading; every other row keeps
+ // the speed it breached in the Speed column, so this column has to stay empty
+ const acc=r=>(r.type==='harsh_braking'||r.type==='harsh_acceleration')?(+r.value).toFixed(1):'-';
  $('evT').innerHTML=`<table><tr><th>Event Start</th><th>Event End</th><th>Duration</th><th>Vehicle</th><th>Driver</th><th>Event</th><th>Speed (km/h)</th><th>Acceleration / Deceleration (km/h/s)</th><th>Details</th><th>Location</th></tr>${rows.slice(0,1000).map(r=>{const E=EVX(r.type),d=evDur(r);return `<tr><td>${new Date(r.recorded_at).toLocaleString()}</td><td>${r.ended_at?new Date(r.ended_at).toLocaleString():'-'}</td><td style="white-space:nowrap">${d==null?'-':hms(d)}</td><td>${esc(r.vehicle_name)}</td><td>${esc(r.driver_name)}</td><td><span class="chip" style="background:${E[2]}22;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</span></td><td>${Math.round(r.speed||0)}</td><td>${acc(r)}</td><td>${esc(r.details||'-')}</td><td><a href="#" onclick="goHist('${r.vehicle_id}','${r.recorded_at}',${r.lat},${r.lng});return false"><i class="fa-solid fa-map-location-dot"></i> ${(+r.lat).toFixed(5)}, ${(+r.lng).toFixed(5)}</a></td></tr>`}).join('')||'<tr><td colspan="10">No events in this period.</td></tr>'}</table>`;tools($('evT'))}
 async function goHist(vid,iso,lat,lng){document.querySelector('.nb[data-t=hist]').click();$('hv').value=vid;const t=new Date(iso).getTime();$('hf')._flatpickr.setDate(new Date(t-9e5),true);$('ht')._flatpickr.setDate(new Date(t+9e5),true);await loadHist();mapH.setView([lat,lng],17)}
 async function loadRep(){
@@ -996,7 +1043,7 @@ async function loadRep(){
  if(error)return toast(error.message);
  if(!data||!data.length){rep=[];$('rpK').innerHTML='';['r1','r2','r3','r4'].forEach(id=>charts[id]?.destroy());$('rpT').innerHTML='<p style="padding:12px;color:var(--mut)">No positions recorded in this period.</p>';return toast('No data in this period. Pick a wider period or another day.')}
  const evs=await fetchAll(()=>sb.from('events').select('vehicle_id,type').gte('recorded_at',f).lte('recorded_at',t));
- const V={},D={},K={harsh_braking:'b',harsh_acceleration:'a',overspeed:'o',road_overspeed:'o'};
+ const V={},D={},K={harsh_braking:'b',harsh_acceleration:'a',overspeed:'o'};
  data.forEach(r=>{const o=V[r.vehicle_id]??={id:r.vehicle_id,name:r.vehicle_name,km:0,max:0,dr:0,sp:0,b:0,a:0,o:0,os:0};o.km+=+r.km;o.max=Math.max(o.max,+r.max_speed);o.dr+=+r.drive_min;o.sp+=+r.stop_min;o.os+=(+r.over_s||0);D[r.day]=(D[r.day]||0)+ +r.km});
  evs.forEach(e=>{if(V[e.vehicle_id]&&K[e.type])V[e.vehicle_id][K[e.type]]++});
  rep=Object.values(V).map(o=>{const q=vehicles.find(x=>x.id===o.id)||{},fm=o.km*(q.fuel_moving||0)/100,fi=o.sp/60*(q.fuel_idle||0);return {...o,fm,fi,ft:fm+fi,l100:o.km>0?(fm+fi)/o.km*100:0,score:(o.a+o.b+o.os)*100/Math.max(o.km,1)}});
@@ -1018,7 +1065,7 @@ async function addUser(e){e.preventDefault();if(!ADMIN)return toast('Only an adm
  if(!data.session)toast('User created but cannot sign in yet: turn OFF "Confirm email" in Supabase (see steps)');else toast('User created',1);
  logAct('Created user',e.target.u.value);e.target.reset();users()}
 let RULES={},SET={},OV=['speed_limit','brake_limit','accel_limit','moving_interval','stopped_interval','speed_buffer','max_accel_warning','min_moving_distance'];
-const UNIT={harsh_braking:'km/h per second',harsh_acceleration:'km/h per second',overspeed:'km/h',road_overspeed:'km/h above the road limit',zone_overspeed:'km/h above the zone limit'};
+const UNIT={harsh_braking:'km/h per second',harsh_acceleration:'km/h per second',overspeed:'km/h',zone_overspeed:'km/h above the zone limit'};
 // Entering and leaving a zone fire on the crossing itself: there is no measured
 // value to compare against a limit, so these two rows get no trigger box at all.
 const NOLIM={zone_enter:1,zone_exit:1};
@@ -1029,11 +1076,15 @@ const vlOpts=r=>{const c=vlOf(r);return '<option value="off">Off</option>'+Objec
 function syncPl(sel){const b=sel.closest('td').querySelector('.play');if(!b)return;if(!b.dataset.t)b.dataset.t=b.title;
  const off=sel.value==='off';b.disabled=off;b.style.opacity=off?.35:1;b.title=off?'Off — nothing to play':b.dataset.t}
 function toneSync(sel){const d=sel.closest('tr').querySelector('.bd');if(d)d.style.opacity=sel.value==='off'?.4:1;syncPl(sel)}
-async function loadRules(){const {data}=await sb.from('event_rules').select('*').order('type');RULES={};(data||[]).forEach(r=>RULES[r.type]=r);
- if(data&&data.length&&(!('hold_s'in data[0])||!('voice'in data[0])||!RULES.road_overspeed)&&!WARNED.hold){WARNED.hold=1;toast('The database is missing the newest columns (tolerance, voice, road speed limit). Run schema.sql in Supabase (SQL Editor) once to add them.')}
+async function loadRules(){const {data}=await sb.from('event_rules').select('*').order('type');RULES={};
+ // v17 retired the road speed limit: a database that still holds that rule row must
+ // not offer an alert no phone can produce any more, and must not save it back
+ const list=(data||[]).filter(r=>r.type!=='road_overspeed');
+ list.forEach(r=>RULES[r.type]=r);
+ if(data&&data.length&&(!('hold_s'in data[0])||!('voice'in data[0])||!RULES.zone_overspeed)&&!WARNED.hold){WARNED.hold=1;toast('The database is missing the newest columns (tolerance, voice, geofence alerts). Run schema.sql in Supabase (SQL Editor) once to add them.')}
  if(data&&data.length&&!('voice_lang'in data[0])&&!WARNED.vl){WARNED.vl=1;toast('Per-event voice languages need the newest schema: run schema.sql in Supabase once. Until then the phone keeps the single fleet language.')}
  const num=(id,v,w,st)=>`<input type="number" step="${st||'any'}" min="0" id="${id}" value="${v??''}" style="width:${w||58}px">`;
- $('ruleT').innerHTML=`<table><tr><th>Event</th><th>Trigger limit</th><th>Tolerance (seconds)</th><th>Recorded</th><th>Visual alert</th><th>Buzzer alert</th><th>Buzzer seconds</th><th>Voice alert</th></tr>${(data||[]).map(r=>`<tr><td><b>${esc(r.label)}</b></td><td>${NOLIM[r.type]?'<small style="opacity:.5">no limit</small>':num('rt_'+r.type,r.threshold,66,'0.1')+' <small>'+(UNIT[r.type]||'')+'</small>'}</td><td>${num('rh_'+r.type,r.hold_s??0)}</td><td><input type="checkbox" id="re_${r.type}" ${r.enabled?'checked':''}></td><td><input type="checkbox" id="ra_${r.type}" ${r.alert?'checked':''}></td><td style="white-space:nowrap"><select id="bt_${r.type}" style="width:126px" onchange="toneSync(this)">${Object.entries(TONES).map(([k,n])=>`<option value="${k}" ${(r.beep_type||'discontinuous')===k?'selected':''}>${n}</option>`).join('')}</select><button type="button" class="play" onclick="tryTone('${r.type}')" title="Play this tone"><i class="fa-solid fa-play"></i></button></td><td class="bd">${num('bd_'+r.type,r.beep_duration??5)}</td><td style="white-space:nowrap"><select id="vl_${r.type}" style="width:96px" onchange="syncPl(this)">${vlOpts(r)}</select><button type="button" class="play" onclick="tryVoice('${r.type}')" title="Speak this message"><i class="fa-solid fa-volume-high"></i></button></td></tr>`).join('')}</table>`;
+ $('ruleT').innerHTML=`<table><tr><th>Event</th><th>Trigger limit</th><th>Tolerance (seconds)</th><th>Recorded</th><th>Visual alert</th><th>Buzzer alert</th><th>Buzzer seconds</th><th>Voice alert</th></tr>${list.map(r=>`<tr><td><b>${esc(r.label)}</b></td><td>${NOLIM[r.type]?'<small style="opacity:.5">no limit</small>':num('rt_'+r.type,r.threshold,66,'0.1')+' <small>'+(UNIT[r.type]||'')+'</small>'}</td><td>${num('rh_'+r.type,r.hold_s??0)}</td><td><input type="checkbox" id="re_${r.type}" ${r.enabled?'checked':''}></td><td><input type="checkbox" id="ra_${r.type}" ${r.alert?'checked':''}></td><td style="white-space:nowrap"><select id="bt_${r.type}" style="width:126px" onchange="toneSync(this)">${Object.entries(TONES).map(([k,n])=>`<option value="${k}" ${(r.beep_type||'discontinuous')===k?'selected':''}>${n}</option>`).join('')}</select><button type="button" class="play" onclick="tryTone('${r.type}')" title="Play this tone"><i class="fa-solid fa-play"></i></button></td><td class="bd">${num('bd_'+r.type,r.beep_duration??5)}</td><td style="white-space:nowrap"><select id="vl_${r.type}" style="width:96px" onchange="syncPl(this)">${vlOpts(r)}</select><button type="button" class="play" onclick="tryVoice('${r.type}')" title="Speak this message"><i class="fa-solid fa-volume-high"></i></button></td></tr>`).join('')}</table>`;
  [...$('ruleT').querySelectorAll('select')].forEach(s=>s.id.startsWith('bt_')?toneSync(s):s.id.startsWith('vl_')&&syncPl(s))}
 async function getSet(){const {data}=await sb.from('app_settings').select('*');SET={};(data||[]).forEach(x=>SET[x.key]=x.value);plLoad();
  const e=$('offH');if(e){e.value=OFFH();e.disabled=!ADMIN}}
@@ -1113,10 +1164,10 @@ function muteTog(){MUTE=!MUTE;localStorage.mute=MUTE?'1':'0';if(MUTE)stopTone();
 // ▶ buttons here use the browser's voice so the wording can be checked.
 const VLANG={en:['English','en-US'],ar:['Arabic','ar-SA'],hi:['Hindi','hi-IN'],ur:['Urdu','ur-PK']};
 const VMSG={
- en:{overspeed:'You are over the speed limit. Please slow down.',road_overspeed:'You are over the speed limit for this road. Please slow down.',harsh_braking:'Harsh braking detected. Keep a safe distance and brake gently.',harsh_acceleration:'Harsh acceleration detected. Please accelerate smoothly.'},
- ar:{overspeed:'لقد تجاوزت حد السرعة. يرجى تخفيف السرعة.',road_overspeed:'لقد تجاوزت السرعة المحددة لهذا الطريق. يرجى تخفيف السرعة.',harsh_braking:'تم رصد فرملة قوية. حافظ على مسافة آمنة واضغط على الفرامل بهدوء.',harsh_acceleration:'تم رصد تسارع قوي. يرجى التسارع بسلاسة.'},
- hi:{overspeed:'आप गति सीमा से ऊपर हैं। कृपया गति कम करें।',road_overspeed:'आप इस सड़क की गति सीमा से ऊपर हैं। कृपया गति कम करें।',harsh_braking:'तेज़ ब्रेक लगाया गया। सुरक्षित दूरी रखें और धीरे ब्रेक लगाएँ।',harsh_acceleration:'तेज़ रफ़्तार पकड़ी गई। कृपया धीरे-धीरे गति बढ़ाएँ।'},
- ur:{overspeed:'آپ رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',road_overspeed:'آپ اس سڑک کی رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',harsh_braking:'سخت بریک لگائی گئی۔ محفوظ فاصلہ رکھیں اور آہستہ بریک لگائیں۔',harsh_acceleration:'تیز رفتاری پکڑی گئی۔ براہ کرم آہستہ آہستہ رفتار بڑھائیں۔'}};
+ en:{overspeed:'You are over the speed limit. Please slow down.',harsh_braking:'Harsh braking detected. Keep a safe distance and brake gently.',harsh_acceleration:'Harsh acceleration detected. Please accelerate smoothly.'},
+ ar:{overspeed:'لقد تجاوزت حد السرعة. يرجى تخفيف السرعة.',harsh_braking:'تم رصد فرملة قوية. حافظ على مسافة آمنة واضغط على الفرامل بهدوء.',harsh_acceleration:'تم رصد تسارع قوي. يرجى التسارع بسلاسة.'},
+ hi:{overspeed:'आप गति सीमा से ऊपर हैं। कृपया गति कम करें।',harsh_braking:'तेज़ ब्रेक लगाया गया। सुरक्षित दूरी रखें और धीरे ब्रेक लगाएँ।',harsh_acceleration:'तेज़ रफ़्तार पकड़ी गई। कृपया धीरे-धीरे गति बढ़ाएँ।'},
+ ur:{overspeed:'آپ رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',harsh_braking:'سخت بریک لگائی گئی۔ محفوظ فاصلہ رکھیں اور آہستہ بریک لگائیں۔',harsh_acceleration:'تیز رفتاری پکڑی گئی۔ براہ کرم آہستہ آہستہ رفتار بڑھائیں۔'}};
 let VOC=[];const sv=()=>{try{VOC=(window.speechSynthesis?speechSynthesis.getVoices():[])||[]}catch(e){VOC=[]}};
 sv();if(window.speechSynthesis)speechSynthesis.addEventListener('voiceschanged',sv);
 function say(lg,txt){const S=window.speechSynthesis;if(!S||!window.SpeechSynthesisUtterance)return toast('This browser cannot speak. The phone uses its own voice.');
@@ -1205,22 +1256,18 @@ function plTable(){const t=$('plT');if(!t)return;
 // A name is chosen on the ground, so it is edited there too: the marker opens the
 // same dialog the table row does, and the bookmark arms a click anywhere on the map.
 let PLG={},PLARM=null;
-// A saved name is a label, not a billboard: the marker stays small and sits under
-// the vehicle, and the name is read by pressing it. The toolbar switch is for the
-// times every name has to be seen at once.
-let PLNAME=localStorage.places_names==='1';
-function plTog(){PLNAME=!PLNAME;localStorage.places_names=PLNAME?'1':'0';plPaint();
- toast(PLNAME?'Saved place names are shown on the maps':'Saved place names are hidden - press a marker to read one',1)}
+// A saved name is a label, not a billboard: the marker stays small, sits under the
+// vehicle, and its name is only ever read from the marker - by hovering it, or by
+// pressing it where there is no mouse. Nothing is painted on the map all the time.
 function plPaint(){[mapL,mapH].forEach(m=>{if(!m)return;const id=m.getContainer().id;
  if(PLG[id]){m.removeLayer(PLG[id]);delete PLG[id]}
- // a name that was painted on the map belongs to a marker that no longer exists:
- // Leaflet leaves an open tooltip in its pane, so clear them before drawing again
+ // a name that was opened belongs to a marker that no longer exists: Leaflet leaves
+ // an open tooltip in its pane, so clear them before drawing again
  m.getContainer().querySelectorAll('.leaflet-tooltip.pltip').forEach(t=>t.remove());
- const b=m._btn&&m._btn.pln;if(b)b.classList.toggle('on',PLNAME);
  const g=L.layerGroup().addTo(m);
  PLACES.forEach((x,i)=>{const mk=L.marker([+x.la,+x.lo],{zIndexOffset:-200,keyboard:false,
    icon:L.divIcon({className:'',html:'<div class="mk pl"><i class="fa-solid fa-bookmark"></i></div>',iconSize:[18,18],iconAnchor:[9,9]})})
-   .bindTooltip(x.n,{permanent:PLNAME,direction:'right',offset:[10,0],className:'pltip'});
+   .bindTooltip(x.n,{direction:'right',offset:[10,0],className:'pltip'});
   // pressing a marker reads or opens the name, but never swallows a click the map
   // is waiting for: saving a place, a zone corner, or nothing while a shape is held
   mk.on('click',e=>{if(PLARM){PLARM.h(e);return}if(DRAW){DRAW.click(e);return}if(ZSH)return;
@@ -1362,7 +1409,10 @@ function tools(el,opt={}){const t=el.querySelector('table');if(!t)return;
   if(b.dataset.x==='print'){const w=window.open('','_blank');w.document.write('<html><head><title>'+esc(title)+'</title><style>body{font-family:sans-serif}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:4px;font-size:11px}.sub{font-size:12px;margin:0 0 10px;color:#333}.foot{font-size:10px;color:#666;margin-top:8px}</style></head><body><h3 style="margin:0 0 4px">'+esc(title)+'</h3><p class="sub">'+esc(m.join('  |  '))+'</p><table><tr>'+head.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr>'+R.map(r=>'<tr>'+r.map(c=>'<td>'+esc(c)+'</td>').join('')+'</tr>').join('')+'</table><p class="foot">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</p></body></html>');w.document.close();w.print()}}}
 const PN={c1:'Events by Type',c2:'Events per Day',c3:'Violator Drivers',t1:'Speed',t2:'Acceleration',t3:'Elevation',t4:'Ignition',r1:'Distance per vehicle',r2:'Fleet distance per day',r3:'Driving vs Idling',r4:'Fuel'};
 const pb=c=>{const b=c.querySelector('[data-a=big]');if(!b)return;const on=c.classList.contains('big'),i=b.querySelector('i');
- b.title=on?'Shrink back':'Enlarge';b.setAttribute('aria-label',b.title);if(i)i.className='fa-solid '+(on?'fa-minimize':'fa-expand')};
+ b.title=on?'Shrink back':'Enlarge';b.setAttribute('aria-label',b.title);if(i)i.className='fa-solid '+(on?'fa-minimize':'fa-expand');
+ // an enlarged chart has to start under the header, never across it - the header wraps
+ // into two rows on a narrow window, so only its measured height is a safe top edge
+ c.style.top=on?(document.querySelector('header').offsetHeight+8)+'px':''};
 function panels(sec){const g=document.querySelector('#'+sec+' .cgrid');if(!g)return;const key='lay_'+sec,bar=document.createElement('div');bar.className='pbar';g.before(bar);
  const orig=[...g.children];
  [...g.children].forEach(c=>{c.dataset.id=(c.querySelector('canvas')||c).id;c.insertAdjacentHTML('afterbegin','<div class="pt"><button data-a="big" title="Enlarge"><i class="fa-solid fa-expand"></i></button><button data-a="l" title="Move left"><i class="fa-solid fa-arrow-left"></i></button><button data-a="r" title="Move right"><i class="fa-solid fa-arrow-right"></i></button><button data-a="h" title="Hide"><i class="fa-solid fa-eye-slash"></i></button></div>');
