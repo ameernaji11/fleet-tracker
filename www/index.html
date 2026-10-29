@@ -13,8 +13,13 @@
 input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);border-radius:12px;width:100%;margin:5px 0;background:#fff;color:var(--ink)}
 .btn{font:inherit;font-weight:700;height:46px;border:0;border-radius:12px;width:100%;margin:6px 0;color:#fff;display:flex;align-items:center;justify-content:center;gap:8px}
 .b{background:var(--bl)}.g{background:var(--gr)}.o{background:var(--or)}.r{background:var(--rd)}.gh{background:#fff;color:var(--ink);border:1px solid var(--line)}
-.top{display:flex;justify-content:space-between;align-items:center}.top b{font-size:20px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:6px}.top b{font-size:20px}
+/* the welcome name takes whatever the buttons leave, so five icons never push the
+   header wider than the screen on a small phone */
+.top>div:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top>div:last-child{display:flex;gap:6px;flex:none}
 .ib{border:0;background:#fff;border-radius:10px;width:40px;height:40px;border:1px solid var(--line)}
+.ib.mute{background:var(--rdl);border-color:var(--rd);color:var(--rd)}
 .id{display:flex;gap:12px;align-items:center}.av{width:46px;height:46px;border-radius:14px;background:var(--orl);color:var(--or);display:grid;place-items:center;font-size:20px}
 .chip{margin-left:auto;font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:var(--bll);color:var(--bl)}
 .spd{text-align:center}.spd b{font-size:56px;line-height:1}.spd span{color:var(--mut);margin-left:6px}
@@ -74,9 +79,10 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 <button class="btn o" onclick="CapPlugins.BG.openSettings()"><i class="fa-solid fa-gear"></i>Open location settings</button>
 <div class="card step"><i class="fa-solid fa-battery-full"></i><div>Battery: "Unrestricted"<br><small>Opens settings. Tap Battery → Unrestricted, so Android never stops tracking.</small></div></div>
 <button class="btn o" onclick="CapPlugins.BG.openSettings()"><i class="fa-solid fa-gear"></i>Open battery settings</button>
+<div class="card step"><i class="fa-solid fa-bell"></i><div>Alerts with the screen off<br><small>Keep Battery "Unrestricted" and notifications allowed: the buzzer and the voice are then produced by Android itself, so both work with the screen locked or another app open. Test them with the bell button once the trip has started. The speaker button silences every sound without losing the on-screen warning.</small></div></div>
 <button class="btn g" onclick="localStorage.perm='1';show('lg');init()"><i class="fa-solid fa-arrow-right"></i>Continue</button></div>
 <div id="app" class="screen hide">
-<div class="top"><div><small>Welcome,</small> <b id="wn"></b><b>!</b></div><div style="display:flex;gap:6px"><button class="ib hide" id="dash" onclick="openDash()" title="Open dashboard"><i class="fa-solid fa-chart-line"></i></button><button class="ib" onclick="pwUi()" title="Change password"><i class="fa-solid fa-key"></i></button><button class="ib" onclick="signOut()" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i></button></div></div>
+<div class="top"><div><small>Welcome,</small> <b id="wn"></b><b>!</b></div><div><button class="ib hide" id="dash" onclick="openDash()" title="Open dashboard"><i class="fa-solid fa-chart-line"></i></button><button class="ib" id="muteB" onclick="muteTog()" title="Mute the alerts"><i class="fa-solid fa-volume-high"></i></button><button class="ib" onclick="testAlert()" title="Test the buzzer and the voice alert"><i class="fa-solid fa-bell"></i></button><button class="ib" onclick="pwUi()" title="Change password"><i class="fa-solid fa-key"></i></button><button class="ib" onclick="signOut()" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i></button></div></div>
 <div class="card id"><div class="av" style="width:38px;height:38px;font-size:17px"><i id="vi" class="fa-solid fa-car"></i></div><div><b id="vn"></b><br><small><i class="fa-solid fa-id-card"></i> <span id="dn"></span></small><br><select id="pk" class="hide" onchange="pickV()" style="margin-top:6px;max-width:190px"></select></div><span class="chip" id="stc">Parking</span></div>
 <div class="card spd"><div style="position:relative"><b id="sp">0</b><span>km/h</span><div class="rl hide" id="rl" title="Speed limit of this road"><b></b></div></div><div class="pr"><small>Position</small><b id="v_pos">-</b><br><small id="lt">No record yet</small></div></div>
 <div id="map"><div id="fr"></div><div class="mcl"><button onclick="togMap()" title="Satellite / map"><i class="fa-solid fa-layer-group"></i></button><button id="fsB" onclick="fsMap()" title="Full screen"><i class="fa-solid fa-expand"></i></button><button id="pinB" class="on" onclick="togPin()" title="Pin: keep the vehicle in the centre"><i class="fa-solid fa-thumbtack"></i></button></div></div>
@@ -103,7 +109,31 @@ window.addEventListener('unhandledrejection',e=>{$('err').textContent='Error: '+
 const DASH=(typeof DASH_URL==='string'&&/^https:\/\/.+\/$/.test(DASH_URL.trim()))?DASH_URL.trim():'https://ameernaji11.github.io/fleet-tracker/dashboard/';
 const mail=u=>u.includes('@')?u.trim():u.trim().toLowerCase()+'@fleet.local';
 const TI={Car:'fa-car',Sedan:'fa-car-side',Hatchback:'fa-car',SUV:'fa-car-rear',Pickup:'fa-truck-pickup',Van:'fa-van-shuttle',Minibus:'fa-van-shuttle',Bus:'fa-bus',Truck:'fa-truck','Heavy Truck':'fa-truck-moving',Tanker:'fa-truck-droplet',Taxi:'fa-taxi',Ambulance:'fa-truck-medical',Motorbike:'fa-motorcycle',Tractor:'fa-tractor',Trailer:'fa-trailer',Equipment:'fa-tractor'};
-let REM=localStorage.rem!=='0',sb=null,me,asg,watcher,lastSent=0,HSENT=null,queue=JSON.parse(localStorage.q||'[]'),SENT=0,ASGS=[],PICK=localStorage.pick||null;
+let REM=localStorage.rem!=='0',sb=null,me,asg,watcher,lastSent=0,HSENT=null,SENT=+(localStorage.sent||0),ASGS=[],PICK=localStorage.pick||null;
+// ---- the outbox. Everything the phone would send sits in IndexedDB until the
+// server has accepted it, so a vehicle can drive through hours without signal and
+// lose nothing. Each entry is {t:'pos'|'ev'|'upd',...} in the order it happened,
+// which is what lets an event close land after the event it closes.
+let OUT=null,outBusy=false,MEMQ=[];
+const outSt=m=>{try{return OUT&&OUT.transaction('out',m).objectStore('out')}catch(e){return null}};
+function outOpen(){return new Promise(res=>{if(!window.indexedDB||!indexedDB.open)return res(false);let req;
+ try{req=indexedDB.open('fleetout',1)}catch(e){return res(false)}
+ req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains('out'))d.createObjectStore('out',{keyPath:'k',autoIncrement:true})};
+ req.onsuccess=()=>{OUT=req.result;res(!!OUT&&OUT.objectStoreNames.contains('out'))};
+ req.onerror=()=>res(false);setTimeout(()=>res(false),5000)})}
+function outAdd(v){const s=outSt('readwrite');if(s){try{s.add({v,at:Date.now()});return}catch(e){}}
+ MEMQ.push({k:++MMX,v,mem:true})}
+let MMX=0;
+function outDel(r){if(r.mem)return;const s=outSt('readwrite');if(s)try{s.delete(r.k)}catch(e){}}
+// oldest-first page of the queue; the server accepts 200 rows per insert, so that
+// is the natural batch size
+function outTake(n,after){return new Promise(res=>{const s=outSt('readonly');
+ if(!s)return res(MEMQ.splice(0,n));
+ try{s.getAll(IDBKeyRange.lowerBound(after||0,true),n).onsuccess=e=>
+  res((e.target.result||[]).map(x=>({k:x.k,v:x.v})))}catch(e){res([])}})}
+const outCount=()=>new Promise(res=>{const s=outSt('readonly');
+ if(!s)return res(MEMQ.length);
+ try{const c=s.count();c.onsuccess=()=>res(c.result+MEMQ.length);c.onerror=()=>res(MEMQ.length)}catch(e){res(MEMQ.length)}});
 const mk=r=>supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storage:r?localStorage:sessionStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'implicit'}});
 try{if(!/^https:\/\/[a-z0-9]{15,30}\.supabase\.co$/.test(SUPABASE_URL)||!String(SUPABASE_KEY).startsWith('eyJ'))throw new Error('config.js has a wrong address or key');sb=mk(REM)}catch(e){$('err').textContent='Setup error: '+(e.message||e)}
 const show=s=>{['lg','pm','app'].forEach(x=>$(x).classList.toggle('hide',x!==s));if(s==='app'&&map)setTimeout(()=>map.invalidateSize(),100)};
@@ -137,10 +167,23 @@ function logAct(action,details,duration_s){if(!me)return;(async()=>{
 let SST=0;
 function sessStop(){if(!SST||!me)return;const s=Math.round((Date.now()-SST)/1000);SST=0;if(s>=10)logAct('Session time','App',s)}
 function sessStart(){if(me)SST=Date.now()}
-document.addEventListener('visibilitychange',()=>{if(document.hidden)sessStop();else{sessStart();if(Date.now()<ALRM)$('fr').classList.add('on')}});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){sessStop();return}
+ sessStart();if(Date.now()<ALRM)$('fr').classList.add('on');
+ // coming back to the front: stop a tone whose deadline passed while we were away,
+ // and push whatever the phone saved in the meantime
+ toneEnd();outUi();if(PEND)flush()});
 addEventListener('pagehide',sessStop);
+// A driver with no signal still has to be able to open the app, start a trip and be
+// warned. The session may be unreadable offline, so the last identity the phone proved
+// is kept as a fallback and the app re-checks it the moment the network is back.
+function cachedWho(){try{const c=JSON.parse(localStorage.cfg||'null');return c&&c.who&&c.who.id?c.who:null}catch(e){return null}}
 async function init(fresh){
- if(!sb)return;const {data:{session}}=await sb.auth.getSession();if(!session)return;me=session.user;
+ if(!sb)return;
+ let s=null;
+ try{const r=await sb.auth.getSession();s=r.data&&r.data.session}catch(e){}
+ if(!s&&!navigator.onLine){const w=cachedWho();if(w)s={user:w,offline:true}}
+ if(!s)return;me=s.user;
+ await outInit();
  await loadRules();
  const nm=(me.email||'').replace('@fleet.local','');$('wn').textContent=nm;
  const v=asg?.vehicles;$('vn').textContent=v?.name||'No vehicle linked';$('dn').textContent=asg?.drivers?.name||'No driver linked';$('vi').className='fa-solid '+(TI[v?.type]||'fa-car');
@@ -148,11 +191,32 @@ async function init(fresh){
  $('dash').classList.remove('hide');
  [['acc','Accuracy','fa-bullseye'],['alt','Elevation','fa-mountain'],['dir','Direction','fa-compass'],['ac','Accel.','fa-gauge'],['bat','Battery','fa-battery-half'],['sent','Sent','fa-cloud-arrow-up'],['trip','This trip','fa-road'],['bbox','Stored on phone','fa-box-archive','w2']].forEach(x=>{if(!$('v_'+x[0]))$('vals').insertAdjacentHTML('beforeend',`<div class="${x[3]||''}"><small><i class="fa-solid ${x[2]}"></i> ${x[1]}</small><b id="v_${x[0]}">-</b></div>`)});
  // the blackbox opens after the tiles exist so its count has somewhere to show
- bbInit();bbWatch();
+ bbInit();bbWatch();await outUi();
+ // records a previous session left in the queue go up as soon as the phone can
+ // reach the server, without waiting for the driver to press Start
+ if(PEND&&navigator.onLine)flush();
+ if(!navigator.onLine)banner('<i class="fa-solid fa-wifi"></i> Offline: everything is kept on the phone until the signal returns',6000);
  // a driver keeps this app open for a whole shift, so touch the session every
  // 10 minutes — getSession() is what makes supabase-js refresh it early.
  setInterval(()=>{if(!document.hidden)sb.auth.getSession().catch(()=>{})},10*60*1000);
- enter()}
+ // Android can hand back the same page after killing the process while a trip was
+ // running; the driver must not have to notice, and must not have to press Start again
+ const tr=tripRead();
+ enter();
+ if(tr&&asg?.vehicle_id===tr.v&&window.CapPlugins)start(1);
+ else if(tr)tripClear()}
+// ---- the outbox at work: open it, carry over anything the older build left in
+// localStorage, and push again whenever the phone hears from the network
+async function outInit(){
+ if(!await outOpen())$('err').textContent='This phone cannot keep a queue between sessions; records are held until the app closes.';
+ try{const old=JSON.parse(localStorage.q||'[]');
+  if(old.length){old.forEach(p=>outAdd({t:'pos',p}));localStorage.removeItem('q');flush()}}catch(e){}
+ outUi()}
+addEventListener('online',()=>{netUi();banner('<i class="fa-solid fa-cloud-arrow-up"></i> Back online: sending '+(PEND||0)+' saved records',5000);flush();bbAnswer()});
+addEventListener('offline',()=>{netUi();banner('<i class="fa-solid fa-wifi"></i> No internet: keeping records on the phone',5000)});
+// a queue that stops being written to still has to drain: the trip callback only
+// fires while the vehicle is moving
+setInterval(()=>{if(!document.hidden&&PEND&&!fl)flush()},60000);
 function enter(){show('app');initMap();showLast()}
 // ---- map
 let map,mrk,trail,tiles,sat=false,follow=true;
@@ -184,39 +248,41 @@ async function pAsk(){try{const id=await CapPlugins.BG.addWatcher({requestPermis
  await askNotif()}
 // ---- alerts on the phone
 let RUL={};const EVN={harsh_braking:'Harsh braking',harsh_acceleration:'Harsh acceleration',overspeed:'Overspeed',road_overspeed:'Road speed limit',zone_enter:'Entered zone',zone_exit:'Left zone',zone_overspeed:'Zone overspeed'};
-let AC=null;
-// One shared AudioContext: the WebView kills a context created outside a user gesture, so it is
-// opened by the Start trip tap and only resumed here (the alert callbacks run in the background).
-function tone(){const A=window.AudioContext||window.webkitAudioContext;if(!A)return null;
- if(!AC)AC=new A();const r=AC.state==='suspended'&&AC.resume();if(r&&r.catch)r.catch(()=>{});return AC}
 // Alerts must be audible even when the driver never opened the Permissions screen, so every
 // trip start re-asks for notification permission and registers the loud channel it posts to.
 let CHAN=false;
+// seven buzzer tones, identical to the dashboard list so the tone you preview
+// there is the tone the phone plays. Each one is a real sound file (tools/tones.js
+// writes www/tones/*.wav) for two reasons: an <audio> element is played by Android's
+// media pipeline, which keeps sounding when the screen goes off or another app covers
+// ours, and the same files, copied into res/raw by the build, become the sound an
+// Android notification channel plays - the only path that is guaranteed to be heard
+// when Android has frozen this app's JavaScript.
+const TONEK=['discontinuous','continuous','fast','twotone','siren','chime','pulse'];
+const TONES={off:'Off',discontinuous:'Discontinuous',continuous:'Continuous',fast:'Fast beeps',twotone:'Two-tone alarm',siren:'Siren',chime:'Chime',pulse:'Rising pulse'};
+let TO=null,TEND=0;
+function stopTone(){if(TO){try{TO.pause();TO.currentTime=0}catch(e){}TO=null}TEND=0}
+function playTone(k,dur){stopTone();if(!k||k==='off'||TONEK.indexOf(k)<0)return;
+ const a=new Audio('tones/'+k+'.wav');a.loop=true;a.volume=1;
+ TEND=Date.now()+Math.max(1,+dur||5)*1000;TO=a;
+ try{const p=a.play();if(p&&p.catch)p.catch(()=>{TO=null})}catch(e){TO=null}
+ // a looping media element outlives a frozen page, so the deadline is enforced here
+ // as well as by the trip callback and the resume handler
+ setTimeout(toneEnd,TEND-Date.now()+400)}
+// a page left hidden can lose its timers, so the trip callback also enforces the deadline
+function toneEnd(){if(TO&&Date.now()>TEND)stopTone()}
 async function askNotif(){await logAct('Allowed permissions');
  try{const p=await CapPlugins.LN.requestPermissions(),s=[p.display,p.alert,p.sound,p.badge].filter(Boolean);
  if(s.includes('denied')&&!s.includes('granted'))$('err').textContent='Notifications are blocked, so alerts only vibrate. Enable them in Android settings.'}catch(e){}
  if(CHAN)return;
- try{await CapPlugins.LN.registerChannel({id:'fleet',name:'Fleet alerts',description:'Overspeed and harsh driving',notificationsAudibility:'HIGH',importance:3,visibility:1});CHAN=true}catch(e){}}
-// seven buzzer tones, identical to the dashboard list so the tone you preview
-// there is the tone the phone plays. Square/sawtooth waves are harsh at full
-// volume, so they are played back quieter.
-const TONES={off:'Off',discontinuous:'Discontinuous',continuous:'Continuous',fast:'Fast beeps',twotone:'Two-tone alarm',siren:'Siren',chime:'Chime',pulse:'Rising pulse'};
-let TOSC=[];
-function stopTone(){if(!AC)return;const n=AC.currentTime;TOSC.forEach(x=>{try{x.g.gain.cancelScheduledValues(n);x.g.gain.setValueAtTime(0,n);x.o.stop(n+.02)}catch(e){}});TOSC=[]}
-function playTone(a,type,dur,vol){if(!a||type==='off')return;stopTone();const t0=a.currentTime+.05,end=t0+dur;
- const note=(f,s,e,w,f2)=>{if(s>=end)return;e=Math.min(e,end);const o=a.createOscillator(),g=a.createGain(),v=w==='square'||w==='sawtooth'?vol*.45:vol;
-  o.type=w||'sine';o.frequency.setValueAtTime(f,s);if(f2)o.frequency.linearRampToValueAtTime(f2,e);
-  g.gain.setValueAtTime(0,s);g.gain.linearRampToValueAtTime(v,s+.01);g.gain.setValueAtTime(v,Math.max(s+.01,e-.02));g.gain.linearRampToValueAtTime(0,e);
-  o.connect(g);g.connect(a.destination);o.start(s);o.stop(e+.01);TOSC.push({o,g})};
- const rep=(st,fn)=>{for(let s=t0;s<end;s+=st)fn(s)};
- switch(type){
-  case 'continuous':note(880,t0,end);break;
-  case 'fast':rep(.2,s=>note(1000,s,s+.1));break;
-  case 'twotone':rep(.8,s=>{note(960,s,s+.4,'square');note(640,s+.4,s+.8,'square')});break;
-  case 'siren':rep(1.2,s=>{note(600,s,s+.6,'sawtooth',1200);note(1200,s+.6,s+1.2,'sawtooth',600)});break;
-  case 'chime':rep(1.4,s=>{note(1319,s,s+.5,'triangle');note(1047,s+.5,s+1.2,'triangle')});break;
-  case 'pulse':rep(.8,s=>[600,800,1000,1200].forEach((f,i)=>note(f,s+i*.16,s+i*.16+.12)));break;
-  default:rep(.5,s=>note(880,s,s+.25))}}
+ // Android writes a channel's sound and loudness when it is created and never lets the
+ // app change them again, so these ids are new: the silent "fleet" channel that earlier
+ // builds registered cannot be repaired, it can only be left behind.
+ for(const k of TONEK){try{await CapPlugins.LN.registerChannel({id:'fleet.'+k,name:'Fleet alerts: '+TONES[k],
+   description:'Overspeed and harsh driving warnings',sound:k+'.wav',importance:4,visibility:1,vibration:true})}catch(e){}}
+ // a quiet channel for the banners posted while the app is on screen, so the same
+ // breach never sounds twice at once
+ try{await CapPlugins.LN.registerChannel({id:'fleet.quiet',name:'Fleet alerts: in app',description:'Shown while the app is open',importance:2,visibility:1,vibration:false});CHAN=true}catch(e){}}
 // ---- spoken safety warnings. English, Arabic, Hindi and Urdu; the language and
 // the on/off switches come from the dashboard Configuration page.
 const VLANG={en:['English','en-US'],ar:['Arabic','ar-SA'],hi:['Hindi','hi-IN'],ur:['Urdu','ur-PK']};
@@ -228,30 +294,65 @@ const VMSG={
 const vrMsg=(t,l)=>(VMSG[l]||VMSG.en)[t]||VMSG.en[t]||'';
 // the WebView's own speechSynthesis is unreliable on Android, so the native
 // text-to-speech plugin is tried first and the browser voice is the fallback.
-async function speak(txt,lang){const code=(VLANG[lang]||VLANG.en)[1],try2=[];
+async function speak(txt,lang){if(MUTE)return;const code=(VLANG[lang]||VLANG.en)[1],try2=[];
  if(CapPlugins&&CapPlugins.TTS){for(const c of [code,code.split('-')[0],'en-US']){if(try2.includes(c))continue;try2.push(c);
    try{await CapPlugins.TTS.speak({text:txt,lang:c,rate:1,pitch:1,volume:1});return}catch(e){}}return}
  const S=window.speechSynthesis,U=window.SpeechSynthesisUtterance;if(!S||!U)return;
  try{let vs=[];try{vs=S.getVoices()||[]}catch(e){}
   const v=vs.find(x=>x.lang===code)||vs.find(x=>(x.lang||'').split('-')[0]===code.split('-')[0]);
   const u=new U(txt);u.lang=v?v.lang:code;if(v)u.voice=v;S.cancel();S.speak(u)}catch(e){}}
-function beep(type){const R=RUL[type]||{};if(R.beep===false||R.beep_type==='off')return;const dur=Math.max(1,+R.beep_duration||5);
- try{playTone(tone(),R.beep_type,dur,.3)}catch(e){}
+// ---- the driver's own switch for every sound this app makes. A cab can be loud,
+// a passenger can be asleep, and the warning still has to reach the screen and the
+// record, so muting silences the buzzer, the voice and the notification tone only.
+let MUTE=localStorage.mute==='1';
+function muteUi(){const b=$('muteB');if(!b)return;const i=b.querySelector('i');
+ b.classList.toggle('mute',MUTE);if(i)i.className='fa-solid '+(MUTE?'fa-volume-xmark':'fa-volume-high');
+ b.title=MUTE?'Alerts are muted - tap to make them audible again':'Tap to mute the buzzer and the spoken warning'}
+function muteTog(){MUTE=!MUTE;localStorage.mute=MUTE?'1':'0';if(MUTE)stopTone();muteUi();
+ banner(MUTE?'<i class="fa-solid fa-volume-xmark"></i> Alerts muted: warnings still show on screen':'<i class="fa-solid fa-volume-high"></i> Alerts are audible again',4000);
+ logAct('Alert sounds',MUTE?'muted':'audible')}
+function beep(type){const R=RUL[type]||{};if(MUTE||R.beep===false||R.beep_type==='off')return;const dur=Math.max(1,+R.beep_duration||5);
+ // with another app or the lock screen in front, the loud notification channel is the
+ // sound, so this page starts no tone of its own: one breach, one buzzer
+ if(!onScreen())return;
+ playTone(R.beep_type,dur);
  if(navigator.vibrate){const p=[];if(R.beep_type==='continuous'||R.beep_type==='siren')p.push(dur*1000);
   else for(let i=0;i<Math.max(1,Math.round(dur*2));i++)p.push(300,200);try{navigator.vibrate(p)}catch(e){}}}
+// true while this app is the screen the driver is looking at. Android mutes the
+// channel sound of a notification from the app already in front of the user, so the
+// same breach is announced one way or the other, never twice.
+const onScreen=()=>!document.hidden;
 let aT;
 function banner(html,ms){const a=$('alert');a.innerHTML=html;a.classList.remove('hide');clearTimeout(aT);aT=setTimeout(()=>a.classList.add('hide'),ms)}
 function warnMsg(txt){banner('<i class="fa-solid fa-gauge-simple-high"></i> '+txt,4000)}
 function notify(type,kmh,lvl){const R=RUL[type]||{},txt=Math.round(kmh)+' km/h'+(lvl?' against '+lvl:'');
- if(R.alert!==false){banner('<i class="fa-solid fa-triangle-exclamation"></i> '+EVN[type]+' · '+txt,6000);alertRing();
-   const n={id:Date.now()%2147483647,title:'Fleet Tracker: '+EVN[type],body:txt};if(CHAN)n.channelId='fleet';
+ const back=!onScreen(),bt=R.beep_type&&TONEK.indexOf(R.beep_type)>=0?R.beep_type:'discontinuous';
+ if(R.alert!==false){banner('<i class="fa-solid fa-triangle-exclamation"></i> '+EVN[type]+' · '+txt,6000);alertRing()}
+ // Android stops this page's own sound the moment another app or the lock screen takes
+ // over, and only a notification still rings there, so one is posted even when the
+ // in-app banner has been switched off - otherwise a backgrounded breach would be silent
+ if(back||R.alert!==false){
+   const n={id:Date.now()%2147483647,title:'Fleet Tracker: '+EVN[type],
+     body:txt+(R.voice===false||!V.voice_on?'':' - '+vrMsg(type,VLANG[R.voice_lang]?R.voice_lang:V.lang))};
+   n.channelId=(CHAN&&back&&!MUTE&&R.beep!==false&&bt!=='off')?'fleet.'+bt:'fleet.quiet';
    try{const p=CapPlugins.LN.schedule({notifications:[n]});if(p&&p.catch)p.catch(()=>{})}catch(e){}
-   // the voice waits for the tone to finish so the two never shout over each
-   // other, and ANN=false means this breach already announced itself
+   // the voice waits for the tone only while the app is on screen, where a timer is
+   // safe to rely on; in the background it is spoken at once instead of never
    const vl=R.voice_lang&&VLANG[R.voice_lang]?R.voice_lang:(R.voice_lang==='off'||R.voice===false||!V.voice_on?'off':V.lang);
-   if(ANN[type]!==false&&vl!=='off')
-    setTimeout(()=>speak(vrMsg(type,vl),vl),Math.min(2,Math.max(1,+R.beep_duration||5)))}
+   if(ANN[type]!==false&&vl!=='off'){const m=vrMsg(type,vl);
+     if(back)speak(m,vl);else setTimeout(()=>speak(m,vl),Math.min(2,Math.max(1,+R.beep_duration||5)))}}
  beep(type)}
+// A driver, or whoever hands the phone over, must be able to prove the alarm works
+// before setting off: this runs the overspeed alert exactly the way a breach does,
+// tone, banner and voice, using the tone and language from the Configuration page.
+function testAlert(){const R=RUL.overspeed||{};
+ banner('<i class="fa-solid fa-triangle-exclamation"></i> Test alert · limit '+Math.round(LIM.speed+LIM.buf)+' km/h',6000);alertRing();
+ // a muted phone would otherwise look broken: the screen flashes and nothing sounds
+ if(MUTE){banner('<i class="fa-solid fa-volume-xmark"></i> Shown without sound - alerts are muted. Tap the speaker to unmute, then test again.',7000);logAct('Tested alert','muted');return}
+ beep('overspeed');
+ const vl=R.voice_lang&&VLANG[R.voice_lang]?R.voice_lang:(R.voice===false||!V.voice_on?'off':V.lang);
+ if(vl!=='off')setTimeout(()=>speak(vrMsg('overspeed',vl),vl),900);
+ logAct('Tested alert')}
 // ---- driving events and telemetry
 const MIN_MOVING_KMH=2;
 const sepm=(a,b)=>{const r=x=>x*Math.PI/180,dLa=r(b.latitude-a.latitude),dLo=r(b.longitude-a.longitude),x=Math.sin(dLa/2)**2+Math.cos(r(a.latitude))*Math.cos(r(b.latitude))*Math.sin(dLo/2)**2;return 12742000*Math.asin(Math.sqrt(x))};
@@ -300,24 +401,26 @@ function zDraw(){if(!map)return;if(zLayer){zLayer.remove();zLayer=null}
 function zEv(type,z,loc,kmh){if(!ON[type])return;
  // a zone change is a moment, not a breach that grows, so it is written straight
  // away with the readings of the fix that crossed the line
- sb.from('events').insert({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,
+ outAdd({t:'ev',p:{cid:uid(),user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,
   vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,type,lat:loc.latitude,lng:loc.longitude,
   speed:Math.round(kmh),value:Math.round(kmh),
   details:(type==='zone_enter'?'Entered ':'Left ')+(z.name||'zone')+(z.speed_limit?' · limit '+z.speed_limit+' km/h':''),
   recorded_at:new Date(loc.time||Date.now()).toISOString(),
   accuracy:loc.accuracy,altitude:loc.altitude,heading:loc.bearing,accel:+(lastA*3.6).toFixed(1),
-  battery_pct:bat.p,charging:bat.c,ignition:true,road_limit:+z.speed_limit||null}).then(({error})=>{
-  if(error)$('err').textContent='Event error: '+error.message})}
+  battery_pct:bat.p,charging:bat.c,ignition:true,road_limit:+z.speed_limit||null}});
+ flush()}
 // the zones a fix falls inside, tightest speed limit first
 const zin=loc=>ZONES.filter(z=>z.pts&&z.pts.length>2&&inPoly(loc.latitude,loc.longitude,z.pts))
  .sort((a,b)=>((+a.speed_limit||999)-(+b.speed_limit||999)));
 function zonesCheck(loc,kmh,t){
- const zs=V.zones_on?zin(loc):[],tight=zs[0];
+ // a zone only announces what its own three switches ask for, exactly as the
+ // dashboard's Alert on entry / exit / overspeed boxes were left
+ const zs=V.zones_on?zin(loc):[],tight=zs.filter(z=>z.overspeed!==false&&+z.speed_limit>0)[0];
  ZONES.forEach(z=>{const on=zs.some(x=>x.id===z.id),was=INZ[z.id];INZ[z.id]=on;
   // the first fix after a start or a zone list change only sets the baseline: it can
   // say nothing about a crossing that happened while the phone was quiet
   if(was===undefined)return;
-  if(on&&!was)zEv('zone_enter',z,loc,kmh);else if(!on&&was)zEv('zone_exit',z,loc,kmh)});
+  if(on&&!was){if(z.enter!==false)zEv('zone_enter',z,loc,kmh)}else if(!on&&was){if(z.exit!==false)zEv('zone_exit',z,loc,kmh)}});
  // overspeed inside a zone rides the same breach machinery as the road limit, so it
  // keeps the driver's alert, the tolerance window and the open/close event row
  ZNA=tight&&+tight.speed_limit>0?{lim:+tight.speed_limit,name:tight.name||'zone'}:null;
@@ -354,7 +457,7 @@ function hold(type,bad,loc,kmh,val,t){if(!ON[type])return;
   if(ANN[type]){lastNotify[type]=n;notify(type,kmh,lvl)}
   // the dashboard needs the fix that opened the breach on the map straight away,
   // so it is pushed and flushed instead of waiting for the next sampling tick
-  lastLoc=loc;queue.push(row(loc,Math.round(kmh),true));flush()}
+  lastLoc=loc;outAdd({t:'pos',p:row(loc,Math.round(kmh),true)});flush()}
  else if(Math.abs(val)>Math.abs(VS[type].peak))VS[type].peak=val}
 const isSp=t=>t==='overspeed'||t==='road_overspeed'||t==='zone_overspeed';
 const evLvl=type=>type==='overspeed'?Math.round(LIM.speed+LIM.buf)+' km/h':
@@ -369,25 +472,26 @@ function ev(type){const b=VS[type];if(!b)return;RST[type]='';
  const lvl=evLvl(type),loc=b.loc,road=type==='road_overspeed'?Math.round(ROAD||0):type==='zone_overspeed'?(ZNA?Math.round(ZNA.lim):null):null;
  if(!ANN[type])notify(type,b.kmh,lvl);ANN[type]=false;
  // every reading of the fix that opened the breach is stored with the event, so
- // the dashboard popup and report need no second query
- sb.from('events').insert({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,
+ // the dashboard popup and report need no second query. The phone names the row
+ // itself: that is what lets its closing update queue up behind it offline.
+ const id=uid();
+ outAdd({t:'ev',p:{cid:id,user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,
   vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,type,lat:loc.latitude,lng:loc.longitude,
   speed:Math.round(b.kmh),value:+(isSp(type)?b.kmh:b.val).toFixed(1),
   details:evTxt(type,b.kmh,b.val,b.peak,lvl),recorded_at:new Date(loc.time||b.t*1000).toISOString(),
   accuracy:loc.accuracy,altitude:loc.altitude,heading:loc.bearing,accel:+(lastA*3.6).toFixed(1),
-  battery_pct:bat.p,charging:bat.c,ignition:true,road_limit:road}).select('id').single().then(({data,error})=>{
-  if(error){$('err').textContent='Event error: '+error.message;RST[type]=null;return}
-  if(data&&data.id!=null)RST[type]=String(data.id)});}
+  battery_pct:bat.p,charging:bat.c,ignition:true,road_limit:road}});
+ RST[type]=id;flush()}
 function endEv(type,t){const b=VS[type];if(!b)return;VS[type]=null;
  const dur=Math.max(0,t-b.t),id=RST[type];
  // a dab shorter than its tolerance never reached ev(), so there is no row to close
  if(id){const lvl=evLvl(type),peak=b.peak;
-  sb.from('events').update({ended_at:new Date(t*1000).toISOString(),
+  outAdd({t:'upd',id,p:{ended_at:new Date(t*1000).toISOString(),
    value:+(isSp(type)?Math.max(b.kmh,peak||0).toFixed(1):peak.toFixed(1)),
-   details:evTxt(type,b.kmh,b.val,peak,lvl,dur)}).eq('id',id).then(({error})=>{if(error&&RST[type]===id)RST[type]=null})}
+   details:evTxt(type,b.kmh,b.val,peak,lvl,dur)}})}
  RST[type]=null;
  // and the fix that closed it, so the breach has an end point on the map too
- if(b.loc)lastLoc=b.loc,queue.push(row(b.loc,Math.round(b.kmh),true)),flush()}
+ if(b.loc)lastLoc=b.loc,outAdd({t:'pos',p:row(b.loc,Math.round(b.kmh),true)}),flush()}
 
 // called when a trip ends: every open breach gets its end time and closing readings
 function closeAll(t){Object.keys(VS).forEach(k=>endEv(k,t))}
@@ -397,19 +501,25 @@ function pickUi(){const s=$('pk');if(!s)return;
  s.classList.remove('hide');s.replaceChildren(...ASGS.map(x=>{const o=document.createElement('option');o.value=x.vehicle_id;o.textContent=x.vehicles?.name||'Vehicle';o.selected=x.vehicle_id===PICK;return o}))}
 function pickV(){PICK=$('pk').value;localStorage.pick=PICK;if(watcher){stop();watcher=null}
  $('err').textContent='';logAct('Switched vehicle',$('pk').selectedOptions[0]?.textContent||PICK);loadRules();showLast()}
-async function loadRules(){
- const [a,r,t,g]=await Promise.all([sb.from('assignments').select('vehicle_id,driver_id,vehicles(name,type,speed_limit,moving_interval,stopped_interval,brake_limit,accel_limit,speed_buffer,max_accel_warning,min_moving_distance),drivers(name)').eq('user_id',me.id),sb.from('event_rules').select('*'),sb.from('app_settings').select('*'),sb.from('geofences').select('*').eq('enabled',true).order('name')]);
- if(a.data){ASGS=a.data.filter(x=>x.vehicle_id);if(!ASGS.some(x=>x.vehicle_id===PICK))PICK=ASGS[0]?.vehicle_id||null;asg=ASGS.find(x=>x.vehicle_id===PICK)||a.data[0]||null;pickUi()}const S={},VC={};Object.keys(ON).forEach(k=>delete ON[k]);(t.data||[]).forEach(x=>VC[x.key]=x.value);(t.data||[]).forEach(x=>S[x.key]=+x.value);const v=asg?.vehicles||{};
+// The setup - which vehicle this login drives, the limits, the voice, the zones - is
+// copied into localStorage every time it is read successfully, because a driver in a
+// basement, a tunnel or a dead spot still has to be warned with the limits he was
+// given. Without that copy the app would open with no rules at all and record nothing.
+function cfgSave(a,r,t,g){try{localStorage.cfg=JSON.stringify({a,r,t,g,who:{id:me.id,email:me.email},at:Date.now()})}catch(e){}}
+function cfgRead(){try{const c=JSON.parse(localStorage.cfg||'null');return c&&c.a&&c.r&&c.t?c:null}catch(e){return null}}
+function applyCfg(a,r,t,g){
+ if(a){ASGS=a.filter(x=>x.vehicle_id);if(!ASGS.some(x=>x.vehicle_id===PICK))PICK=ASGS[0]?.vehicle_id||null;asg=ASGS.find(x=>x.vehicle_id===PICK)||ASGS[0]||null;pickUi()}
+ const S={},VC={};Object.keys(ON).forEach(k=>delete ON[k]);(t||[]).forEach(x=>VC[x.key]=x.value);(t||[]).forEach(x=>S[x.key]=+x.value);const v=asg?.vehicles||{};
  // voice_on is only 0 when the dashboard switches it off; voice_lang stays text
  // because app_settings stores every value as a string
  V={voice_on:VC.voice_on==='0'?0:1,lang:VLANG[VC.voice_lang]?VC.voice_lang:'en',
   zones_on:VC.zones_on==='0'?0:1,bb_on:VC.bb_on==='0'?0:1,bb_days:Math.min(14,Math.max(1,+VC.bb_days||3))};
  // the zones drawn on the dashboard map, ready for the point-in-polygon test
- ZONES=(g.data||[]).map(x=>({id:x.id,name:x.name,color:x.color,speed_limit:x.speed_limit,
+ ZONES=(g||[]).map(x=>({id:x.id,name:x.name,color:x.color,speed_limit:x.speed_limit,
   enter:x.enter!==false,exit:x.exit!==false,overspeed:x.overspeed!==false,
   pts:((x.shape||{}).pts||[]).map(p=>[+p[0],+p[1]]).filter(p=>p.length===2)})).filter(x=>x.pts.length>2);
  zDraw();
- (r.data||[]).forEach(x=>{RUL[x.type]=x;if('voice'in x)x.voice=x.voice!==false;ON[x.type]=x.enabled;const h=Math.max(0,+x.hold_s||0);
+ (r||[]).forEach(x=>{RUL[x.type]=x;if('voice'in x)x.voice=x.voice!==false;ON[x.type]=x.enabled;const h=Math.max(0,+x.hold_s||0);
   if(x.type==='overspeed'){LIM.speed=v.speed_limit||x.threshold;LIM.buf=Math.max(0,+v.speed_buffer||0);HOLD.overspeed=h}
   if(x.type==='harsh_braking'){LIM.brake=-(v.brake_limit||x.threshold)/3.6;HOLD.harsh_braking=h}
   if(x.type==='harsh_acceleration'){LIM.accel=(v.accel_limit||x.threshold)/3.6;HOLD.harsh_acceleration=h}
@@ -418,9 +528,65 @@ async function loadRules(){
    if(x.type==='zone_overspeed'){LIM.zbuf=Math.max(0,+x.threshold||0);HOLD.zone_overspeed=h}});
  LIM.warn=Math.max(0,+v.max_accel_warning||0);LIM.dist=Math.max(0,+v.min_moving_distance||0);
  MOV=Math.max(1,v.moving_interval||S.moving_interval||10);STP=Math.max(1,v.stopped_interval||S.stopped_interval||60)}
+// a failed query answers, it never throws: PostgREST can reject, and offline the
+// fetch itself rejects, and neither may take the trip down with it
+const q=p=>p?Promise.resolve(p).then(x=>({data:x.data,error:x.error}),()=>({data:null,error:{message:'no network'}})):{data:null,error:null};
+const AQL=u=>q(u.select('vehicle_id,driver_id,vehicles(name,type,speed_limit,moving_interval,stopped_interval,brake_limit,accel_limit,speed_buffer,max_accel_warning,min_moving_distance),drivers(name)').eq('user_id',me.id));
+async function loadRules(){
+ const off=!navigator.onLine;
+ const [a,r,t,g]=await Promise.all([
+  AQL(sb.from('assignments')),q(sb.from('event_rules').select('*')),q(sb.from('app_settings').select('*')),q(sb.from('geofences').select('*').eq('enabled',true).order('name'))]);
+ if(a.data&&r.data&&t.data){applyCfg(a.data,r.data,t.data,g.data||[]);cfgSave(a.data,r.data,t.data,g.data||[]);netUi();return 1}
+ // nothing arrived: fall back to the last setup the phone did manage to read
+ const c=cfgRead();
+ if(c){applyCfg(c.a,c.r,c.t,c.g);netUi();return 1}
+ if(!off)$('err').textContent='Could not read your settings: '+(a.error&&a.error.message||r.error&&r.error.message||'unknown');
+ return 0}
 async function pollBat(){try{const b=await CapPlugins.Device.getBatteryInfo();bat={p:Math.round(b.batteryLevel*100),c:b.isCharging};$('v_bat').textContent=bat.p+'%'+(bat.c?' ⚡':'')}catch(e){}}
 const row=(loc,speed,ign)=>({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,lat:loc.latitude,lng:loc.longitude,speed,accuracy:loc.accuracy,altitude:loc.altitude,heading:loc.bearing,ignition:ign,accel:+(lastA*3.6).toFixed(1),battery_pct:bat.p,charging:bat.c,recorded_at:new Date(loc.time||Date.now()).toISOString()});
-async function flush(){if(fl)return;fl=true;try{localStorage.q=JSON.stringify(queue);while(queue.length){const b=queue.slice(0,200);const {error}=await sb.from('positions').insert(b);if(error){$('err').textContent='Upload error: '+error.message;break}queue=queue.slice(b.length);SENT+=b.length;localStorage.q=JSON.stringify(queue)}$('v_sent').textContent=SENT+(queue.length?' ('+queue.length+' waiting)':'')}finally{fl=false}}
+// a client-side id lets an event and its closing update both wait in the outbox in
+// order, so a breach that started offline still ends up as one complete row
+const uid=()=>{try{if(crypto.randomUUID)return crypto.randomUUID()}catch(e){}
+ return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=(crypto.getRandomValues(new Uint8Array(1))[0]||Math.random()*256)%16;
+  return (c==='x'?r:(r&3|8)).toString(16)})};
+let PEND=0,OFFL=false,lastTry=0;
+// send one queued item; answers true when the server took it
+async function outSend(r){const v=r.v;
+ if(v.t==='pos'){const {error}=await q(sb.from('positions').insert(v.p));return {ok:!error,error}}
+ if(v.t==='ev'){const {error}=await q(sb.from('events').insert(v.p));return {ok:!error,error}}
+ // a close the server refuses must not hold the whole queue behind it
+ // the row is found by the name the phone gave it, because that is the only id it
+ // knows while it is offline; a refused close must not hold the queue behind it
+ const {error}=await q(sb.from('events').update(v.p).eq('cid',v.id));return {ok:true,error:error&&error.message&&('Event end not saved: '+error.message)}}
+async function flush(){if(fl||!me)return;fl=true;
+ try{let after=0,rounds=0,stop=false,why='';
+  while(!stop&&rounds++<200){const b=await outTake(200,after);if(!b.length)break;
+   after=b[b.length-1].k;
+   if(!navigator.onLine){stop=true;why='offline';break}
+   let i=0;
+   while(i<b.length){
+    if(b[i].v.t==='pos'){const run=[];while(i<b.length&&b[i].v.t==='pos')run.push(b[i++]);
+     // nothing was deleted yet, so a failed batch simply stays where it is and the
+     // next flush reads it again from the top of the queue
+     const {ok,error}=await outSend({v:{t:'pos',p:run.map(x=>x.v.p)}});
+     if(!ok){stop=true;why=error&&error.message||'send failed';break}
+     run.forEach(outDel);SENT+=run.length;localStorage.sent=SENT;outUi()}
+    else{const r=b[i++];const {ok,error}=await outSend(r);
+     if(r.v.t==='ev'&&!ok){stop=true;why=error&&error.message||'send failed';break}
+     outDel(r);if(error)$('err').textContent=why=String(error);outUi()}}
+   }
+  OFFL=!navigator.onLine;netUi(why)}
+ finally{fl=false;outUi()}}
+// the two tiles that tell the driver whether the phone is talking to the server
+function outUi(){return outCount().then(n=>{PEND=n;const t=$('v_sent');if(t)t.textContent=SENT+(n?' (+'+n+')':'')})}
+function netUi(why){const t=$('v_sent');if(!t)return;
+ if(!navigator.onLine){t.textContent='⚠ '+(PEND||0);t.title='No internet - '+PEND+' records waiting on the phone';return}
+ if(why)t.title=why;outUi()}
+// a trip the phone never got to finish: kept so that opening the app again after a
+// crash, an update or a swipe-away resumes tracking instead of waiting for the driver
+async function tripSave(){try{localStorage.trip=JSON.stringify({v:asg?.vehicle_id,t:Date.now()})}catch(e){}}
+const tripRead=()=>{try{const t=JSON.parse(localStorage.trip||'null');return t&&t.v?t:null}catch(e){return null}};
+function tripClear(){localStorage.removeItem('trip')}
 // ---- blackbox. Every fix the location watcher delivers (about one per second on
 // the move) is stored on the handset in IndexedDB and never uploaded, so the server
 // keeps only the sampled stream. An admin asks for a window of time on the Vehicles
@@ -502,24 +668,29 @@ function upd(loc,kmh,moving){const c=$('stc');c.textContent=moving?'Moving':'Idl
 // the driver sees where the vehicle last was before pressing Start trip: the
 // newest stored fix is plotted and its readings fill the tiles
 async function showLast(){if(!asg?.vehicle_id)return;
- const {data}=await sb.from('positions').select('*').eq('vehicle_id',asg.vehicle_id).order('recorded_at',{ascending:false}).limit(1);
- const p=data&&data[0];if(!p)return;const ll=[+p.lat,+p.lng],t=Date.parse(p.recorded_at),old=Date.now()-t>120000;
+ // offline this simply has nothing to show: the newest fix on the server is
+ // unreachable, and the phone has not recorded one yet in this session
+ const r=await q(sb.from('positions').select('*').eq('vehicle_id',asg.vehicle_id).order('recorded_at',{ascending:false}).limit(1));
+ const p=r.data&&r.data[0];if(!p)return;const ll=[+p.lat,+p.lng],t=Date.parse(p.recorded_at),old=Date.now()-t>120000;
  upd({latitude:+p.lat,longitude:+p.lng,accuracy:p.accuracy,altitude:p.altitude,bearing:p.heading,time:t},old?0:p.speed||0,!old&&(p.speed||0)>=MIN_MOVING_KMH);
  if(old){const c=$('stc');c.textContent='Parking';c.style.background='var(--bll)';c.style.color='var(--bl)'}
  $('lt').textContent='Last record '+new Date(t).toLocaleString('en-GB');
  if(map){if(follow)map.setView(ll,Math.max(map.getZoom(),15));trail.addLatLng(ll)}}
-async function start(){
+async function start(quiet){
  if(!asg?.vehicle_id){$('err').textContent='No vehicle linked to this user. Ask your admin.';return}
- tone();
+ if(watcher)return;
  try{
  await loadRules();pollBat();batT=setInterval(pollBat,30000);cfgT=setInterval(loadRules,300000);prev=null;pp=null;HSENT=null;ODOM=0;Object.keys(VS).forEach(k=>VS[k]=0);Object.keys(RST).forEach(k=>RST[k]=null);
  // a new trip starts from a clean map: no stale road limit or alert timer
  ROAD=null;RT=RS=0;rlUi();Object.keys(lastNotify).forEach(k=>lastNotify[k]=0);
  if(!window.CapPlugins)throw new Error('Plugin bridge missing: rebuild the APK with the latest build-apk.yml');
- watcher=await CapPlugins.BG.addWatcher({backgroundTitle:'Trip in progress',backgroundMessage:'Sending location to fleet dashboard',requestPermissions:true,stale:false,distanceFilter:0},
+ watcher=await CapPlugins.BG.addWatcher({backgroundTitle:quiet?'Trip resumed':'Trip in progress',backgroundMessage:'Sending location to fleet dashboard',requestPermissions:true,stale:false,distanceFilter:0},
  async(loc,err)=>{
   if(err){if(err.code==='NOT_AUTHORIZED')$('err').textContent='Allow location "All the time" in app settings (Permissions button).';return}
   const kmh=Math.max(0,(loc.speed||0)*3.6),moving=kmh>=MIN_MOVING_KMH,every=(moving?MOV:STP)*1000,n=Date.now();
+  // the tone stops on its own deadline even if Android froze the timer that was
+  // supposed to stop it, because these callbacks are what keep this page alive
+  toneEnd();
   // the blackbox takes every fix, before the upload throttle below drops most
   bbPut(bbPack(loc,kmh));
   // detect first: the Accel. tile then shows the value that just triggered the alert
@@ -528,20 +699,28 @@ async function start(){
   // interval would otherwise draw a turn as one straight cut across the bend
   const hd=loc.bearing,off=hd!=null&&HSENT!=null?Math.min(Math.abs(hd-HSENT),360-Math.abs(hd-HSENT)):0;
   if(n-lastSent<every-500&&!(moving&&off>=30&&n-lastSent>1200))return;lastSent=n;if(hd!=null)HSENT=hd;
-  lastLoc=loc;queue.push(row(loc,moving?kmh:0,true));if(queue.length>=Math.ceil(5/MOV)||!moving)flush()});
+  lastLoc=loc;outAdd({t:'pos',p:row(loc,moving?kmh:0,true)});
+  // try the server again every minute while records are waiting, so a phone that
+  // regains signal in a tunnel pushes without waiting for the next sampled point
+  if(PEND>=Math.ceil(5/MOV)||!moving||n-lastTry>60000){lastTry=n;flush()}});
  $('go').classList.add('hide');$('stp').classList.remove('hide');$('err').textContent='';
- logAct('Started trip',(asg?.vehicles?.name||'')+' · records every '+(MOV)+' s moving, '+(STP)+' s stopped');
+ tripSave();
+ logAct(quiet?'Resumed trip':'Started trip',(asg?.vehicles?.name||'')+' · records every '+(MOV)+' s moving, '+(STP)+' s stopped');
  await askNotif();
+ if(!navigator.onLine)banner('<i class="fa-solid fa-wifi"></i> No internet: records are kept on the phone and sent later',7000);
  }catch(e){$('err').textContent='Error: '+(e.message||e)}
 }
 async function stop(){stopTone();clearInterval(batT);clearInterval(cfgT);prev=null;pp=null;closeAll(Date.now()/1000);
- Object.keys(VS).forEach(k=>VS[k]=0);ROAD=null;RT=RS=0;rlUi();if(lastLoc){queue.push(row(lastLoc,0,false));flush()}
+ Object.keys(VS).forEach(k=>VS[k]=0);ROAD=null;RT=RS=0;rlUi();tripClear();
+ if(lastLoc)outAdd({t:'pos',p:row(lastLoc,0,false)});flush();
  logAct('Ended trip',(asg?.vehicles?.name||'')+(lastLoc?' at '+lastLoc.latitude.toFixed(5)+', '+lastLoc.longitude.toFixed(5):''));
- await CapPlugins.BG.removeWatcher({id:watcher});$('go').classList.remove('hide');$('stp').classList.add('hide');const c=$('stc');c.textContent='Parking';c.style.background='var(--bll)';c.style.color='var(--bl)';$('sp').textContent='0'}
+ if(watcher){await CapPlugins.BG.removeWatcher({id:watcher});watcher=null}
+ $('go').classList.remove('hide');$('stp').classList.add('hide');const c=$('stc');c.textContent='Parking';c.style.background='var(--bll)';c.style.color='var(--bl)';$('sp').textContent='0'}
 async function openDash(){const {data:{session}}=await sb.auth.getSession();if(!session)return;
  logAct('Opened dashboard from app',(asg?.vehicles?.name||''));
  const u=DASH+'#access_token='+session.access_token+'&refresh_token='+session.refresh_token+'&expires_in=3600&token_type=bearer';
  try{await CapPlugins.Browser.open({url:u})}catch(e){window.open(u,'_blank')}}
+muteUi();
 if(localStorage.user){$('em').value=localStorage.user;$('rem').checked=true}
 if(localStorage.perm!=='1')show('pm');
 init();
