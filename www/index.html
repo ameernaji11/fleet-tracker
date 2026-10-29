@@ -31,9 +31,9 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 .mcl button.on{background:var(--bl);color:#fff}
 .mk.pulse{width:52px;height:52px;border:0;background:none;box-shadow:none;animation:pl .9s infinite alternate}
 @keyframes pl{50%{transform:scale(1.5);opacity:.45}}
-#map.alrt{outline:4px solid var(--rd);outline-offset:-4px;animation:mb 1s infinite alternate}@keyframes mb{to{outline-color:#fff0}}
+#fr{position:absolute;inset:0;z-index:998;pointer-events:none;border-radius:14px;border:0 solid var(--rd)}#fr.on{border-width:5px;animation:mb 1s infinite alternate}@keyframes mb{to{border-color:#fff0}}
 .hero{width:100%;height:auto;border-radius:16px;display:block}.hero .draw{stroke-dasharray:400;stroke-dashoffset:400;animation:dr 7s ease-in-out infinite}@keyframes dr{0%{stroke-dashoffset:400}65%,100%{stroke-dashoffset:0}}.hero .blink{animation:bk 1.2s steps(2) infinite}@keyframes bk{to{opacity:.15}}
-.lgname{font-weight:900;font-size:22px;letter-spacing:.2px;margin:0 0 4px}@media (prefers-reduced-motion:reduce){.hero .draw,.hero .blink,#map.alrt,.mk.pulse{animation:none}}
+.lgname{font-weight:900;font-size:22px;letter-spacing:.2px;margin:0 0 4px}@media (prefers-reduced-motion:reduce){.hero .draw,.hero .blink,#fr.on,.mk.pulse{animation:none}}
 #map{flex:1;min-height:80px;margin:0}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.grid3 div{background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px 8px;min-width:0}.grid3 small{display:block;color:var(--mut);font-size:10px}.grid3 b{font-size:12px;white-space:nowrap}.grid3 .w2{grid-column:span 2}
 .btns{display:flex;gap:8px}.btns .btn{margin:0;height:48px}
@@ -76,7 +76,7 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 <div class="top"><div><small>Welcome,</small> <b id="wn"></b><b>!</b></div><div style="display:flex;gap:6px"><button class="ib hide" id="dash" onclick="openDash()" title="Open dashboard"><i class="fa-solid fa-chart-line"></i></button><button class="ib" onclick="pwUi()" title="Change password"><i class="fa-solid fa-key"></i></button><button class="ib" onclick="signOut()" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i></button></div></div>
 <div class="card id"><div class="av" style="width:38px;height:38px;font-size:17px"><i id="vi" class="fa-solid fa-car"></i></div><div><b id="vn"></b><br><small><i class="fa-solid fa-id-card"></i> <span id="dn"></span></small><br><select id="pk" class="hide" onchange="pickV()" style="margin-top:6px;max-width:190px"></select></div><span class="chip" id="stc">Parking</span></div>
 <div class="card spd"><div style="position:relative"><b id="sp">0</b><span>km/h</span><div class="rl hide" id="rl" title="Speed limit of this road"><b></b></div></div><div class="pr"><small>Position</small><b id="v_pos">-</b><br><small id="lt">No record yet</small></div></div>
-<div id="map"><div class="mcl"><button onclick="togMap()" title="Satellite / map"><i class="fa-solid fa-layer-group"></i></button><button onclick="fsMap()" title="Full screen"><i class="fa-solid fa-expand"></i></button><button id="pinB" class="on" onclick="togPin()" title="Pin: keep the vehicle in the centre"><i class="fa-solid fa-thumbtack"></i></button></div></div>
+<div id="map"><div id="fr"></div><div class="mcl"><button onclick="togMap()" title="Satellite / map"><i class="fa-solid fa-layer-group"></i></button><button id="fsB" onclick="fsMap()" title="Full screen"><i class="fa-solid fa-expand"></i></button><button id="pinB" class="on" onclick="togPin()" title="Pin: keep the vehicle in the centre"><i class="fa-solid fa-thumbtack"></i></button></div></div>
 <div class="grid3" id="vals"></div>
 <div class="btns"><button id="go" class="btn g" onclick="start()"><i class="fa-solid fa-play"></i>Start trip</button><button id="stp" class="btn r hide" onclick="stop()"><i class="fa-solid fa-stop"></i>End trip</button></div>
 <div class="foot">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</div>
@@ -100,7 +100,7 @@ window.addEventListener('unhandledrejection',e=>{$('err').textContent='Error: '+
 const DASH=(typeof DASH_URL==='string'&&/^https:\/\/.+\/$/.test(DASH_URL.trim()))?DASH_URL.trim():'https://ameernaji11.github.io/fleet-tracker/dashboard/';
 const mail=u=>u.includes('@')?u.trim():u.trim().toLowerCase()+'@fleet.local';
 const TI={Car:'fa-car',Sedan:'fa-car-side',Hatchback:'fa-car',SUV:'fa-car-rear',Pickup:'fa-truck-pickup',Van:'fa-van-shuttle',Minibus:'fa-van-shuttle',Bus:'fa-bus',Truck:'fa-truck','Heavy Truck':'fa-truck-moving',Tanker:'fa-truck-droplet',Taxi:'fa-taxi',Ambulance:'fa-truck-medical',Motorbike:'fa-motorcycle',Tractor:'fa-tractor',Trailer:'fa-trailer',Equipment:'fa-tractor'};
-let REM=localStorage.rem!=='0',sb=null,me,asg,watcher,lastSent=0,queue=JSON.parse(localStorage.q||'[]'),SENT=0,ASGS=[],PICK=localStorage.pick||null;
+let REM=localStorage.rem!=='0',sb=null,me,asg,watcher,lastSent=0,HSENT=null,queue=JSON.parse(localStorage.q||'[]'),SENT=0,ASGS=[],PICK=localStorage.pick||null;
 const mk=r=>supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storage:r?localStorage:sessionStorage}});
 try{if(!/^https:\/\/[a-z0-9]{15,30}\.supabase\.co$/.test(SUPABASE_URL)||!String(SUPABASE_KEY).startsWith('eyJ'))throw new Error('config.js has a wrong address or key');sb=mk(REM)}catch(e){$('err').textContent='Setup error: '+(e.message||e)}
 const show=s=>{['lg','pm','app'].forEach(x=>$(x).classList.toggle('hide',x!==s));if(s==='app'&&map)setTimeout(()=>map.invalidateSize(),100)};
@@ -134,7 +134,7 @@ function logAct(action,details,duration_s){if(!me)return;(async()=>{
 let SST=0;
 function sessStop(){if(!SST||!me)return;const s=Math.round((Date.now()-SST)/1000);SST=0;if(s>=10)logAct('Session time','App',s)}
 function sessStart(){if(me)SST=Date.now()}
-document.addEventListener('visibilitychange',()=>{document.hidden?sessStop():sessStart()});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)sessStop();else{sessStart();if(Date.now()<ALRM)$('fr').classList.add('on')}});
 addEventListener('pagehide',sessStop);
 async function init(fresh){
  if(!sb)return;const {data:{session}}=await sb.auth.getSession();if(!session)return;me=session.user;
@@ -145,26 +145,32 @@ async function init(fresh){
  $('dash').classList.remove('hide');
  [['acc','Accuracy','fa-bullseye'],['alt','Elevation','fa-mountain'],['dir','Direction','fa-compass'],['ac','Accel.','fa-gauge'],['bat','Battery','fa-battery-half'],['sent','Sent','fa-cloud-arrow-up']].forEach(x=>{if(!$('v_'+x[0]))$('vals').insertAdjacentHTML('beforeend',`<div class="${x[3]||''}"><small><i class="fa-solid ${x[2]}"></i> ${x[1]}</small><b id="v_${x[0]}">-</b></div>`)});
  enter()}
-function enter(){show('app');initMap()}
+function enter(){show('app');initMap();showLast()}
 // ---- map
 let map,mrk,trail,tiles,sat=false,follow=true;
 const G=l=>'https://{s}.google.com/vt/lyrs='+l+'&x={x}&y={y}&z={z}';
-function initMap(){if(map)return;map=L.map('map',{zoomControl:false}).setView([23.6,58.5],12);map.on('dragstart',()=>{follow=false;pinUi()});document.addEventListener('fullscreenchange',()=>setTimeout(()=>map.invalidateSize(),250));
+function initMap(){if(map)return;map=L.map('map',{zoomControl:false}).setView([23.6,58.5],12);map.on('dragstart',()=>{follow=false;pinUi()});
+ document.addEventListener('fullscreenchange',()=>{const on=!!document.fullscreenElement,b=$('fsB');if(b){b.title=on?'Shrink back':'Full screen';const i=b.querySelector('i');if(i)i.className='fa-solid '+(on?'fa-minimize':'fa-expand')}setTimeout(()=>map.invalidateSize(),250)});
  tiles=L.tileLayer(G('m'),{maxZoom:20,subdomains:['mt0','mt1','mt2','mt3'],attribution:'Map data © Google'}).addTo(map);trail=L.polyline([],{color:'#2f7fe6',weight:4}).addTo(map);setTimeout(()=>map.invalidateSize(),200)}
 function togMap(){sat=!sat;tiles.setUrl(G(sat?'y':'m'))}
 function fsMap(){document.fullscreenElement?document.exitFullscreen():$('map').requestFullscreen()}
 function pinUi(){const b=$('pinB');b.classList.toggle('on',follow);
  b.title=follow?'Pin on: the map follows the vehicle. Drag the map to unpin.':'Pin off: press to follow the vehicle'}
 function togPin(){follow=!follow;pinUi();if(follow&&mrk)map.setView(mrk.getLatLng(),Math.max(map.getZoom(),16))}
-function mpos(loc,moving){const ll=[loc.latitude,loc.longitude],ic=L.divIcon({className:'',html:`<div class="mk" style="background:${moving?'#27a46a':'#f28c28'}"><i class="fa-solid ${$('vi').className.split(' ')[1]}"></i></div>`,iconSize:[34,34],iconAnchor:[17,17]});
+const PICON=L.divIcon({className:'',html:'<div class="mk pulse" style="background:#d9534f"><i class="fa-solid fa-triangle-exclamation"></i></div>',iconSize:[52,52],iconAnchor:[26,26]});
+let MICON=null,ALRM=0;
+function mpos(loc,moving){const ll=[loc.latitude,loc.longitude];
+ MICON=L.divIcon({className:'',html:`<div class="mk" style="background:${moving?'#27a46a':'#f28c28'}"><i class="fa-solid ${$('vi').className.split(' ')[1]}"></i></div>`,iconSize:[34,34],iconAnchor:[17,17]});
  // a fix reporting no usable accuracy is not plotted, but the trip row still
  // goes into the upload queue so the record is not lost
  if(loc.accuracy!=null&&+loc.accuracy<=0)return;
+ const ic=Date.now()<ALRM?PICON:MICON;
  mrk?mrk.setLatLng(ll).setIcon(ic):mrk=L.marker(ll,{icon:ic}).addTo(map);trail.addLatLng(ll);if(follow)map.panTo(ll)}
-// the driver sees the breach on the map, not only in the banner at the top
-function alertRing(){if(!mrk)return;const i=mrk.options.icon;
- mrk.setIcon(L.divIcon({className:'',html:'<div class="mk pulse" style="background:#d9534f"><i class="fa-solid fa-triangle-exclamation"></i></div>',iconSize:[52,52],iconAnchor:[26,26]}));
- $('map').classList.add('alrt');setTimeout(()=>{mrk&&mrk.setIcon(i);$('map').classList.remove('alrt')},8000)}
+// the driver sees the breach on the map, not only in the banner at the top. The
+// alert is held by a deadline rather than by the icon alone, because a fix
+// arriving one second later used to overwrite the pulse before it was noticed.
+function alertRing(){ALRM=Date.now()+8000;$('fr').classList.add('on');if(mrk)mrk.setIcon(PICON);
+ setTimeout(()=>{ALRM=0;$('fr').classList.remove('on');if(mrk&&MICON)mrk.setIcon(MICON)},8000)}
 // ---- permissions
 async function pAsk(){try{const id=await CapPlugins.BG.addWatcher({requestPermissions:true,backgroundTitle:'Fleet Tracker',backgroundMessage:'Checking permissions'},()=>{});setTimeout(()=>CapPlugins.BG.removeWatcher({id}),3000)}catch(e){$('err').textContent='Location: '+(e.message||e)}
  await askNotif()}
@@ -340,7 +346,7 @@ function pickUi(){const s=$('pk');if(!s)return;
  if(ASGS.length<2){s.classList.add('hide');s.replaceChildren();return}
  s.classList.remove('hide');s.replaceChildren(...ASGS.map(x=>{const o=document.createElement('option');o.value=x.vehicle_id;o.textContent=x.vehicles?.name||'Vehicle';o.selected=x.vehicle_id===PICK;return o}))}
 function pickV(){PICK=$('pk').value;localStorage.pick=PICK;if(watcher){stop();watcher=null}
- $('err').textContent='';logAct('Switched vehicle',$('pk').selectedOptions[0]?.textContent||PICK);loadRules()}
+ $('err').textContent='';logAct('Switched vehicle',$('pk').selectedOptions[0]?.textContent||PICK);loadRules();showLast()}
 async function loadRules(){
  const [a,r,t]=await Promise.all([sb.from('assignments').select('vehicle_id,driver_id,vehicles(name,type,speed_limit,moving_interval,stopped_interval,brake_limit,accel_limit,speed_buffer,max_accel_warning,min_moving_distance),drivers(name)').eq('user_id',me.id),sb.from('event_rules').select('*'),sb.from('app_settings').select('*')]);
  if(a.data){ASGS=a.data.filter(x=>x.vehicle_id);if(!ASGS.some(x=>x.vehicle_id===PICK))PICK=ASGS[0]?.vehicle_id||null;asg=ASGS.find(x=>x.vehicle_id===PICK)||a.data[0]||null;pickUi()}const S={},VC={};Object.keys(ON).forEach(k=>delete ON[k]);(t.data||[]).forEach(x=>VC[x.key]=x.value);(t.data||[]).forEach(x=>S[x.key]=+x.value);const v=asg?.vehicles||{};
@@ -360,20 +366,33 @@ async function flush(){if(fl)return;fl=true;try{localStorage.q=JSON.stringify(qu
 function upd(loc,kmh,moving){const c=$('stc');c.textContent=moving?'Moving':'Idling';c.style.background=moving?'var(--grl)':'var(--orl)';c.style.color=moving?'var(--gr)':'var(--or)';
  $('sp').textContent=Math.round(kmh);const V=(k,v)=>$('v_'+k).textContent=v;
  V('pos',loc.latitude.toFixed(5)+', '+loc.longitude.toFixed(5));V('acc',loc.accuracy!=null?Math.round(loc.accuracy)+' m':'-');V('alt',loc.altitude!=null?Math.round(loc.altitude)+' m':'-');V('dir',loc.bearing!=null?Math.round(loc.bearing)+'°':'-');V('ac',(lastA*3.6).toFixed(1)+' km/h/s');$('lt').textContent='Last record '+new Date().toLocaleTimeString('en-GB');mpos(loc,moving)}
+// the driver sees where the vehicle last was before pressing Start trip: the
+// newest stored fix is plotted and its readings fill the tiles
+async function showLast(){if(!asg?.vehicle_id)return;
+ const {data}=await sb.from('positions').select('*').eq('vehicle_id',asg.vehicle_id).order('recorded_at',{ascending:false}).limit(1);
+ const p=data&&data[0];if(!p)return;const ll=[+p.lat,+p.lng],t=Date.parse(p.recorded_at),old=Date.now()-t>120000;
+ upd({latitude:+p.lat,longitude:+p.lng,accuracy:p.accuracy,altitude:p.altitude,bearing:p.heading,time:t},old?0:p.speed||0,!old&&(p.speed||0)>=MIN_MOVING_KMH);
+ if(old){const c=$('stc');c.textContent='Parking';c.style.background='var(--bll)';c.style.color='var(--bl)'}
+ $('lt').textContent='Last record '+new Date(t).toLocaleString('en-GB');
+ if(map){if(follow)map.setView(ll,Math.max(map.getZoom(),15));trail.addLatLng(ll)}}
 async function start(){
  if(!asg?.vehicle_id){$('err').textContent='No vehicle linked to this user. Ask your admin.';return}
  tone();
  try{
- await loadRules();pollBat();batT=setInterval(pollBat,30000);cfgT=setInterval(loadRules,300000);prev=null;pp=null;ODOM=0;Object.keys(VS).forEach(k=>VS[k]=0);Object.keys(RST).forEach(k=>RST[k]=null);
+ await loadRules();pollBat();batT=setInterval(pollBat,30000);cfgT=setInterval(loadRules,300000);prev=null;pp=null;HSENT=null;ODOM=0;Object.keys(VS).forEach(k=>VS[k]=0);Object.keys(RST).forEach(k=>RST[k]=null);
  // a new trip starts from a clean map: no stale road limit or alert timer
  ROAD=null;RT=RS=0;rlUi();Object.keys(lastNotify).forEach(k=>lastNotify[k]=0);
  if(!window.CapPlugins)throw new Error('Plugin bridge missing: rebuild the APK with the latest build-apk.yml');
  watcher=await CapPlugins.BG.addWatcher({backgroundTitle:'Trip in progress',backgroundMessage:'Sending location to fleet dashboard',requestPermissions:true,stale:false,distanceFilter:0},
  async(loc,err)=>{
   if(err){if(err.code==='NOT_AUTHORIZED')$('err').textContent='Allow location "All the time" in app settings (Permissions button).';return}
-  const kmh=Math.max(0,(loc.speed||0)*3.6),moving=kmh>=MIN_MOVING_KMH,every=(moving?MOV:STP)*1000;
+  const kmh=Math.max(0,(loc.speed||0)*3.6),moving=kmh>=MIN_MOVING_KMH,every=(moving?MOV:STP)*1000,n=Date.now();
   // detect first: the Accel. tile then shows the value that just triggered the alert
-  detect(loc,kmh);upd(loc,kmh,moving);if(Date.now()-lastSent<every-500)return;lastSent=Date.now();
+  detect(loc,kmh);upd(loc,kmh,moving);
+  // a corner is worth a point of its own: two fixes spaced by the recording
+  // interval would otherwise draw a turn as one straight cut across the bend
+  const hd=loc.bearing,off=hd!=null&&HSENT!=null?Math.min(Math.abs(hd-HSENT),360-Math.abs(hd-HSENT)):0;
+  if(n-lastSent<every-500&&!(moving&&off>=30&&n-lastSent>1200))return;lastSent=n;if(hd!=null)HSENT=hd;
   lastLoc=loc;queue.push(row(loc,moving?kmh:0,true));if(queue.length>=Math.ceil(5/MOV)||!moving)flush()});
  $('go').classList.add('hide');$('stp').classList.remove('hide');$('err').textContent='';
  logAct('Started trip',(asg?.vehicles?.name||'')+' · records every '+(MOV)+' s moving, '+(STP)+' s stopped');
