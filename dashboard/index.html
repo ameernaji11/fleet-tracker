@@ -71,6 +71,9 @@ td select{height:36px}#evt,#rep,#trip,#cfg,#hist{height:auto;min-height:100%}.cg
 .seg{display:flex;background:var(--card);border-radius:10px;box-shadow:0 1px 6px #0003;padding:3px;gap:2px}.seg button{border:0;background:none;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;color:var(--mut);font-size:12px}
 .seg button.on{background:var(--bl);color:#fff}
 .mk{width:32px;height:32px;border-radius:50%;border:3px solid #fff;box-shadow:0 1px 6px #0006;display:grid;place-items:center;color:#fff;font-size:13px}
+.mk.pl{width:24px;height:24px;border-width:2px;font-size:10px;background:var(--or)}
+.leaflet-tooltip.pltip{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 6px #0003;padding:3px 8px;font-weight:700;font-size:11px;line-height:1.3;white-space:nowrap}
+.leaflet-tooltip.pltip::before{display:none}
 #login{margin:auto;width:340px;padding:28px;display:flex;flex-direction:column;gap:14px;text-align:center}.lgname{font-weight:900;font-size:22px;letter-spacing:.2px}
 .err{color:var(--rd);min-height:18px;margin:0;font-weight:600}
 .zgo{background:none;border:0;padding:0;color:var(--bl);cursor:pointer;text-align:left;text-decoration:underline}
@@ -195,7 +198,7 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <div class="card"><div class="csh"><i class="fa-solid fa-draw-polygon"></i><div><b>Zones (geofences) <span class="hp" data-tip="A zone is a shape you draw on the Live Tracking map. Every phone tests each position against it, so driving in, driving out or passing the zone's own speed limit makes an event - and each of those three has its own alert, buzzer, voice and tolerance in the Events table above. &lt;b&gt;Leave a limit empty&lt;/b&gt; and the zone only reports entries and exits. Phones reload the shapes within 5 minutes.">?</span></b><small>The areas the whole fleet is watched against, and what each one reports. Type in the box below to search by name, or press a name to open that shape on the Live Tracking map. Press Edit, or click the shape on a map, to change its name, limit, alerts, colour or outline.</small></div><button class="btn b sm" onclick="switchTab('live');setTimeout(()=>{if(!DRAW)drawZone(mapL)},200)" title="Switches to Live Tracking and starts the drawing tool"><i class="fa-solid fa-draw-polygon"></i>Draw a zone</button></div>
 <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap"><input id="zQ" placeholder="Search zones by name" oninput="zFilter(this.value)" style="width:260px;max-width:100%"><small id="zC" style="opacity:.65"></small></div>
 <div class="tw" id="zT" style="margin-top:8px"></div></div>
-<div class="card"><div class="csh"><i class="fa-solid fa-signature"></i><div><b>Saved place names <span class="hp" data-tip="Map services name a place from their own data, so a private or newly built address often shows the wrong label - a neighbour's building, or just a street number. A saved name here wins over every map service: any position inside its radius is reported with this name in trip popups, the trip list and every report. Names already shown on screen are corrected as soon as the page reloads.">?</span></b><small>Names you choose yourself, overriding what the map services call a place.</small></div><button class="btn b sm" onclick="plAdd()"><i class="fa-solid fa-plus"></i>Add a place</button></div>
+<div class="card"><div class="csh"><i class="fa-solid fa-signature"></i><div><b>Saved place names <span class="hp" data-tip="Map services name a place from their own data, so a private or newly built address often shows the wrong label - a neighbour's building, or just a street number. A saved name here wins over every map service: any position inside its radius is reported with this name in trip popups, the trip list and every report. Names already shown on screen are corrected as soon as the page reloads.">?</span></b><small>Names you choose yourself, overriding what the map services call a place. Each one is drawn on the maps: press a name to edit or delete it, or press the bookmark on a map and click the spot to add one.</small></div><button class="btn b sm" onclick="plAdd()"><i class="fa-solid fa-plus"></i>Add a place</button></div>
 <div class="tw" id="plT" style="margin-top:10px"></div></div>
 <div class="card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><small style="flex:1;min-width:220px;color:var(--mut)">Everything on this page is saved together. Phones apply the changes within 5 minutes, or at the next trip start.</small><button class="btn g" onclick="saveCfg()"><i class="fa-solid fa-floppy-disk"></i>Save</button></div></section>
 <section id="trip"><div class="card frow"><div class="field"><label>Vehicle</label><select id="tr_v"></select></div><div class="field"><label>From</label><input id="tr_f" type="text"></div><div class="field"><label>To</label><input id="tr_t" type="text"></div>
@@ -298,7 +301,8 @@ function mkMap(id,fit,extra){
   const tb=(ic,t,f,k)=>{const b=L.DomUtil.create('button','ic',d);b.innerHTML='<i class="fa-solid '+ic+'"></i>';b.title=t;b.onclick=f;if(k)m._btn[k]=b};
   tb('fa-expand','Full screen',()=>document.fullscreenElement===m.getContainer()?document.exitFullscreen():m.getContainer().requestFullscreen(),'fs');
   tb('fa-crosshairs','Zoom to all',()=>fit&&fit());tb('fa-ruler','Measure distance',()=>measure(m));
-  tb('fa-shapes','Show or hide the geofences',zTog,'zshow');(extra||[]).forEach(x=>tb(...x));return d};
+  tb('fa-shapes','Show or hide the geofences',zTog,'zshow');
+  tb('fa-bookmark','Add a saved place: press this, then click the spot on the map',()=>plArm(m),'pl');(extra||[]).forEach(x=>tb(...x));return d};
  c.addTo(m);L.control.scale({imperial:false}).addTo(m);document.addEventListener('fullscreenchange',()=>{const b=m._btn&&m._btn.fs;if(b){const on=document.fullscreenElement===m.getContainer(),i=b.querySelector('i');
    b.title=on?'Shrink back':'Full screen';if(i)i.className='fa-solid '+(on?'fa-minimize':'fa-expand')}setTimeout(()=>m.invalidateSize(),250)});return m}
 function measure(m){if(m._meas){m.off('click',m._meas.h);m._meas.g.remove();m._meas=null;m.getContainer().style.cursor='';return}
@@ -342,7 +346,7 @@ function zCancel(){if(!DRAW)return;const m=DRAW.m,rp=DRAW.replace;
  m.removeLayer(DRAW.g);$('zHint').classList.add('hide');DRAW=null;
  // cancelling a redraw must hand the old shape back to the dialog it came from
  if(rp)zDlg(rp)}
-function drawZone(m,op){if(DRAW){zCancel();return}
+function drawZone(m,op){if(PLARM)plCancel();if(DRAW){zCancel();return}
  if(!ADMIN)return toast('Only an admin can draw zones');
  const pts=[];let line=null;const g=L.layerGroup().addTo(m);
  const ui=()=>{g.clearLayers();if(line)line.remove();
@@ -998,7 +1002,7 @@ const gk=r=>(+r.lat).toFixed(4)+','+(+r.lng).toFixed(4);
 // lookup: it is matched by distance, so it also fixes a spot the services ignore.
 let PLACES=[],PLI=null;
 function plLoad(){let a=[];try{a=JSON.parse(SET.places||'[]')}catch(e){}
- PLACES=Array.isArray(a)?a.filter(x=>x&&x.n&&isFinite(+x.la)&&isFinite(+x.lo)):[];plTable()}
+ PLACES=Array.isArray(a)?a.filter(x=>x&&x.n&&isFinite(+x.la)&&isFinite(+x.lo)):[];plTable();plPaint()}
 // metres, accurate enough at the few-kilometre scale a radius works at
 const plDist=(a,b,c,d)=>Math.hypot((c-a)*111320*Math.cos(b*Math.PI/180),(d-b)*110540);
 const plRad=x=>Math.min(5000,Math.max(20,+x.r||150));
@@ -1008,6 +1012,26 @@ const plName=p=>plNear(+p.lat,+p.lng)||GC[gk(p)];
 function plTable(){const t=$('plT');if(!t)return;
  t.innerHTML=`<table><tr><th>Name shown</th><th>Latitude</th><th>Longitude</th><th>Radius (m)</th><th></th></tr>${PLACES.map((x,i)=>`<tr><td><b>${esc(x.n)}</b></td><td>${(+x.la).toFixed(5)}</td><td>${(+x.lo).toFixed(5)}</td><td>${plRad(x)}</td><td style="text-align:right;white-space:nowrap"><button class="btn gh sm" onclick="plEdit(${i})"><i class="fa-solid fa-pen"></i>Edit</button> <button class="btn r sm" onclick="plDel(${i})"><i class="fa-solid fa-trash"></i>Delete</button></td></tr>`).join('')||'<tr><td colspan="5">No saved names yet. Add one and it is shown instead of the name the map services give.</td></tr>'}</table>`;
  tools(t)}
+// A name is chosen on the ground, so it is edited there too: the marker opens the
+// same dialog the table row does, and the bookmark arms a click anywhere on the map.
+let PLG={},PLARM=null;
+function plPaint(){[mapL,mapH].forEach(m=>{if(!m)return;const id=m.getContainer().id;
+ if(PLG[id]){m.removeLayer(PLG[id]);delete PLG[id]}
+ const g=L.layerGroup().addTo(m);
+ PLACES.forEach((x,i)=>{const mk=L.marker([+x.la,+x.lo],{zIndexOffset:700,interactive:ADMIN,keyboard:false,
+   icon:L.divIcon({className:'',html:'<div class="mk pl"><i class="fa-solid fa-bookmark"></i></div>',iconSize:[24,24],iconAnchor:[12,12]})})
+   .bindTooltip(x.n,{permanent:true,direction:'right',offset:[14,0],className:'pltip'});
+  if(ADMIN)mk.on('click',()=>plEdit(i));
+  mk.addTo(g)});
+ PLG[id]=g})}
+function plArm(m){if(!ADMIN)return toast('Only an admin can save place names');
+ if(PLARM){plCancel();return}
+ if(DRAW)return toast('Finish or cancel the zone you are drawing first');
+ m.getContainer().style.cursor='crosshair';
+ const h=e=>{plCancel();plDlg(-1,{la:+e.latlng.lat.toFixed(5),lo:+e.latlng.lng.toFixed(5),r:150})};
+ m.on('click',h);PLARM={m,h};
+ toast('Click the spot that deserves its own name. Press the bookmark again to stop.',5)}
+function plCancel(){if(!PLARM)return;PLARM.m.off('click',PLARM.h);PLARM.m.getContainer().style.cursor='';PLARM=null}
 function plDlg(i,x){PLI={i:i??-1,...(x||{})};
  $('plTitle').textContent=(i>=0?'Edit':'Add')+' a saved place name';
  $('plN').value=PLI.n||'';$('plLa').value=PLI.la??'';$('plLo').value=PLI.lo??'';$('plR').value=PLI.r||150;
@@ -1021,7 +1045,7 @@ function plPick(){const s={n:$('plN').value,la:null,lo:null,r:+$('plR').value||1
  toast('Click the exact spot on the Live Tracking map',4);
  mapL.once('click',e=>{s.la=+e.latlng.lat.toFixed(5);s.lo=+e.latlng.lng.toFixed(5);plDlg(i,s)})}
 async function plWrite(a){const {error}=await sb.from('app_settings').upsert({key:'places',value:JSON.stringify(a)});
- if(error)return toast(error.message),false;SET.places=JSON.stringify(a);PLACES=a;plTable();return true}
+ if(error)return toast(error.message),false;SET.places=JSON.stringify(a);PLACES=a;plTable();plPaint();return true}
 async function plSave(){if(!ADMIN)return;const n=$('plN').value.trim(),la=+$('plLa').value,lo=+$('plLo').value;
  if(!n)return toast('Type the name this place should show',1);
  if(!isFinite(la)||Math.abs(la)>90||!isFinite(lo)||Math.abs(lo)>180)return toast('Set the latitude and longitude first, or pick the spot on the map',1);
