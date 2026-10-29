@@ -41,7 +41,7 @@ section{display:none;height:100%;flex-direction:column;gap:10px;min-width:0}sect
 .csh>div{flex:1;min-width:180px}.csh b{font-size:15px}.csh small{display:block;color:var(--mut);margin-top:2px;font-weight:400}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
 .kpi{display:flex;align-items:center;gap:10px;padding:9px 11px}.kpi .ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:18px}
-.kpi b{font-size:22px;display:block;line-height:1.1}.kpi span{color:var(--mut);font-size:12px}
+.kpi b{font-size:22px;display:block;line-height:1.1;white-space:nowrap}.kpi span{color:var(--mut);font-size:12px}
 .bl .ic{background:var(--bll);color:var(--bl)}.gr .ic{background:var(--grl);color:var(--gr)}.or .ic{background:var(--orl);color:var(--or)}.gy .ic{background:var(--gyl);color:var(--gy)}.rd .ic{background:var(--rdl);color:var(--rd)}
 .hbar{display:grid;grid-template-columns:minmax(140px,1.3fr) minmax(120px,1fr) minmax(120px,1fr) auto auto;gap:10px;align-items:end}
 @media(max-width:900px){.hbar{grid-template-columns:1fr 1fr}.hbar .btn{grid-column:span 1}}
@@ -94,6 +94,24 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 .eye{position:absolute;right:6px;top:6px;border:0;background:none;color:var(--mut);cursor:pointer;height:28px;width:30px}
 .mt{display:flex;flex-direction:column;gap:6px;align-items:flex-end}.mt button{background:var(--card);color:var(--ink);border:0;border-radius:8px;box-shadow:0 1px 6px #0003;padding:7px 10px;font-weight:700;cursor:pointer;font-size:12px}.mt .ic{width:34px}
 .mm{background:var(--card);border-radius:10px;box-shadow:0 2px 10px #0004;display:flex;flex-direction:column;padding:4px}.mm button{box-shadow:none;text-align:left}.mm.hide{display:none!important}
+// the zone finder: search, tick which shapes this map draws, and jump to one
+.zmenu{width:250px;max-width:70vw;background:var(--card);border-radius:10px;box-shadow:0 2px 10px #0004;padding:6px;font-size:12px;text-align:left}
+.zmenu.hide{display:none!important}
+.zmenu input{width:100%;box-sizing:border-box;height:30px;margin-bottom:6px}
+.zbar{display:flex;gap:4px;margin-bottom:6px}
+.zmenu button{box-shadow:none}
+.zlist{max-height:38vh;overflow:auto}
+.zrow{display:flex;gap:4px;align-items:center;border-radius:6px;padding:1px 2px}
+.zrow:hover{background:var(--bll)}
+.zrow label{flex:1;min-width:0;display:flex;gap:6px;align-items:center;cursor:pointer;font-weight:400;padding:2px 0}
+.zrow span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zrow .go{background:none;border:0;color:var(--bl);cursor:pointer;width:22px;height:22px;padding:0;font-size:11px}
+.zmenu .empty{padding:6px 4px;color:var(--mut)}
+// handles for changing a zone outline in place
+.zg{cursor:grab}.zg.leaflet-marker-dragging{cursor:grabbing}
+.zv{width:12px;height:12px;border:2px solid #fff;background:#27a46a;border-radius:3px;box-shadow:0 1px 4px #0008}
+.zv.mid{width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid #27a46a;box-shadow:0 1px 3px #0007}
+.zv.cen{width:22px;height:22px;border-radius:50%;background:var(--bl);color:#fff;display:grid;place-items:center;font-size:10px;border-width:2px}
 @media(max-width:820px){aside{width:auto!important}}
 .tbar{display:flex;gap:6px;align-items:center;padding:8px;flex-wrap:wrap}.tbar input{width:220px;height:34px}.tbar .btn{height:34px}.tw th{cursor:pointer;user-select:none}
 .pgr{margin-left:auto;display:flex;gap:6px;align-items:center}.pgr select{height:34px}.pgr .btn{min-width:34px}.pc{font-size:12px;color:var(--mut);min-width:130px;text-align:center}
@@ -193,9 +211,9 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <tr><td>Blackbox recording on the phone <span class="hp" data-tip="The phone keeps &lt;b&gt;every&lt;/b&gt; fix it receives - about one per second - in its own storage and never uploads them, so the server stays small. When an incident has to be investigated, choose the vehicle and the period on the Vehicles page and press Download: the phone then pushes exactly the fixes in that window, each stamped with the moment it was taken.">?</span></td><td><label class="ck"><input id="s_bb" type="checkbox"> Keep every fix on the handset</label></td><td><small>Off stops the recording; anything already stored stays until it ages out.</small></td></tr>
 <tr><td>Blackbox kept for</td><td><input id="s_bbd" type="number" min="1" max="14" style="width:110px"></td><td><small>Days the phone holds before it overwrites the oldest fixes.</small></td></tr>
 <tr><td>Zone detection <span class="hp" data-tip="Turns zone checking off for the whole fleet without deleting any shape. Draw, name and limit your zones in the Zones table below.">?</span></td><td><label class="ck"><input id="s_z" type="checkbox"> Report entry, exit and overspeed</label></td><td><small>Each zone's own limit and alerts are set in the Zones table below.</small></td></tr></table></div></div>
-<div class="card"><div class="csh"><i class="fa-solid fa-triangle-exclamation"></i><div><b>Events (defaults for all vehicles) <span class="hp" data-tip="&lt;b&gt;Tolerance&lt;/b&gt; is how long the driver must keep breaking the rule before it is written to the database. The buzzer and the on-screen alert fire immediately; the event is only recorded once the violation lasts longer than the tolerance. Use 2 s for harsh braking/acceleration and 10 s for overspeed. &lt;b&gt;Trigger limit&lt;/b&gt; is the fleet default that a vehicle uses unless it has its own value below.">?</span></b><small>The limit, the buzzer and the spoken message the whole fleet starts from.</small></div></div><div class="tw" id="ruleT" style="margin-top:10px"></div></div>
+<div class="card"><div class="csh"><i class="fa-solid fa-triangle-exclamation"></i><div><b>Events (defaults for all vehicles) <span class="hp" data-tip="&lt;b&gt;Tolerance&lt;/b&gt; is how long the driver must keep breaking the rule before it is written to the database. The buzzer and the on-screen alert fire immediately; the event is only recorded once the violation lasts longer than the tolerance. Use 2 s for harsh braking/acceleration and 10 s for overspeed. &lt;b&gt;Trigger limit&lt;/b&gt; is the fleet default that a vehicle uses unless it has its own value below. Zone entered and Zone exited have no trigger limit: crossing the line is itself the event.">?</span></b><small>The limit, the buzzer and the spoken message the whole fleet starts from.</small></div></div><div class="tw" id="ruleT" style="margin-top:10px"></div></div>
 <div class="card"><div class="csh"><i class="fa-solid fa-truck"></i><div><b>Settings per vehicle <span class="hp" data-tip="A vehicle marked &lt;b&gt;custom&lt;/b&gt; keeps its own values; leave a box empty to follow the fleet default above. Phones apply changes within 5 minutes or at the next trip start. &lt;b&gt;Overspeed buffer&lt;/b&gt; is added on top of the limit before the alert starts. &lt;b&gt;Warning level&lt;/b&gt; buzzes the phone without recording an event. &lt;b&gt;Min. distance&lt;/b&gt; suppresses events until the vehicle has actually moved that far. Tick the box beside a vehicle and press Reset to send it back to the fleet defaults.">?</span></b><small>Overrides for one vehicle. Tick the box beside it to include it in Reset.</small></div><button class="btn o sm" onclick="resetSelV()" title="Clears the own values of every vehicle you ticked in the table below, so it follows the fleet defaults on this page again. Unticked vehicles are left exactly as they are. Phones apply the change within 5 minutes."><i class="fa-solid fa-rotate-left"></i>Reset selected</button></div><div class="tw" id="cfgV" style="margin-top:10px"></div></div>
-<div class="card"><div class="csh"><i class="fa-solid fa-draw-polygon"></i><div><b>Zones (geofences) <span class="hp" data-tip="A zone is a shape you draw on the Live Tracking map. Every phone tests each position against it, so driving in, driving out or passing the zone's own speed limit makes an event - and each of those three has its own alert, buzzer, voice and tolerance in the Events table above. &lt;b&gt;Leave a limit empty&lt;/b&gt; and the zone only reports entries and exits. Phones reload the shapes within 5 minutes.">?</span></b><small>The areas the whole fleet is watched against, and what each one reports. Type in the box below to search by name, or press a name to open that shape on the Live Tracking map. Press Edit, or click the shape on a map, to change its name, limit, alerts, colour or outline.</small></div><button class="btn b sm" onclick="switchTab('live');setTimeout(()=>{if(!DRAW)drawZone(mapL)},200)" title="Switches to Live Tracking and starts the drawing tool"><i class="fa-solid fa-draw-polygon"></i>Draw a zone</button></div>
+<div class="card"><div class="csh"><i class="fa-solid fa-draw-polygon"></i><div><b>Zones (geofences) <span class="hp" data-tip="A zone is a shape you draw on the Live Tracking map. Every phone tests each position against it, so driving in, driving out or passing the zone's own speed limit makes an event - and each of those three has its own alert, buzzer, voice and tolerance in the Events table above. &lt;b&gt;Leave a limit empty&lt;/b&gt; and the zone only reports entries and exits. Phones reload the shapes within 5 minutes.">?</span></b><small>The areas the whole fleet is watched against, and what each one reports. Type in the box below to search by name, or press a name to open that shape on the Live Tracking map. Press Edit, or click the shape on a map, to change its name, limit, alerts, colour, or to move, add and drop single corners without drawing the whole zone again.</small></div><button class="btn b sm" onclick="switchTab('live');setTimeout(()=>{if(!DRAW)drawZone(mapL)},200)" title="Switches to Live Tracking and starts the drawing tool"><i class="fa-solid fa-draw-polygon"></i>Draw a zone</button></div>
 <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap"><input id="zQ" placeholder="Search zones by name" oninput="zFilter(this.value)" style="width:260px;max-width:100%"><small id="zC" style="opacity:.65"></small></div>
 <div class="tw" id="zT" style="margin-top:8px"></div></div>
 <div class="card"><div class="csh"><i class="fa-solid fa-signature"></i><div><b>Saved place names <span class="hp" data-tip="Map services name a place from their own data, so a private or newly built address often shows the wrong label - a neighbour's building, or just a street number. A saved name here wins over every map service: any position inside its radius is reported with this name in trip popups, the trip list and every report. Names already shown on screen are corrected as soon as the page reloads.">?</span></b><small>Names you choose yourself, overriding what the map services call a place. Each one is drawn on the maps: press a name to edit or delete it, or press the bookmark on a map and click the spot to add one.</small></div><button class="btn b sm" onclick="plAdd()"><i class="fa-solid fa-plus"></i>Add a place</button></div>
@@ -212,7 +230,7 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <div class="field"><label>Make / model</label><input name="make_model"></div><div class="field"><label>Year</label><input name="year" type="number" min="1980" max="2100"></div><div class="field"><label>VIN / chassis</label><input name="vin"></div>
 <div class="field"><label>Fuel</label><select name="fuel_type"><option value="">-</option><option>Petrol</option><option>Diesel</option><option>Hybrid</option><option>Electric</option></select></div>
 <div class="field"><label>Speed limit (km/h)</label><input name="speed_limit" type="number" min="10" max="250"></div><div class="field"><label>Fuel moving (L/100 km)</label><input name="fuel_moving" type="number" step="0.1" min="0"></div><div class="field"><label>Fuel idling (L/hour)</label><input name="fuel_idle" type="number" step="0.1" min="0"></div><div class="field"><label>Notes</label><input name="notes"></div><button class="btn g"><i class="fa-solid fa-plus"></i>Add vehicle</button></form></div><div class="tw" id="vehT"></div>
-<div class="card" style="margin-top:10px"><div class="csh"><i class="fa-solid fa-box-archive"></i><div><b>Blackbox download <span class="hp" data-tip="Each phone keeps &lt;b&gt;every&lt;/b&gt; fix it receives - about one per second - in its own storage, and never uploads that stream. Pick the vehicle and the period around an incident and press Download: the request reaches the phone over realtime (or on its next minute-long poll), and the phone then pushes exactly the stored fixes in that window, each stamped with the moment it was taken. They appear in Historical Tracking and the Tacho report as Blackbox rows. A phone that is switched off or out of coverage answers as soon as it is back.">?</span></b><small>Ask one vehicle for its stored 1-per-second fixes for a period — for accident investigation.</small></div><button class="btn gh sm" onclick="bbTable()" title="Check whether the phone has answered yet"><i class="fa-solid fa-rotate"></i>Refresh</button></div>
+<div class="card" style="margin-top:10px"><div class="csh"><i class="fa-solid fa-box-archive"></i><div><b>Blackbox download <span class="hp" data-tip="Each phone keeps &lt;b&gt;every&lt;/b&gt; fix it receives - about one per second - in its own storage, and never uploads that stream. Pick the vehicle and the period around an incident and press Download: the request reaches the phone over realtime (or on its next minute-long poll), and the phone then pushes exactly the stored fixes in that window, each stamped with the moment it was taken. They appear in Historical Tracking and the Tacho report as Blackbox rows. A phone that is switched off or out of coverage answers as soon as it is back. Every second exists once on the phone and is uploaded once: a request for a period that was already downloaded, or one that overlaps an earlier request, pushes only the seconds the server does not have, and a pull that stops halfway resumes where it left off.">?</span></b><small>Ask one vehicle for its stored 1-per-second fixes for a period — for accident investigation.</small></div><button class="btn gh sm" onclick="bbTable()" title="Check whether the phone has answered yet"><i class="fa-solid fa-rotate"></i>Refresh</button></div>
 <div class="frow" style="margin-top:10px"><div class="field"><label>Vehicle</label><select id="bb_v"></select></div>
 <div class="field"><label>From</label><input id="bb_f" type="text"></div><div class="field"><label>To</label><input id="bb_t" type="text"></div>
 <button class="btn b" onclick="bbAsk()"><i class="fa-solid fa-cloud-arrow-down"></i>Download</button></div>
@@ -240,7 +258,7 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <label class="ck"><input id="zOn" type="checkbox"> Watch this zone</label><span class="hp" data-tip="&lt;b&gt;Watched (ticked)&lt;/b&gt;: every phone checks each position it records against this shape, so driving in, driving out or going faster than the zone limit makes an event with the alert, buzzer and voice you set for it in Configuration.&lt;br&gt;&lt;b&gt;Not watched (empty)&lt;/b&gt;: the shape stays on the map and in this list, but nothing is reported for it. Use it while a zone is being moved or rebuilt instead of deleting it, or to rest a zone temporarily.">?</span>
 <label class="ck"><input id="zCol" type="color"> Colour</label></div>
 <p id="zShape" style="color:var(--mut);margin:6px 0 12px"></p>
-<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap"><button class="btn o sm" style="margin-right:auto" onclick="zRedraw()" title="Closes this box and lets you click a new outline on the Live Tracking map. Every other setting here is kept."><i class="fa-solid fa-pen-ruler"></i>Redraw the shape</button><button class="btn r sm hide" id="zDelB" onclick="zDelById(ZED&&ZED.id)"><i class="fa-solid fa-trash"></i>Delete</button>
+<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap"><span style="margin-right:auto;display:flex;gap:8px;flex-wrap:wrap"><button class="btn o sm" onclick="zShapeBtn()" title="Closes this box and puts the outline on the Live Tracking map with grips on it: drag a corner, drag a white dot to make a new corner, right-click a corner to drop it, drag the blue dot to move the whole zone, or Grow / Shrink it. Press Apply shape to come back with the name, limit and alerts kept."><i class="fa-solid fa-vector-square"></i>Change the shape on the map</button><button class="btn gh sm" onclick="zRedraw()" title="Forget this outline and click a brand new one from the first corner."><i class="fa-solid fa-draw-polygon"></i>Draw it again</button></span><button class="btn r sm hide" id="zDelB" onclick="zDelById(ZED&&ZED.id)"><i class="fa-solid fa-trash"></i>Delete</button>
 <button class="btn gh" onclick="zClose()">Cancel</button><button class="btn b" onclick="zSave()"><i class="fa-solid fa-floppy-disk"></i>Save zone</button></div>
 <small style="color:var(--mut);display:block;margin-top:8px">A vehicle crossing the line makes an event, and a vehicle faster than the limit above makes a Zone overspeed event — each with the alert, buzzer and voice you set for it in Configuration.</small></div></div>
 <div id="pdlg" class="mdl"><div><div id="plTitle" style="font-size:15px;font-weight:800;margin-bottom:8px"></div>
@@ -302,6 +320,7 @@ function mkMap(id,fit,extra){
   tb('fa-expand','Full screen',()=>document.fullscreenElement===m.getContainer()?document.exitFullscreen():m.getContainer().requestFullscreen(),'fs');
   tb('fa-crosshairs','Zoom to all',()=>fit&&fit());tb('fa-ruler','Measure distance',()=>measure(m));
   tb('fa-shapes','Show or hide the geofences',zTog,'zshow');
+  zPanel(d,m);
   tb('fa-bookmark','Add a saved place: press this, then click the spot on the map',()=>plArm(m),'pl');(extra||[]).forEach(x=>tb(...x));return d};
  c.addTo(m);L.control.scale({imperial:false}).addTo(m);document.addEventListener('fullscreenchange',()=>{const b=m._btn&&m._btn.fs;if(b){const on=document.fullscreenElement===m.getContainer(),i=b.querySelector('i');
    b.title=on?'Shrink back':'Full screen';if(i)i.className='fa-solid '+(on?'fa-minimize':'fa-expand')}setTimeout(()=>m.invalidateSize(),250)});return m}
@@ -330,23 +349,64 @@ function switchTab(t){const b=document.querySelector('.nb[data-t="'+t+'"]');if(b
 function zPaint(){[mapL,mapH].forEach(m=>{if(!m)return;const id=m.getContainer().id;
  if(zG[id]){m.removeLayer(zG[id]);delete zG[id]}
  const b=m._btn&&m._btn.zshow;if(b){b.classList.toggle('on',ZSHOW);b.title=(ZSHOW?'Hide':'Show')+' the geofences drawn on this map'}
- if(!ZSHOW)return;
+ if(!ZSHOW){zList(m);return}
+ zList(m);
  const g=L.layerGroup().addTo(m);
- zones.forEach(z=>{const p=zPts(z.shape);if(p.length<3)return;const off=z.enabled===false;
+ zones.forEach(z=>{const p=zPts(z.shape);if(p.length<3||!zOn(z.id)||(ZSH&&ZSH.id===z.id))return;const off=z.enabled===false;
   const poly=L.polygon(p,{color:off?'#9aa7b0':(z.color||'#2f7fe6'),weight:2.5,fillOpacity:off?.04:.1,dashArray:off?'6 5':null})
    .bindTooltip(z.name+(z.speed_limit?' - max '+z.speed_limit+' km/h':'')+(off?' - not watched':'')+(ADMIN?' - click to edit':''),{sticky:true});
   // an admin edits the zone they are looking at, on the map it was drawn on
-  if(ADMIN)poly.on('click',()=>{if(!DRAW)zEdit(z.id)});
+  if(ADMIN)poly.on('click',()=>{if(!DRAW&&!ZSH)zEdit(z.id)});
   poly.addTo(g)});
  zG[id]=g})}
 function zTog(){ZSHOW=!ZSHOW;localStorage.zones_show=ZSHOW?'1':'0';zPaint();
  toast(ZSHOW?'Geofences are shown on the maps':'Geofences are hidden on the maps',1)}
+// Once there are more shapes than colours, the map needs a way to pick out the one
+// you mean: search by name, then tick the zones this map should draw. Only the
+// hidden ones are remembered, so a zone drawn later appears without any setting.
+let ZOFF=new Set();try{(JSON.parse(localStorage.zones_hide||'[]')||[]).forEach(id=>ZOFF.add(id))}catch(e){}
+const zOn=id=>!ZOFF.has(id);
+function zHide(){localStorage.zones_hide=JSON.stringify([...ZOFF]);zPaint()}
+function zPanel(d,m){const b=L.DomUtil.create('button','ic',d);
+ b.innerHTML='<i class="fa-solid fa-list-check"></i>';b.title='Find a zone, tick the ones this map shows';
+ const p=L.DomUtil.create('div','zmenu hide',d);
+ const q=L.DomUtil.create('input','',p);q.placeholder='Search zones by name';q.maxLength=60;q.oninput=()=>zList(m);
+ const bar=L.DomUtil.create('div','zbar',p);
+ [['All',()=>{ZOFF.clear();zHide()},'Show every zone on this map again'],
+  ['None',()=>{zones.forEach(z=>ZOFF.add(z.id));zHide()},'Clear the shapes off the map, then tick the ones you want']].forEach(x=>{
+   const k=L.DomUtil.create('button','gh sm',bar);k.textContent=x[0];k.title=x[2];k.onclick=x[1]});
+ const list=L.DomUtil.create('div','zlist',p);
+ // arrow keys typed into the search box must not slide the map about
+ p.addEventListener('keydown',e=>e.stopPropagation());
+ m._zq=q;m._zl=list;m._zp=p;
+ b.onclick=()=>{const sh=p.classList.toggle('hide');b.classList.toggle('on',!sh);if(!sh)zList(m)};
+ return b}
+function zList(m){if(!m||!m._zl)return;const q=(m._zq.value||'').trim().toLowerCase();
+ const S=zones.filter(z=>!q||String(z.name||'').toLowerCase().includes(q));
+ m._zl.innerHTML=S.map(z=>`<div class="zrow"><label title="${zOn(z.id)?'Untick to hide this zone on the maps':'Tick to show this zone on the maps'}"><input type="checkbox" ${zOn(z.id)?'checked':''} onchange="zTick('${z.id}',this.checked)"><span>${esc(z.name)}</span></label><button class="go" title="Centre the map on this zone" onclick="zFocus('${z.id}','${m.getContainer().id}')"><i class="fa-solid fa-crosshairs"></i></button></div>`).join('')
+  ||`<div class="empty">${zones.length?'No zone matches &quot;'+esc(q)+'&quot;':'No zones drawn yet'}</div>`}
+function zTick(id,on){const was=zOn(id);if(on)ZOFF.delete(id);else ZOFF.add(id);
+ if(on&&!ZSHOW){ZSHOW=true;localStorage.zones_show='1'}
+ if(was!==!!on)zHide()}
+// A name pressed on the map panel has to deliver the shape, so a hidden zone is
+// brought back before the map flies to it.
+function zFocus(id,mid){const z=zones.find(x=>x.id===id);if(!z)return;
+ const p=zPts(z.shape);if(p.length<3)return toast('This zone has no shape to show yet');
+ const m=mid==='mapHist'?mapH:mapL;if(!m)return;
+ let chg=ZOFF.delete(id);
+ if(!ZSHOW){ZSHOW=true;localStorage.zones_show='1';chg=true}
+ if(chg)zHide();
+ switchTab(mid==='mapHist'?'hist':'live');
+ setTimeout(()=>{m.invalidateSize();m.fitBounds(L.latLngBounds(p),{padding:[60,60],maxZoom:17});
+  toast('Showing "'+(z.name||'zone')+'" on the map',1)},60)}
 function zCancel(){if(!DRAW)return;const m=DRAW.m,rp=DRAW.replace;
  m.off('click',DRAW.click);m.off('dblclick',DRAW.fin);m.doubleClickZoom.enable();m.getContainer().style.cursor='';
  m.removeLayer(DRAW.g);$('zHint').classList.add('hide');DRAW=null;
  // cancelling a redraw must hand the old shape back to the dialog it came from
  if(rp)zDlg(rp)}
-function drawZone(m,op){if(PLARM)plCancel();if(DRAW){zCancel();return}
+function drawZone(m,op){if(PLARM)plCancel();
+ if(ZSH)return toast('Apply or cancel the zone shape you are changing first',1);
+ if(DRAW){zCancel();return}
  if(!ADMIN)return toast('Only an admin can draw zones');
  const pts=[];let line=null;const g=L.layerGroup().addTo(m);
  const ui=()=>{g.clearLayers();if(line)line.remove();
@@ -381,7 +441,7 @@ function zDlg(z){if(!ADMIN)return;ZED=z;
  $('zEnter').checked=z.enter!==false;$('zExit').checked=z.exit!==false;
  $('zOver').checked=z.overspeed!==false;$('zOn').checked=z.enabled!==false;
  $('zCol').value=z.color||'#2f7fe6';const p=zRing(z);
- $('zShape').textContent=p.length+' corners \u00b7 '+zArea(p).toFixed(3)+' km\u00b2 \u2014 press "Redraw the shape" to change the outline';
+ $('zShape').textContent=(p.length?p.length+' corners \u00b7 '+zArea(p).toFixed(3)+' km\u00b2':'No outline yet')+' \u2014 press "Change the shape on the map" to move, add or drop a corner, shift or enlarge the zone';
  $('zDelB').classList.toggle('hide',!z.id);$('zdlg').classList.add('on');$('zName').focus()}
 function zClose(){if($('zdlg'))$('zdlg').classList.remove('on');ZED=null}
 async function zSave(){if(!ADMIN||!ZED)return;const p=zRing(ZED);
@@ -406,7 +466,9 @@ function zFilter(v){ZQ=(v||'').trim().toLowerCase();zTable()}
 function zGoto(id){const z=zones.find(x=>x.id===id);if(!z)return;
  const p=zPts(z.shape);if(!p.length)return toast('This zone has no shape to show yet');
  switchTab('live');
- if(!ZSHOW){ZSHOW=true;localStorage.zones_show='1';zPaint()}
+ let chg=ZOFF.delete(id);
+ if(!ZSHOW){ZSHOW=true;localStorage.zones_show='1';chg=true}
+ if(chg)zHide();
  setTimeout(()=>{if(!mapL)return;mapL.invalidateSize();
   mapL.fitBounds(L.latLngBounds(p),{padding:[60,60],maxZoom:17});
   toast('Showing "'+(z.name||'zone')+'" on the Live Tracking map',1)},60)}
@@ -427,6 +489,67 @@ function zEdit(id){const z=zones.find(x=>x.id===id);if(z)zDlg(Object.assign({},z
 function zDelById(id){const z=zones.find(x=>x.id===id);if(!z)return;
  if(!confirm('Delete the zone "'+z.name+'"? Events already recorded in it stay.'))return;
  sb.from('geofences').delete().eq('id',id).then(()=>{zRefs();toast('Zone deleted');logAct('Deleted zone',z.name)})}
+// ---- changing an outline in place. Re-clicking all eighteen corners of a depot
+// because one corner sat thirty metres wrong is not editing, so the ring goes back
+// onto the map with grips: green corners drag, the white dots between them become
+// new corners when dragged out, right-click drops a corner, the blue dot shifts the
+// whole shape, and Grow/Shrink resize it around its own centre.
+let ZSH=null;
+const zCen=p=>{let a=0,b=0;p.forEach(x=>{a+=+x[0];b+=+x[1]});return [a/p.length,b/p.length]};
+const zGrip=k=>{const s=k==='cen'?22:k==='mid'?14:12;
+ return L.divIcon({className:'zg',html:'<div class="zv'+(k==='v'?'':' '+k)+'">'+(k==='cen'?'<i class="fa-solid fa-arrows-up-down-left-right"></i>':'')+'</div>',iconSize:[s,s],iconAnchor:[s/2,s/2]})};
+function zShapeEdit(z,back){if(!ADMIN)return;if(!mapL)return;if(DRAW)zCancel();if(PLARM)plCancel();
+ if(ZSH)zshStop();
+ const p=zRing(z).map(x=>[+x[0],+x[1]]);if(p.length<3)return toast('This zone has no outline to change yet',1);
+ ZSH={id:z.id,pts:p,back:back||null,m:mapL,gp:L.layerGroup().addTo(mapL),gh:L.layerGroup().addTo(mapL)};
+ switchTab('live');zPaint();zshUi();
+ setTimeout(()=>{if(ZSH)mapL.fitBounds(L.latLngBounds(ZSH.pts),{padding:[70,70],maxZoom:17})},60);
+ toast('Drag a green corner to move it. Drag a white dot off a side to add a corner. Right-click a corner to drop it. Drag the blue dot to shift the whole zone.',7)}
+function zshUi(){if(!ZSH)return;const pts=ZSH.pts;
+ ZSH.gp.clearLayers();ZSH.gh.clearLayers();
+ ZSH.poly=L.polygon(pts,{color:'#27a46a',weight:2.5,dashArray:'7 5',fillOpacity:.08}).addTo(ZSH.gp);
+ pts.forEach((p,i)=>{const k=L.marker(p,{draggable:true,keyboard:false,icon:zGrip('v'),zIndexOffset:1100}).addTo(ZSH.gh);
+  k.on('drag',e=>{const q=e.target.getLatLng();pts[i]=[q.lat,q.lng];ZSH.poly.setLatLngs(pts);zshHint()});
+  k.on('dragend',zshUi);
+  k.on('contextmenu',()=>{if(pts.length<=3)return toast('A zone keeps at least 3 corners',1);
+   pts.splice(i,1);zshUi()})});
+ for(let i=0;i<pts.length;i++){const a=pts[i],b=pts[(i+1)%pts.length],mid=[(a[0]+b[0])/2,(a[1]+b[1])/2];
+  const k=L.marker(mid,{draggable:true,keyboard:false,icon:zGrip('mid'),zIndexOffset:1000}).addTo(ZSH.gh);
+  k.on('dragstart',()=>{pts.splice(i+1,0,mid);ZSH.ins=i+1;ZSH.poly.setLatLngs(pts)});
+  k.on('drag',e=>{const q=e.target.getLatLng();pts[ZSH.ins]=[q.lat,q.lng];ZSH.poly.setLatLngs(pts);zshHint()});
+  k.on('dragend',zshUi)}
+ const c=zCen(pts),was=pts.map(x=>[x[0],x[1]]);
+ const k=L.marker(c,{draggable:true,keyboard:false,icon:zGrip('cen'),zIndexOffset:900}).addTo(ZSH.gh);
+ k.on('drag',e=>{const q=e.target.getLatLng(),d=[q.lat-c[0],q.lng-c[1]];
+  ZSH.move=d;ZSH.poly.setLatLngs(was.map(x=>[x[0]+d[0],x[1]+d[1]]));zshHint()});
+ k.on('dragend',()=>{const d=ZSH.move||[0,0];
+  ZSH.pts=was.map(x=>[+(x[0]+d[0]).toFixed(6),+(x[1]+d[1]).toFixed(6)]);ZSH.move=null;zshUi()});
+ zshHint()}
+function zshHint(){if(!ZSH)return;const z=zones.find(x=>x.id===ZSH.id),h=$('zHint');
+ h.innerHTML='<b>'+esc((ZSH.back&&ZSH.back.name)||(z&&z.name)||'this zone')+'</b> &middot; '+ZSH.pts.length+' corners &middot; '+zArea(ZSH.pts).toFixed(3)+' km&sup2; '+
+  '<button class="btn gh sm" onclick="zshScale(1.15)" title="Make the whole shape bigger around its centre"><i class="fa-solid fa-magnifying-glass-plus"></i>Grow</button>'+
+  '<button class="btn gh sm" onclick="zshScale(1/1.15)" title="Make the whole shape smaller around its centre"><i class="fa-solid fa-magnifying-glass-minus"></i>Shrink</button>'+
+  '<button class="btn g sm" onclick="zshDone()" title="Take this outline back to the zone box"><i class="fa-solid fa-check"></i>Apply shape</button>'+
+  '<button class="btn r sm" onclick="zshCancel()" title="Throw the changes away"><i class="fa-solid fa-xmark"></i>Cancel</button>';
+ h.classList.remove('hide')}
+function zshScale(k){if(!ZSH)return;const c=zCen(ZSH.pts);
+ ZSH.pts=ZSH.pts.map(p=>[+(c[0]+(p[0]-c[0])*k).toFixed(6),+(c[1]+(p[1]-c[1])*k).toFixed(6)]);
+ zshUi();ZSH.m.fitBounds(L.latLngBounds(ZSH.pts),{padding:[70,70],maxZoom:17})}
+function zshStop(){if(!ZSH)return;const {gp,gh,m}=ZSH,back=ZSH.back;ZSH=null;
+ m.removeLayer(gp);m.removeLayer(gh);$('zHint').classList.add('hide');zPaint();return back}
+function zshDone(){if(!ZSH)return;if(ZSH.pts.length<3)return toast('A zone needs at least 3 corners',1);
+ const p=ZSH.pts.map(x=>[+x[0].toFixed(6),+x[1].toFixed(6)]),back=zshStop();
+ if(!back)return toast('Shape ready');
+ back.shape={type:'polygon',pts:p};delete back.pts;zDlg(back);
+ $('zShape').textContent=p.length+' corners \u00b7 '+zArea(p).toFixed(3)+' km\u00b2 \u2014 press Save zone to put this outline on the map'}
+function zshCancel(){if(!ZSH)return;const back=zshStop();
+ if(back)zDlg(back);else toast('Shape change cancelled: the zone keeps its old outline')}
+// the dialog covers the map, so the outline is edited with the box put away and
+// carried back into it with the name, limit, alerts and colour untouched
+function zShapeBtn(){if(!ADMIN||!ZED)return;const t=zForm();
+ const p=t.shape&&zPts(t.shape).length?zPts(t.shape):zRing(t);
+ if(p.length<3)return toast('This zone has no outline yet: press "Draw it again"',1);
+ zClose();zShapeEdit({id:t.id||'pending',name:t.name,shape:{type:'polygon',pts:p}},t)}
 // ---- blackbox pull. The phone keeps every fix locally; this asks it for a window
 // and it answers over realtime or on its own minute poll.
 let BBS=[];
@@ -577,7 +700,7 @@ async function loadAct(){if(!ADMIN)return;
  const byU=cnt(ACT,r=>r.user_name),byA=cnt(ACT,r=>r.action);
  // 'Session time' rows are the only ones that carry duration_s, so the tile is
  // the total the picked people actually spent inside the dashboard or the app.
- const SEC=ACT.reduce((s,r)=>s+(+r.duration_s||0),0),hms=s=>Math.floor(s/3600)+'h '+p2(Math.floor(s%3600/60))+'m';
+ const SEC=ACT.reduce((s,r)=>s+(+r.duration_s||0),0);
  $('acK').innerHTML=tile('gy','fa-user-clock',ACT.length,'Entries')+tile('bl','fa-users',Object.keys(byU).length,'People active')+tile('gr','fa-list',Object.keys(byA).length,'Activity types')+tile('or','fa-mobile-screen',ACT.filter(r=>r.device==='phone').length,'From phones')+tile('bl','fa-stopwatch',hms(SEC),'Time on screen');
  const H=['Date and time','User','Activity','Details','Time on screen','From'];
  const R=r=>[new Date(r.recorded_at).toLocaleString('en-GB'),r.user_name||'-',r.action||'',r.details||'',r.duration_s==null?'':hms(+r.duration_s),r.device==='phone'?'Phone':'Computer'];
@@ -623,7 +746,13 @@ const km=(a,b)=>{const r=x=>x*Math.PI/180,h=Math.sin(r(b.lat-a.lat)/2)**2+Math.c
 const tile=(c,i,v,l)=>`<div class="card kpi ${c}"><div class="ic"><i class="fa-solid ${i}"></i></div><div><b>${v}</b><span>${l}</span></div></div>`;
 // a fix reporting accuracy 0 or less is a placeholder, not a real position
 const okFix=p=>!(p.accuracy!=null&&+p.accuracy<=0);
-const hm=x=>{x=Math.max(0,Math.round(x||0));return Math.floor(x/3600)+'h '+p2(Math.floor(x%3600/60))+'m '+p2(x%60)+'s'};
+// the phone keeps one position per second, and a blackbox window that was pulled
+// twice used to break that. Repeating seconds are dropped here so rows that are
+// already on the server cannot show, plot or export twice.
+const ded=rows=>{const s=new Set();return rows.filter(r=>{const k=(r.vehicle_id||'-')+'|'+Math.floor(Date.parse(r.recorded_at)/1000);
+ if(s.has(k))return false;s.add(k);return true})};
+// Every duration the system shows is hh:mm:ss, with hours allowed to run past 24
+// (37:15:59), so the same reading works for a 3-second breach and a 2-day trip.
 const hms=x=>{x=Math.max(0,Math.round(x||0));return p2(Math.floor(x/3600))+':'+p2(Math.floor(x%3600/60))+':'+p2(x%60)};
 const tms=p=>new Date(p.recorded_at).getTime();
 const brg=(a,b)=>{const r=x=>x*Math.PI/180,y=Math.sin(r(b.lng-a.lng))*Math.cos(r(b.lat)),x=Math.cos(r(a.lat))*Math.sin(r(b.lat))-Math.sin(r(a.lat))*Math.cos(r(b.lat))*Math.cos(r(b.lng-a.lng));return (Math.atan2(y,x)*180/Math.PI+360)%360};
@@ -648,7 +777,7 @@ function tPop(T,w){const p=w==='s'?T.pts[0]:T.pts.at(-1),S=T.st,s=w==='s';
  return `<div style="min-width:230px"><b style="font-size:15px;color:${s?'#27a46a':'#d9534f'}"><i class="fa-solid ${s?'fa-play':'fa-flag-checkered'}"></i> ${s?'Start':'End'} Trip</b> <span class="chip" style="background:${T.col}22;color:${T.col}">Trip ${T.n}</span>${HR}
  <i class="fa-solid fa-car"></i> ${esc(p.vehicle_name||'-')}<br><i class="fa-solid fa-id-card"></i> ${esc(p.driver_name||'-')}<br><i class="fa-regular fa-clock"></i> ${new Date(p.recorded_at).toLocaleString()}<br>
  <i class="fa-solid fa-map-pin"></i> <span class="gname">${esc(plName(p)||'Looking up the place…')}</span><br><i class="fa-solid fa-location-dot"></i> ${(+p.lat).toFixed(5)}, ${(+p.lng).toFixed(5)}<br><i class="fa-solid fa-gauge-high"></i> ${Math.round(p.speed||0)} km/h${HR}
- Distance <b>${S.d.toFixed(2)} km</b> · Duration <b>${hm(S.dur)}</b><br>Max speed <b>${Math.round(S.max)} km/h</b> · Events <b>${T.evs.length}</b></div>`}
+ Distance <b>${S.d.toFixed(2)} km</b> · Duration <b>${hms(S.dur)}</b><br>Max speed <b>${Math.round(S.max)} km/h</b> · Events <b>${T.evs.length}</b></div>`}
 function ptPop(p,T,l,r,c){return `<b>${new Date(p.recorded_at).toLocaleString()}</b> <span class="chip" style="background:${T.col}22;color:${T.col}">Trip ${T.n}</span><br><i class="fa-solid fa-car"></i> ${esc(p.vehicle_name||'-')} · <i class="fa-solid fa-id-card"></i> ${esc(p.driver_name||'-')}<br><i class="fa-solid fa-gauge-high"></i> ${Math.round(p.speed||0)} km/h · ${stt(p)}<br><i class="fa-solid fa-gas-pump"></i> Fuel ${l.toFixed(3)} L${r?' ('+r+')':''}<br>Trip fuel so far: ${c.toFixed(2)} L<br><i class="fa-solid fa-location-dot"></i> ${(+p.lat).toFixed(5)}, ${(+p.lng).toFixed(5)}<br>Accuracy ${p.accuracy??'-'} m · Elev. ${p.altitude!=null?Math.round(p.altitude):'-'} m · Dir ${p.heading!=null?Math.round(p.heading):'-'}°<br>Accel ${p.accel??'-'} km/h/s<br><i class="fa-solid fa-battery-half"></i> ${p.battery_pct!=null?Math.round(p.battery_pct)+'%':'-'}${p.charging?' ⚡':''}`}
 function drawTrip(T,Vh){const P=T.pts,g=T.ly,fm=+Vh.fuel_moving||0,fi=+Vh.fuel_idle||0,k=Math.max(1,Math.ceil(P.length/120));
  T.pl=L.polyline(P.map(p=>[p.lat,p.lng]),{color:T.col,weight:5,opacity:.9}).addTo(g).on('click',()=>tSel(T.n-1));
@@ -665,7 +794,7 @@ function drawTrip(T,Vh){const P=T.pts,g=T.ly,fm=+Vh.fuel_moving||0,fi=+Vh.fuel_i
  T.evs.forEach(x=>evMk(x).addTo(g))}
 async function loadHist(){pbStop();
  const vid=$('hv').value,hf=new Date($('hf').value).toISOString(),ht=new Date($('ht').value).toISOString();
- const data=(await fetchAll(()=>sb.from('positions').select('*').eq('vehicle_id',vid).gte('recorded_at',hf).lte('recorded_at',ht).order('recorded_at'))).filter(okFix);
+ const data=ded((await fetchAll(()=>sb.from('positions').select('*').eq('vehicle_id',vid).gte('recorded_at',hf).lte('recorded_at',ht).order('recorded_at'))).filter(okFix));
  if(hLayer)hLayer.remove();TRIPS.forEach(t=>t.ly.remove());TRIPS=[];TSEL=-1;HEVS=[];hData=data;
  if(!data.length){$('hstat').innerHTML='';hSide();return toast('No data in this period.')}
  HEVS=(await fetchAll(()=>sb.from('events').select('*').eq('vehicle_id',vid).gte('recorded_at',hf).lte('recorded_at',ht).order('recorded_at'))).filter(x=>EV[x.type]&&okFix(x));
@@ -684,7 +813,7 @@ function tTog(i,on){const T=TRIPS[i];T.on=on;on?T.ly.addTo(mapH):T.ly.remove();i
 function tAll(on){TRIPS.forEach((T,i)=>{T.on=!!on;on?T.ly.addTo(mapH):T.ly.remove()});if(!on){TSEL=-1;pbStop()}hStyle();hSide();hKpis();if(on)hFit()}
 function tSel(i){const T=TRIPS[i];if(!T)return;if(!T.on){T.on=true;T.ly.addTo(mapH)}
  if(TSEL!==i){TSEL=i;pbInit()}hStyle();hSide();hKpis();mapH.fitBounds(T.pts.map(p=>[p.lat,p.lng]),{padding:[30,30],maxZoom:17})}
-function tDet(T){const S=T.st;return [['Start',new Date(S.s).toLocaleString()],['End',new Date(S.e).toLocaleString()],['Distance',S.d.toFixed(2)+' km'],['Max Speed',Math.round(S.max)+' km/h'],['Avg moving speed',Math.round(S.avg)+' km/h'],['Driving',hm(S.dr)],['Idling',hm(S.id)],['Duration',hm(S.dur)],['Events',T.evs.length],['Estimated fuel',S.fuel.toFixed(2)+' L'],['Records',T.pts.length]]}
+function tDet(T){const S=T.st;return [['Start',new Date(S.s).toLocaleString()],['End',new Date(S.e).toLocaleString()],['Distance',S.d.toFixed(2)+' km'],['Max Speed',Math.round(S.max)+' km/h'],['Avg moving speed',Math.round(S.avg)+' km/h'],['Driving',hms(S.dr)],['Idling',hms(S.id)],['Duration',hms(S.dur)],['Events',T.evs.length],['Estimated fuel',S.fuel.toFixed(2)+' L'],['Records',T.pts.length]]}
 const HHINT='<small style="color:var(--mut);display:block">Click a trip to see its details, print them and play the trip back.</small>';
 function hSide(){const s=$('hside');
  if(!TRIPS.length){s.innerHTML='<p style="color:var(--mut);margin:0">No trips in this period.</p>';return}
@@ -751,7 +880,7 @@ function pbShow(){if(!PB)return;const {tl,c,T}=PB,P=T.pts;let i=Math.min(Math.ma
  const v=$('pbV');if(v)v.innerHTML=V.map(x=>`<div><small>${x[0]}</small><b>${esc(x[1])}</b></div>`).join('')}
 function hKpis(){const S=TRIPS.filter(t=>t.on),sm=k=>S.reduce((a,t)=>a+t.st[k],0);let ms=0,mn=0;S.forEach(t=>t.pts.forEach(p=>{if(p.speed>0){ms+=+p.speed;mn++}}));
  const ev=S.reduce((a,t)=>a+t.evs.length,0)+HEVS.length-TRIPS.reduce((a,t)=>a+t.evs.length,0);
- $('hstat').innerHTML=tile('bl','fa-route',S.length+' / '+TRIPS.length,'Trips shown')+tile('bl','fa-location-dot',S.reduce((a,t)=>a+t.pts.length,0),'Points')+tile('gr','fa-road',sm('d').toFixed(1)+' km','Distance')+tile('or','fa-gauge-high',Math.round(S.reduce((a,t)=>Math.max(a,t.st.max),0))+' km/h','Max speed')+tile('gy','fa-gauge',Math.round(mn?ms/mn:0)+' km/h','Avg moving speed')+tile('gr','fa-road-circle-check',hm(sm('dr')),'Driving')+tile('or','fa-hourglass-half',hm(sm('id')),'Idling')+tile('bl','fa-clock',hm(sm('dur')),'Duration')+tile('rd','fa-triangle-exclamation',ev,'Events')+tile('or','fa-gas-pump',sm('fuel').toFixed(1)+' L','Estimated fuel')}
+ $('hstat').innerHTML=tile('bl','fa-route',S.length+' / '+TRIPS.length,'Trips shown')+tile('bl','fa-location-dot',S.reduce((a,t)=>a+t.pts.length,0),'Points')+tile('gr','fa-road',sm('d').toFixed(1)+' km','Distance')+tile('or','fa-gauge-high',Math.round(S.reduce((a,t)=>Math.max(a,t.st.max),0))+' km/h','Max speed')+tile('gy','fa-gauge',Math.round(mn?ms/mn:0)+' km/h','Avg moving speed')+tile('gr','fa-road-circle-check',hms(sm('dr')),'Driving')+tile('or','fa-hourglass-half',hms(sm('id')),'Idling')+tile('bl','fa-clock',hms(sm('dur')),'Duration')+tile('rd','fa-triangle-exclamation',ev,'Events')+tile('or','fa-gas-pump',sm('fuel').toFixed(1)+' L','Estimated fuel')}
 function hKpiSet(){const off=localStorage.hk==='0';$('hstat').classList.toggle('hide',off);$('hkB').innerHTML=`<i class="fa-solid ${off?'fa-eye':'fa-eye-slash'}"></i>${off?'Show summary':''}`;$('hkB').title=off?'Show the summary':'Hide the summary';if(mapH)setTimeout(()=>mapH.invalidateSize(),50)}
 function hKpi(){localStorage.hk=localStorage.hk==='0'?'1':'0';hKpiSet()}
 hKpiSet();
@@ -798,7 +927,7 @@ function renderEvt(){
  const dr=Object.entries(cnt(rows,r=>r.driver_name)).sort((a,b)=>b[1]-a[1]).slice(0,8).map(x=>x[0]);
  chart('c3','bar',dr,K.map(k=>({label:EV[k][0],backgroundColor:EV[k][2],data:dr.map(n=>rows.filter(r=>(r.driver_name||'-')===n&&r.type===k).length)})),{t:'Violator Drivers',s:1,h:1,click:(e,el)=>{if(!el.length)return;EVF.driver=dr[el[0].index];EVF.type=K[el[0].datasetIndex];renderEvt()}});
  const acc=r=>r.type==='overspeed'||r.type==='road_overspeed'?'-':(+r.value).toFixed(1);
- $('evT').innerHTML=`<table><tr><th>Event Start</th><th>Event End</th><th>Duration</th><th>Vehicle</th><th>Driver</th><th>Event</th><th>Speed (km/h)</th><th>Acceleration / Deceleration (km/h/s)</th><th>Details</th><th>Location</th></tr>${rows.slice(0,1000).map(r=>{const E=EVX(r.type),d=evDur(r);return `<tr><td>${new Date(r.recorded_at).toLocaleString()}</td><td>${r.ended_at?new Date(r.ended_at).toLocaleString():'-'}</td><td>${d==null?'-':hms(d)}</td><td>${esc(r.vehicle_name)}</td><td>${esc(r.driver_name)}</td><td><span class="chip" style="background:${E[2]}22;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</span></td><td>${Math.round(r.speed||0)}</td><td>${acc(r)}</td><td>${esc(r.details||'-')}</td><td><a href="#" onclick="goHist('${r.vehicle_id}','${r.recorded_at}',${r.lat},${r.lng});return false"><i class="fa-solid fa-map-location-dot"></i> ${(+r.lat).toFixed(5)}, ${(+r.lng).toFixed(5)}</a></td></tr>`}).join('')||'<tr><td colspan="10">No events in this period.</td></tr>'}</table>`;tools($('evT'))}
+ $('evT').innerHTML=`<table><tr><th>Event Start</th><th>Event End</th><th>Duration</th><th>Vehicle</th><th>Driver</th><th>Event</th><th>Speed (km/h)</th><th>Acceleration / Deceleration (km/h/s)</th><th>Details</th><th>Location</th></tr>${rows.slice(0,1000).map(r=>{const E=EVX(r.type),d=evDur(r);return `<tr><td>${new Date(r.recorded_at).toLocaleString()}</td><td>${r.ended_at?new Date(r.ended_at).toLocaleString():'-'}</td><td style="white-space:nowrap">${d==null?'-':hms(d)}</td><td>${esc(r.vehicle_name)}</td><td>${esc(r.driver_name)}</td><td><span class="chip" style="background:${E[2]}22;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</span></td><td>${Math.round(r.speed||0)}</td><td>${acc(r)}</td><td>${esc(r.details||'-')}</td><td><a href="#" onclick="goHist('${r.vehicle_id}','${r.recorded_at}',${r.lat},${r.lng});return false"><i class="fa-solid fa-map-location-dot"></i> ${(+r.lat).toFixed(5)}, ${(+r.lng).toFixed(5)}</a></td></tr>`}).join('')||'<tr><td colspan="10">No events in this period.</td></tr>'}</table>`;tools($('evT'))}
 async function goHist(vid,iso,lat,lng){document.querySelector('.nb[data-t=hist]').click();$('hv').value=vid;const t=new Date(iso).getTime();$('hf')._flatpickr.setDate(new Date(t-9e5),true);$('ht')._flatpickr.setDate(new Date(t+9e5),true);await loadHist();mapH.setView([lat,lng],17)}
 async function loadRep(){
  const F=new Date($('rp_f').value),T=new Date($('rp_t').value);
@@ -815,12 +944,12 @@ async function loadRep(){
  rep=Object.values(V).map(o=>{const q=vehicles.find(x=>x.id===o.id)||{},fm=o.km*(q.fuel_moving||0)/100,fi=o.sp/60*(q.fuel_idle||0);return {...o,fm,fi,ft:fm+fi,l100:o.km>0?(fm+fi)/o.km*100:0,score:(o.a+o.b+o.os)*100/Math.max(o.km,1)}});
  const sum=k=>rep.reduce((a,o)=>a+o[k],0),n=rep.map(o=>o.name);
  const G=Number.isFinite(+SET.score_green)?+SET.score_green:1,R=Number.isFinite(+SET.score_red)?+SET.score_red:3,sc=s=>s>=R?'rd':s<=G?'gr':'or',avg=sum('score')/(rep.length||1);
- $('rpK').innerHTML=tile('bl','fa-road',sum('km').toFixed(0)+' km','Total distance')+tile('gr','fa-clock',(sum('dr')/60).toFixed(1)+' h','Driving time')+tile('or','fa-triangle-exclamation',sum('b')+sum('a')+sum('o'),'Driving events')+tile(sc(avg),'fa-shield-halved',avg.toFixed(1)+' <small style="font-size:11px;font-weight:400">'+({gr:'green',or:'amber',rd:'red'})[sc(avg)]+'</small>','Average safety score')+tile('or','fa-gas-pump',sum('ft').toFixed(1)+' L','Estimated fuel');
+ $('rpK').innerHTML=tile('bl','fa-road',sum('km').toFixed(0)+' km','Total distance')+tile('gr','fa-clock',hms(sum('dr')*60),'Driving time')+tile('or','fa-triangle-exclamation',sum('b')+sum('a')+sum('o'),'Driving events')+tile(sc(avg),'fa-shield-halved',avg.toFixed(1)+' <small style="font-size:11px;font-weight:400">'+({gr:'green',or:'amber',rd:'red'})[sc(avg)]+'</small>','Average safety score')+tile('or','fa-gas-pump',sum('ft').toFixed(1)+' L','Estimated fuel');
  chart('r1','bar',n,[{label:'km',backgroundColor:'#2f7fe6',data:rep.map(o=>+o.km.toFixed(1))}],{t:'Distance per vehicle (km)'});
  chart('r2','line',Object.keys(D),[{label:'km',borderColor:'#27a46a',backgroundColor:'#27a46a33',fill:true,tension:.3,data:Object.values(D).map(x=>+x.toFixed(1))}],{t:'Fleet distance per day (km)'});
  chart('r3','bar',n,[{label:'Driving (h)',backgroundColor:'#27a46a',data:rep.map(o=>+(o.dr/60).toFixed(1))},{label:'Idling (h)',backgroundColor:'#f28c28',data:rep.map(o=>+(o.sp/60).toFixed(1))}],{t:'Driving vs Idling time',s:1});
  chart('r4','bar',n,[{label:'Moving (L)',backgroundColor:'#2f7fe6',data:rep.map(o=>+o.fm.toFixed(1))},{label:'Idling (L)',backgroundColor:'#f28c28',data:rep.map(o=>+o.fi.toFixed(1))}],{t:'Estimated fuel (litres)',s:1});
- $('rpT').innerHTML=`<table><tr><th>Vehicle</th><th>Distance</th><th>Max speed</th><th>Driving</th><th>Idling</th><th>Braking</th><th>Accel.</th><th>Overspeed events</th><th>Overspeed seconds</th><th>Fuel moving</th><th>Fuel idling</th><th>Total fuel</th><th>L/100 km</th><th>Safety score <button class="ibtn" onclick="event.stopPropagation();msg('Safety score formula',SCF())" title="How is it calculated?">!</button></th></tr>${rep.sort((a,b)=>b.score-a.score).map(o=>`<tr><td><b>${esc(o.name)}</b></td><td>${o.km.toFixed(1)} km</td><td>${o.max} km/h</td><td>${(o.dr/60).toFixed(1)} h</td><td>${(o.sp/60).toFixed(1)} h</td><td>${o.b}</td><td>${o.a}</td><td>${o.o}</td><td>${Math.round(o.os)}</td><td>${o.fm.toFixed(1)} L</td><td>${o.fi.toFixed(1)} L</td><td><b>${o.ft.toFixed(1)} L</b></td><td>${o.l100.toFixed(1)}</td><td><span class="chip" style="background:var(--${sc(o.score)}l);color:var(--${sc(o.score)})">${o.score.toFixed(1)}</span></td></tr>`).join('')||'<tr><td colspan="14">No data in this period.</td></tr>'}</table>`;tools($('rpT'))}
+ $('rpT').innerHTML=`<table><tr><th>Vehicle</th><th>Distance</th><th>Max speed</th><th>Driving</th><th>Idling</th><th>Braking</th><th>Accel.</th><th>Overspeed events</th><th>Overspeed seconds</th><th>Fuel moving</th><th>Fuel idling</th><th>Total fuel</th><th>L/100 km</th><th>Safety score <button class="ibtn" onclick="event.stopPropagation();msg('Safety score formula',SCF())" title="How is it calculated?">!</button></th></tr>${rep.sort((a,b)=>b.score-a.score).map(o=>`<tr><td><b>${esc(o.name)}</b></td><td>${o.km.toFixed(1)} km</td><td>${o.max} km/h</td><td style="white-space:nowrap">${hms(o.dr*60)}</td><td style="white-space:nowrap">${hms(o.sp*60)}</td><td>${o.b}</td><td>${o.a}</td><td>${o.o}</td><td>${Math.round(o.os)}</td><td>${o.fm.toFixed(1)} L</td><td>${o.fi.toFixed(1)} L</td><td><b>${o.ft.toFixed(1)} L</b></td><td>${o.l100.toFixed(1)}</td><td><span class="chip" style="background:var(--${sc(o.score)}l);color:var(--${sc(o.score)})">${o.score.toFixed(1)}</span></td></tr>`).join('')||'<tr><td colspan="14">No data in this period.</td></tr>'}</table>`;tools($('rpT'))}
 // ---- theme, users, event rules, alerts
 function theme(){const d=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=d;localStorage.theme=d;themeBtn()}
 const mail=u=>u.includes('@')?u.trim():u.trim().toLowerCase()+'@fleet.local';
@@ -831,7 +960,10 @@ async function addUser(e){e.preventDefault();if(!ADMIN)return toast('Only an adm
  if(!data.session)toast('User created but cannot sign in yet: turn OFF "Confirm email" in Supabase (see steps)');else toast('User created',1);
  logAct('Created user',e.target.u.value);e.target.reset();users()}
 let RULES={},SET={},OV=['speed_limit','brake_limit','accel_limit','moving_interval','stopped_interval','speed_buffer','max_accel_warning','min_moving_distance'];
-const UNIT={harsh_braking:'km/h per second',harsh_acceleration:'km/h per second',overspeed:'km/h',road_overspeed:'km/h above the road limit'};
+const UNIT={harsh_braking:'km/h per second',harsh_acceleration:'km/h per second',overspeed:'km/h',road_overspeed:'km/h above the road limit',zone_overspeed:'km/h above the zone limit'};
+// Entering and leaving a zone fire on the crossing itself: there is no measured
+// value to compare against a limit, so these two rows get no trigger box at all.
+const NOLIM={zone_enter:1,zone_exit:1};
 const WARNED={};
 const vlOf=r=>r.voice_lang&&VLANG[r.voice_lang]?r.voice_lang:(r.voice_lang==='off'||r.voice===false?'off':(SET.voice_lang&&VLANG[SET.voice_lang]?SET.voice_lang:'en'));
 const vlOpts=r=>{const c=vlOf(r);return '<option value="off">Off</option>'+Object.entries(VLANG).map(([k,n])=>`<option value="${k}" ${c===k?'selected':''}>${n[0]}</option>`).join('')};
@@ -843,7 +975,7 @@ async function loadRules(){const {data}=await sb.from('event_rules').select('*')
  if(data&&data.length&&(!('hold_s'in data[0])||!('voice'in data[0])||!RULES.road_overspeed)&&!WARNED.hold){WARNED.hold=1;toast('The database is missing the newest columns (tolerance, voice, road speed limit). Run schema.sql in Supabase (SQL Editor) once to add them.')}
  if(data&&data.length&&!('voice_lang'in data[0])&&!WARNED.vl){WARNED.vl=1;toast('Per-event voice languages need the newest schema: run schema.sql in Supabase once. Until then the phone keeps the single fleet language.')}
  const num=(id,v,w,st)=>`<input type="number" step="${st||'any'}" min="0" id="${id}" value="${v??''}" style="width:${w||58}px">`;
- $('ruleT').innerHTML=`<table><tr><th>Event</th><th>Trigger limit</th><th>Tolerance (seconds)</th><th>Recorded</th><th>Visual alert</th><th>Buzzer alert</th><th>Buzzer seconds</th><th>Voice alert</th></tr>${(data||[]).map(r=>`<tr><td><b>${esc(r.label)}</b></td><td>${num('rt_'+r.type,r.threshold,66,'0.1')} <small>${UNIT[r.type]||''}</small></td><td>${num('rh_'+r.type,r.hold_s??0)}</td><td><input type="checkbox" id="re_${r.type}" ${r.enabled?'checked':''}></td><td><input type="checkbox" id="ra_${r.type}" ${r.alert?'checked':''}></td><td style="white-space:nowrap"><select id="bt_${r.type}" style="width:126px" onchange="toneSync(this)">${Object.entries(TONES).map(([k,n])=>`<option value="${k}" ${(r.beep_type||'discontinuous')===k?'selected':''}>${n}</option>`).join('')}</select><button type="button" class="play" onclick="tryTone('${r.type}')" title="Play this tone"><i class="fa-solid fa-play"></i></button></td><td class="bd">${num('bd_'+r.type,r.beep_duration??5)}</td><td style="white-space:nowrap"><select id="vl_${r.type}" style="width:96px" onchange="syncPl(this)">${vlOpts(r)}</select><button type="button" class="play" onclick="tryVoice('${r.type}')" title="Speak this message"><i class="fa-solid fa-volume-high"></i></button></td></tr>`).join('')}</table>`;
+ $('ruleT').innerHTML=`<table><tr><th>Event</th><th>Trigger limit</th><th>Tolerance (seconds)</th><th>Recorded</th><th>Visual alert</th><th>Buzzer alert</th><th>Buzzer seconds</th><th>Voice alert</th></tr>${(data||[]).map(r=>`<tr><td><b>${esc(r.label)}</b></td><td>${NOLIM[r.type]?'<small style="opacity:.5">no limit</small>':num('rt_'+r.type,r.threshold,66,'0.1')+' <small>'+(UNIT[r.type]||'')+'</small>'}</td><td>${num('rh_'+r.type,r.hold_s??0)}</td><td><input type="checkbox" id="re_${r.type}" ${r.enabled?'checked':''}></td><td><input type="checkbox" id="ra_${r.type}" ${r.alert?'checked':''}></td><td style="white-space:nowrap"><select id="bt_${r.type}" style="width:126px" onchange="toneSync(this)">${Object.entries(TONES).map(([k,n])=>`<option value="${k}" ${(r.beep_type||'discontinuous')===k?'selected':''}>${n}</option>`).join('')}</select><button type="button" class="play" onclick="tryTone('${r.type}')" title="Play this tone"><i class="fa-solid fa-play"></i></button></td><td class="bd">${num('bd_'+r.type,r.beep_duration??5)}</td><td style="white-space:nowrap"><select id="vl_${r.type}" style="width:96px" onchange="syncPl(this)">${vlOpts(r)}</select><button type="button" class="play" onclick="tryVoice('${r.type}')" title="Speak this message"><i class="fa-solid fa-volume-high"></i></button></td></tr>`).join('')}</table>`;
  [...$('ruleT').querySelectorAll('select')].forEach(s=>s.id.startsWith('bt_')?toneSync(s):s.id.startsWith('vl_')&&syncPl(s))}
 async function getSet(){const {data}=await sb.from('app_settings').select('*');SET={};(data||[]).forEach(x=>SET[x.key]=x.value);plLoad();
  const e=$('offH');if(e){e.value=OFFH();e.disabled=!ADMIN}}
@@ -871,7 +1003,7 @@ async function resetSelV(){if(!ADMIN)return;const ids=selCfg();
 async function saveCfg(){if(!ADMIN)return;
  const hasVL=Object.values(RULES).some(r=>'voice_lang'in r);
  const rules=Object.values(RULES).map(r=>{const bt=$('bt_'+r.type).value,vl=$('vl_'+r.type).value;
-  return{type:r.type,label:r.label,enabled:$('re_'+r.type).checked,threshold:+$('rt_'+r.type).value||null,hold_s:Math.max(0,+$('rh_'+r.type).value||0),alert:$('ra_'+r.type).checked,beep:bt!=='off',beep_duration:Math.max(1,Math.round(+$('bd_'+r.type).value||5)),beep_type:bt,voice:vl!=='off',...(hasVL?{voice_lang:vl}:{})}});
+  return{type:r.type,label:r.label,enabled:$('re_'+r.type).checked,threshold:NOLIM[r.type]?null:+$('rt_'+r.type).value||null,hold_s:Math.max(0,+$('rh_'+r.type).value||0),alert:$('ra_'+r.type).checked,beep:bt!=='off',beep_duration:Math.max(1,Math.round(+$('bd_'+r.type).value||5)),beep_type:bt,voice:vl!=='off',...(hasVL?{voice_lang:vl}:{})}});
  const vls=rules.map(r=>r.voice_lang).filter(v=>v&&v!=='off');
  const byV={};document.querySelectorAll('#cfgV input[data-k]').forEach(i=>{(byV[i.dataset.v]??={})[i.dataset.k]=i.value===''?null:+i.value});
  const res=await Promise.all([sb.from('event_rules').upsert(rules),sb.from('app_settings').upsert([{key:'moving_interval',value:String(Math.max(1,+$('s_mov').value||10))},{key:'stopped_interval',value:String(Math.max(1,+$('s_stp').value||60))},{key:'score_green',value:String(Math.max(0,+$('sc_g').value||0))},{key:'score_red',value:String(Math.max(0,+$('sc_r').value||0))},{key:'voice_on',value:vls.length?'1':'0'},{key:'voice_lang',value:vls[0]||'en'},{key:'bb_on',value:$('s_bb').checked?'1':'0'},{key:'bb_days',value:String(Math.min(14,Math.max(1,+$('s_bbd').value||3)))},{key:'zones_on',value:$('s_z').checked?'1':'0'}]),...Object.entries(byV).map(([id,o])=>sb.from('vehicles').update({...o,custom:OV.some(k=>o[k]!=null)}).eq('id',id))]);
@@ -981,7 +1113,7 @@ addEventListener('scroll',e=>{if(MSO&&(e.target.closest?e.target.closest('.msp')
 addEventListener('resize',msPos);
 async function loadTrip(){
  const v=$('tr_v').value,f=new Date($('tr_f').value).toISOString(),t=new Date($('tr_t').value).toISOString();
- tr=(await fetchAll(()=>sb.from('positions').select('*').eq('vehicle_id',v).gte('recorded_at',f).lte('recorded_at',t).order('recorded_at'))).filter(okFix);tp=0;
+ tr=ded((await fetchAll(()=>sb.from('positions').select('*').eq('vehicle_id',v).gte('recorded_at',f).lte('recorded_at',t).order('recorded_at'))).filter(okFix));tp=0;
  if(!tr.length)return toast('No data in this period');
  const sp=tr.map(r=>r.speed||0),mx=Math.max(...sp),mv=sp.filter(x=>x>0),av=mv.length?mv.reduce((a,b)=>a+b)/mv.length:0,lim=(vehicles.find(x=>x.id===v)||{}).speed_limit||RULES.overspeed?.threshold||100;
  $('trK').innerHTML=tile('bl','fa-database',tr.length,'Records')+tile('or','fa-gauge-high',Math.round(mx)+' km/h','Max speed')+tile('gr','fa-gauge',Math.round(av)+' km/h','Avg moving speed')+tile('gy','fa-mountain',Math.round(Math.max(...tr.map(r=>r.altitude||0)))+' m','Max elevation');
@@ -1027,6 +1159,7 @@ function plPaint(){[mapL,mapH].forEach(m=>{if(!m)return;const id=m.getContainer(
 function plArm(m){if(!ADMIN)return toast('Only an admin can save place names');
  if(PLARM){plCancel();return}
  if(DRAW)return toast('Finish or cancel the zone you are drawing first');
+ if(ZSH)return toast('Apply or cancel the zone shape you are changing first');
  m.getContainer().style.cursor='crosshair';
  const h=e=>{plCancel();plDlg(-1,{la:+e.latlng.lat.toFixed(5),lo:+e.latlng.lng.toFixed(5),r:150})};
  m.on('click',h);PLARM={m,h};
