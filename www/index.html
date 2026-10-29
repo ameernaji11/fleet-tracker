@@ -343,19 +343,20 @@ function enter(){show('app');initMap();showLast()}
 // ---- map
 let map,mrk,trail,tiles,follow=true,MI=0;
 const G=l=>'https://{s}.google.com/vt/lyrs='+l+'&x={x}&y={y}&z={z}',GS={subdomains:['mt0','mt1','mt2','mt3']};
-// the same six styles the dashboard offers, in the same order, so a manager and a
-// driver are always looking at the same picture. OpenStreetMap is last on purpose:
-// that server blocked this app once, and if it blocks again the line below is the
-// only one to delete.
+// the same five styles the dashboard offers, in the same order, so a manager and a
+// driver are always looking at the same picture. OpenStreetMap is not one of them:
+// its tile server blocks this app, so the style was removed rather than left broken.
 const MAPS=[['Google Map',G('m'),'Map data © Google',20,GS],
  ['Google Hybrid',G('y'),'Map data © Google',20,GS],
  ['Google Satellite',G('s'),'Map data © Google',20,GS],
  ['Esri Street Map','https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}','Tiles © Esri',19,null],
- ['Esri Satellite','https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}','Tiles © Esri',20,null],
- ['OpenStreetMap','https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png','© OpenStreetMap contributors',19,{subdomains:['a','b','c']}]];
+ ['Esri Satellite','https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}','Tiles © Esri',20,null]];
 function initMap(){if(map)return;map=L.map('map',{zoomControl:false}).setView([23.6,58.5],12);map.on('dragstart',()=>{follow=false;pinUi()});
  document.addEventListener('fullscreenchange',()=>{topLift();const on=!!document.fullscreenElement,b=$('fsB');if(b){b.title=on?'Shrink back':'Full screen';const i=b.querySelector('i');if(i)i.className='fa-solid '+(on?'fa-minimize':'fa-expand')}setTimeout(()=>map.invalidateSize(),250)});
- MI=Math.min(MAPS.length-1,Math.max(0,+localStorage.mbase||0));tiles=lay(MI);trail=L.polyline([],{color:'#2f7fe6',weight:4}).addTo(map);zDraw();setTimeout(()=>map.invalidateSize(),200)}
+ // this list is shorter than the one an older build saved its number against, and a
+// driver who never picked this style should not wake on it: out of range falls back
+// to the first one, exactly as the dashboard does for a saved name it no longer has
+ const sv=+localStorage.mbase;MI=sv>0&&sv<MAPS.length?sv:0;tiles=lay(MI);trail=L.polyline([],{color:'#2f7fe6',weight:4}).addTo(map);zDraw();setTimeout(()=>map.invalidateSize(),200)}
 // a tile that will not arrive while there is no signal is expected, but it has to
 // be explained: the picture comes from the cache this app keeps of the areas the
 // driver has already driven through with internet
