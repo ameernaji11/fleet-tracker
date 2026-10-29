@@ -10,8 +10,11 @@ const SVG = { icon: 'www/icon.svg', fg: 'icons/icon-foreground.svg', bg: 'icons/
 const LEGACY = { mdpi: 48, hdpi: 72, xhdpi: 96, xxhdpi: 144, xxxhdpi: 192 };
 const LAYER = { mdpi: 108, hdpi: 162, xhdpi: 216, xxhdpi: 324, xxxhdpi: 486 };
 
+// sharp wants the channels flat on the colour object; a nested {rgba:{}} is only
+// what getPixel() hands back, and passing it in throws "Unable to parse color".
+const CLEAR = { r: 0, g: 0, b: 0, alpha: 0 };
 const px = (src, size) => sharp(path.join(ROOT, src), { density: 300 })
-  .resize(size, size, { fit: 'contain', background: { rgba: { r: 0, g: 0, b: 0, alpha: 0 } } })
+  .resize(size, size, { fit: 'contain', background: CLEAR })
   .png()
   .toBuffer();
 
