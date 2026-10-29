@@ -27,6 +27,10 @@ header h1{font-size:19px;margin:0;flex:1;font-weight:800}#me{color:var(--mut)}
 main{flex:1;min-height:0;min-width:0;padding:12px 16px;overflow:auto}
 section{display:none;height:100%;flex-direction:column;gap:10px;min-width:0}section.on{display:flex}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;min-width:0}
+/* page title outside a card, and the icon+title+note header every Configuration block uses */
+.ctitle{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:0 2px}.ctitle b{font-size:17px}.ctitle small{color:var(--mut)}
+.csh{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}.csh>i{width:32px;height:32px;border-radius:10px;background:var(--bll);color:var(--bl);display:grid;place-items:center;font-size:14px;flex:none}
+.csh>div{flex:1;min-width:180px}.csh b{font-size:15px}.csh small{display:block;color:var(--mut);margin-top:2px;font-weight:400}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
 .kpi{display:flex;align-items:center;gap:10px;padding:9px 11px}.kpi .ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:18px}
 .kpi b{font-size:22px;display:block;line-height:1.1}.kpi span{color:var(--mut);font-size:12px}
@@ -50,6 +54,10 @@ input:focus,select:focus{outline:2px solid var(--bl);border-color:transparent}
 .btn.b{background:var(--bl)}.btn.g{background:var(--gr)}.btn.o{background:var(--or)}.btn.r{background:var(--rdl);color:var(--rd)}.btn.sm{height:34px;padding:0 12px}
 .btn.gh{background:var(--gyl);color:var(--ink);border:1px solid var(--line);box-shadow:0 1px 2px #0002}.btn.gh i{color:var(--bl)}
 .tw{flex:none;overflow:auto;min-width:0;max-width:100%;border-radius:12px;border:1px solid var(--line);background:var(--card)}table{border-collapse:collapse;width:100%}
+/* the Activity Log and the tacho table hold long single-line values: they keep
+   their natural width and the card scrolls sideways instead of wrapping text */
+#acT table{width:auto;min-width:100%}#acT td,#acT th{white-space:nowrap}
+#trT th:nth-child(-n+2),#trT td:nth-child(-n+2){white-space:nowrap;min-width:88px}
 th{background:var(--th);text-align:left;font-size:12px;color:var(--mut);padding:7px 8px}td{padding:6px 8px;border-top:1px solid var(--line);overflow-wrap:anywhere}
 td select{height:36px}#evt,#rep,#trip,#cfg,#hist{height:auto;min-height:100%}.cgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:10px}.cgrid .card{height:252px;position:relative}.tw a{color:var(--bl);font-weight:700;text-decoration:none}
 .seg{display:flex;background:var(--card);border-radius:10px;box-shadow:0 1px 6px #0003;padding:3px;gap:2px}.seg button{border:0;background:none;padding:6px 10px;border-radius:8px;font-weight:700;cursor:pointer;color:var(--mut);font-size:12px}
@@ -164,15 +172,14 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <div class="field"><label>From</label><input id="ev_f" type="text"></div><div class="field"><label>To</label><input id="ev_to" type="text"></div>
 <button class="btn b" onclick="loadEvt()"><i class="fa-solid fa-play"></i>Generate</button></div>
 <div id="evFl" style="display:flex;gap:8px;align-items:center;min-height:30px"></div><div class="kpis" id="evK"></div><div class="cgrid"><div class="card"><canvas id="c1"></canvas></div><div class="card"><canvas id="c2"></canvas></div><div class="card"><canvas id="c3"></canvas></div></div><div class="tw" id="evT"></div></section>
-<section id="cfg"><div class="card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><div style="flex:1;min-width:220px"><b><i class="fa-solid fa-gear"></i> Configuration</b><br><small style="color:var(--mut)">An empty box in a vehicle row means "use the default". Press Save at the bottom of this page to keep every change on it.</small></div>
-<div class="card"><b><i class="fa-solid fa-sliders"></i> Fleet defaults</b><div class="tw" style="margin-top:10px"><table><tr><th>Setting</th><th>Value</th><th>What it does</th></tr>
+<section id="cfg"><div class="ctitle"><b><i class="fa-solid fa-gear"></i> Configuration</b><small>An empty box in a vehicle row means "use the default". Press Save at the bottom of this page to keep every change on it.</small></div>
+<div class="card"><div class="csh"><i class="fa-solid fa-sliders"></i><div><b>Fleet defaults</b><small>Values every vehicle follows unless it carries its own further down this page.</small></div></div><div class="tw" style="margin-top:10px"><table><tr><th>Setting</th><th>Value</th><th>What it does</th></tr>
 <tr><td>Recording interval — while moving</td><td><input id="s_mov" type="number" min="1" style="width:110px"></td><td><small>Seconds between positions while the vehicle is moving.</small></td></tr>
 <tr><td>Recording interval — while stopped</td><td><input id="s_stp" type="number" min="1" style="width:110px"></td><td><small>Seconds between positions while the vehicle is standing still.</small></td></tr>
 <tr><td>Safety score — green at or below <span class="hp" data-tip="Fleet Summary scores every vehicle with &lt;b&gt;(harsh acceleration events + harsh braking events + overspeed seconds) &times; (100 &divide; distance in km)&lt;/b&gt;, so a lower number is safer. Set where green stops and red starts; everything between the two is amber.">?</span></td><td><input id="sc_g" type="number" step="0.1" min="0" style="width:110px"></td><td><small>A vehicle at or under this score is shown green.</small></td></tr>
 <tr><td>Safety score — red at or above</td><td><input id="sc_r" type="number" step="0.1" min="0" style="width:110px"></td><td><small>A vehicle at or over this score is shown red; in between is amber.</small></td></tr></table></div></div>
-<div class="card"><b><i class="fa-solid fa-triangle-exclamation"></i> Events (defaults for all vehicles) <span class="hp" data-tip="&lt;b&gt;Tolerance&lt;/b&gt; is how long the driver must keep breaking the rule before it is written to the database. The buzzer and the on-screen alert fire immediately; the event is only recorded once the violation lasts longer than the tolerance. Use 2 s for harsh braking/acceleration and 10 s for overspeed. &lt;b&gt;Trigger limit&lt;/b&gt; is the fleet default that a vehicle uses unless it has its own value below.">?</span></b><div class="tw" id="ruleT" style="margin-top:10px"></div></div>
-
-<div class="card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><b style="flex:1;min-width:220px"><i class="fa-solid fa-truck"></i> Settings per vehicle <span class="hp" data-tip="A vehicle marked &lt;b&gt;custom&lt;/b&gt; keeps its own values; leave a box empty to follow the fleet default above. Phones apply changes within 5 minutes or at the next trip start. &lt;b&gt;Overspeed buffer&lt;/b&gt; is added on top of the limit before the alert starts. &lt;b&gt;Warning level&lt;/b&gt; buzzes the phone without recording an event. &lt;b&gt;Min. distance&lt;/b&gt; suppresses events until the vehicle has actually moved that far. Tick the box beside a vehicle and press Reset to send it back to the fleet defaults.">?</span></b><button class="btn o sm" onclick="resetSelV()"><i class="fa-solid fa-rotate-left"></i>Reset selected</button><span class="hp" data-tip="Clears the own values of every vehicle you ticked in the table below, so it follows the fleet defaults on this page again. Unticked vehicles are left exactly as they are. Phones apply the change within 5 minutes.">!</span></div><div class="tw" id="cfgV" style="margin-top:10px"></div></div>
+<div class="card"><div class="csh"><i class="fa-solid fa-triangle-exclamation"></i><div><b>Events (defaults for all vehicles) <span class="hp" data-tip="&lt;b&gt;Tolerance&lt;/b&gt; is how long the driver must keep breaking the rule before it is written to the database. The buzzer and the on-screen alert fire immediately; the event is only recorded once the violation lasts longer than the tolerance. Use 2 s for harsh braking/acceleration and 10 s for overspeed. &lt;b&gt;Trigger limit&lt;/b&gt; is the fleet default that a vehicle uses unless it has its own value below.">?</span></b><small>The limit, the buzzer and the spoken message the whole fleet starts from.</small></div></div><div class="tw" id="ruleT" style="margin-top:10px"></div></div>
+<div class="card"><div class="csh"><i class="fa-solid fa-truck"></i><div><b>Settings per vehicle <span class="hp" data-tip="A vehicle marked &lt;b&gt;custom&lt;/b&gt; keeps its own values; leave a box empty to follow the fleet default above. Phones apply changes within 5 minutes or at the next trip start. &lt;b&gt;Overspeed buffer&lt;/b&gt; is added on top of the limit before the alert starts. &lt;b&gt;Warning level&lt;/b&gt; buzzes the phone without recording an event. &lt;b&gt;Min. distance&lt;/b&gt; suppresses events until the vehicle has actually moved that far. Tick the box beside a vehicle and press Reset to send it back to the fleet defaults.">?</span></b><small>Overrides for one vehicle. Tick the box beside it to include it in Reset.</small></div><button class="btn o sm" onclick="resetSelV()" title="Clears the own values of every vehicle you ticked in the table below, so it follows the fleet defaults on this page again. Unticked vehicles are left exactly as they are. Phones apply the change within 5 minutes."><i class="fa-solid fa-rotate-left"></i>Reset selected</button></div><div class="tw" id="cfgV" style="margin-top:10px"></div></div>
 <div class="card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><small style="flex:1;min-width:220px;color:var(--mut)">Everything on this page is saved together. Phones apply the changes within 5 minutes, or at the next trip start.</small><button class="btn g" onclick="saveCfg()"><i class="fa-solid fa-floppy-disk"></i>Save</button></div></section>
 <section id="trip"><div class="card frow"><div class="field"><label>Vehicle</label><select id="tr_v"></select></div><div class="field"><label>From</label><input id="tr_f" type="text"></div><div class="field"><label>To</label><input id="tr_t" type="text"></div>
 <button class="btn b" onclick="loadTrip()"><i class="fa-solid fa-stopwatch"></i>Generate</button></div>
@@ -227,16 +234,21 @@ const COL={go:'#27a46a',idle:'#f28c28',park:'#2f7fe6',off:'#8b98a5'},LBL={go:'Mo
 const OFFH=()=>{const h=+SET.offline_after_h;return Number.isFinite(h)&&h>0?h:24};
 const off=p=>Date.now()-new Date(p.recorded_at)>OFFH()*36e5;
 const st=p=>off(p)?'off':(p.ignition===false||Date.now()-new Date(p.recorded_at)>STALE_MIN*6e4)?'park':(p.speed>0?'go':'idle');
+// tile sources, shared by every map on the page and by the trip print-out window
+const BASES={'Street Map':['https://tile.openstreetmap.org/{z}/{x}/{y}.png','© OpenStreetMap',19,{}],
+ 'Google Map':['https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}','Map data © Google',20,{subdomains:['mt0','mt1','mt2','mt3']}],
+ 'Google Satellite':['https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}','Map data © Google',20,{subdomains:['mt0','mt1','mt2','mt3']}],
+ 'Google Hybrid':['https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}','Map data © Google',20,{subdomains:['mt0','mt1','mt2','mt3']}],
+ 'Esri Satellite':['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}','Tiles © Esri',20,{}]};
+const baseN=()=>BASES[localStorage.base]?localStorage.base:'Google Map';
+const baseL=n=>{const b=BASES[n||baseN()];return L.tileLayer(b[0],{attribution:b[1],maxZoom:b[2],...b[3]})};
 function mkMap(id,fit,extra){
  const m=L.map(id).setView([23.6,58.5],8);m._btn={};
- const T=(u,a,o={})=>L.tileLayer(u,{attribution:a,maxZoom:20,...o});
- const G=l=>T('https://{s}.google.com/vt/lyrs='+l+'&x={x}&y={y}&z={z}','Map data © Google',{subdomains:['mt0','mt1','mt2','mt3']});
- const base={'Street Map':T('https://tile.openstreetmap.org/{z}/{x}/{y}.png','© OpenStreetMap',{maxZoom:19}),'Google Map':G('m'),'Google Satellite':G('s'),'Google Hybrid':G('y'),'Esri Satellite':T('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}','Tiles © Esri')};
- let cur=localStorage.base;if(!base[cur])cur='Google Map';let layer=base[cur].addTo(m);
+ let cur=baseN();let layer=baseL(cur).addTo(m);
  const c=L.control({position:'topright'});
  c.onAdd=()=>{const d=L.DomUtil.create('div','mt');L.DomEvent.disableClickPropagation(d);
   const lb=L.DomUtil.create('button','',d),lab=n=>'<i class="fa-solid fa-layer-group"></i> '+n+' ▾',menu=L.DomUtil.create('div','mm hide',d);lb.innerHTML=lab(cur);lb.title='Map style';
-  for(const n in base){const b=L.DomUtil.create('button','',menu);b.textContent=n;b.onclick=()=>{m.removeLayer(layer);layer=base[n].addTo(m);localStorage.base=n;lb.innerHTML=lab(n);menu.classList.add('hide')}}
+  for(const n in BASES){const b=L.DomUtil.create('button','',menu);b.textContent=n;b.onclick=()=>{m.removeLayer(layer);layer=baseL(n).addTo(m);localStorage.base=n;lb.innerHTML=lab(n);menu.classList.add('hide')}}
   lb.onclick=()=>menu.classList.toggle('hide');
   const tb=(ic,t,f,k)=>{const b=L.DomUtil.create('button','ic',d);b.innerHTML='<i class="fa-solid '+ic+'"></i>';b.title=t;b.onclick=f;if(k)m._btn[k]=b};
   tb('fa-expand','Full screen',()=>document.fullscreenElement===m.getContainer()?document.exitFullscreen():m.getContainer().requestFullscreen(),'fs');
@@ -382,7 +394,7 @@ function selLive(uid){SELV=uid;const p=last[uid];if(!p)return;if(PINV)mapL.panTo
 function pinV(){if(PINV){PINV=null;mapL._btn.pin&&mapL._btn.pin.classList.remove('on');return toast('Pin off — the map no longer follows the vehicle')}
  const uid=SELV||(Object.keys(last).length===1?Object.keys(last)[0]:null);
  if(!uid||!last[uid])return toast('Select a vehicle on the map or in the list first, then press Pin');
- PINV=uid;mapL.setView([last[uid].lat,last[uid].lng],Math.max(mapL.getZoom(),15));mapL._btn.pin&&mapL._btn.pin.classList.add('on');toast('Pinned to '+(last[uid].vehicle_name||'vehicle'),1)}
+ PINV=uid;mapL.setView([last[uid].lat,last[uid].lng],Math.max(mapL.getZoom(),17));mapL._btn.pin&&mapL._btn.pin.classList.add('on');toast('Pinned to '+(last[uid].vehicle_name||'vehicle')+' — the map follows it',1)}
 function setF(f){FILT=f;document.querySelectorAll('.kpi.click').forEach(k=>k.classList.toggle('on',k.dataset.f===f));renderList();fitAll()}
 function fitAll(){const a=Object.values(last).filter(shown);if(a.length)mapL.fitBounds(a.map(p=>[p.lat,p.lng]),{maxZoom:15,padding:[40,40]})}
 async function loadLive(){(await fetchAll(()=>sb.from('latest_positions').select('*'))).filter(okFix).forEach(upsert);fitAll()}
@@ -462,26 +474,12 @@ function tAll(on){TRIPS.forEach((T,i)=>{T.on=!!on;on?T.ly.addTo(mapH):T.ly.remov
 function tSel(i){const T=TRIPS[i];if(!T)return;if(!T.on){T.on=true;T.ly.addTo(mapH)}
  if(TSEL!==i){TSEL=i;pbInit()}hStyle();hSide();hKpis();mapH.fitBounds(T.pts.map(p=>[p.lat,p.lng]),{padding:[30,30],maxZoom:17})}
 function tDet(T){const S=T.st;return [['Start',new Date(S.s).toLocaleString()],['End',new Date(S.e).toLocaleString()],['Distance',S.d.toFixed(2)+' km'],['Max Speed',Math.round(S.max)+' km/h'],['Avg moving speed',Math.round(S.avg)+' km/h'],['Driving',hm(S.dr)],['Idling',hm(S.id)],['Duration',hm(S.dur)],['Events',T.evs.length],['Estimated fuel',S.fuel.toFixed(2)+' L'],['Records',T.pts.length]]}
-function routeSvg(T){const P=T.pts;if(!P.length)return '';
- const W=760,H=400,PAD=26,la=P.map(p=>+p.lat),lo=P.map(p=>+p.lng);
- const nA=Math.min(...la),xA=Math.max(...la),nO=Math.min(...lo),xO=Math.max(...lo);
- const spA=Math.max(xA-nA,1e-5),spO=Math.max(xO-nO,1e-5),kx=Math.cos(((nA+xA)/2)*Math.PI/180)||1e-5;
- const sc=Math.min((W-2*PAD)/(spO*kx),(H-2*PAD)/spA),cx=(nO+xO)/2,cy=(nA+xA)/2;
- const X=p=>W/2+((+p.lng-cx)*kx*sc),Y=p=>H/2-((+p.lat-cy)*sc),ok=v=>Number.isFinite(v);
- const k=Math.max(1,Math.ceil(P.length/1200)),pts=[];
- for(let i=0;i<P.length;i+=k){const x=X(P[i]),y=Y(P[i]);if(ok(x)&&ok(y))pts.push(x.toFixed(1)+','+y.toFixed(1))}
- const z=X(P.at(-1)),y2=Y(P.at(-1));
- if(pts.length<2||!ok(z))return '';
- return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Route of trip ${T.n}"><polyline points="${pts.join(' ')}" fill="none" stroke="${T.col}" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>
- <circle cx="${X(P[0]).toFixed(1)}" cy="${Y(P[0]).toFixed(1)}" r="7" fill="#27a46a" stroke="#fff" stroke-width="2.5"/>
- <circle cx="${z.toFixed(1)}" cy="${y2.toFixed(1)}" r="7" fill="#d9534f" stroke="#fff" stroke-width="2.5"/>
- ${T.evs.map(x=>{const px=X(x),py=Y(x);return ok(px)&&ok(py)?`<path d="M${px.toFixed(1)} ${(py-6).toFixed(1)}l5.5 9h-11z" fill="#d9534f" opacity=".85"/>`:''}).join('')}</svg>`}
 const HHINT='<small style="color:var(--mut);display:block">Click a trip to see its details, print them and play the trip back.</small>';
 function hSide(){const s=$('hside');
  if(!TRIPS.length){s.innerHTML='<p style="color:var(--mut);margin:0">No trips in this period.</p>';return}
  const T=TRIPS[TSEL];
  s.innerHTML=`<div style="display:flex;align-items:center;gap:6px"><b style="flex:1"><i class="fa-solid fa-route"></i> Trips (${TRIPS.length})</b><button class="btn gh sm" onclick="tAll(1)" title="Show every trip">All</button><button class="btn gh sm" onclick="tAll(0)" title="Hide every trip">None</button></div>${HHINT}
- <div class="trl">${TRIPS.map((t,i)=>`<div class="trr${i===TSEL?' on':''}" onclick="tSel(${i})" title="Click to see this trip's details and play it back"><input type="checkbox" ${t.on?'checked':''} onclick="event.stopPropagation()" onchange="tTog(${i},this.checked)" title="Show this trip on the map"><span class="sw" style="background:${t.col}"></span><div style="flex:1;min-width:0"><b>Trip ${t.n}</b> <small>${new Date(t.st.s).toLocaleString()} → ${new Date(t.st.e).toLocaleTimeString()} · ${t.st.d.toFixed(1)} km</small></div></div>${i===TSEL?tdBox(t):''}`).join('')}</div>${HHINT}`;
+ <div class="trl">${TRIPS.map((t,i)=>`<div class="trr${i===TSEL?' on':''}" onclick="tSel(${i})" title="Click to see this trip's details and play it back"><input type="checkbox" ${t.on?'checked':''} onclick="event.stopPropagation()" onchange="tTog(${i},this.checked)" title="Show this trip on the map"><span class="sw" style="background:${t.col}"></span><div style="flex:1;min-width:0"><b>Trip ${t.n}</b> <small>${new Date(t.st.s).toLocaleString()} → ${new Date(t.st.e).toLocaleTimeString()} · ${t.st.d.toFixed(1)} km</small></div></div>${i===TSEL?tdBox(t):''}`).join('')}</div>`;
  if(T){[['tdS',T.pts[0]],['tdE',T.pts.at(-1)]].forEach(([id,p])=>geoOne(gk(p)).then(nm=>{if($(id))$(id).textContent=nm||'Place name not found'}));
   $('pbR').onchange=e=>{if(PB)PB.rate=+e.target.value};pbShow()}}
 function tdBox(T){return `<div class="tbox" style="border-left:4px solid ${T.col};margin-top:2px">
@@ -492,13 +490,19 @@ async function tPrint(){const T=TRIPS[TSEL];if(!T)return;const a=T.pts[0],z=T.pt
  const w=open('','_blank');if(!w)return toast('Allow pop-ups for this site to print');
  const [ls,le]=await Promise.all([geoOne(gk(a)),geoOne(gk(z))]);
  const rows=[['Vehicle',a.vehicle_name||'-'],['Driver',a.driver_name||'-'],...tDet(T),['Start location',ls||gk(a)],['End location',le||gk(z)]];
- w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Trip ${T.n} - ${esc(a.vehicle_name||'')}</title><style>body{font:14px system-ui,sans-serif;margin:28px;color:#222}h2{margin:0 0 4px}h3{margin:22px 0 6px}small{color:#666}table{border-collapse:collapse;width:100%;margin-top:14px}td,th{border:1px solid #ccc;padding:6px 9px;text-align:left}td:first-child{background:#f5f5f5;font-weight:600;width:38%}th{background:#eee}.rt{margin-top:16px}.rt svg{width:100%;height:auto;border:1px solid #ccc;border-radius:10px;background:#f7fafc}.lg{font-size:12px;color:#444;margin:6px 0 0}</style></head><body>
+ // the print-out carries a real map of the trip so the reader can see where it
+ // ran; the popup prints itself once every tile has arrived, with a timeout for
+ // a network that never answers
+ const B=BASES[baseN()],k=Math.max(1,Math.ceil(T.pts.length/1200));
+ const MAP=JSON.stringify({u:B[0],o:{attribution:B[1],maxZoom:B[2],...B[3]},pts:T.pts.filter((_,i)=>i%k===0).map(p=>[+p.lat,+p.lng]),col:T.col,evs:T.evs.map(x=>[+x.lat,+x.lng])});
+ w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Trip ${T.n} - ${esc(a.vehicle_name||'')}</title><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"><\/script><style>*{print-color-adjust:exact;-webkit-print-color-adjust:exact}body{font:14px system-ui,sans-serif;margin:28px;color:#222}h2{margin:0 0 4px}h3{margin:22px 0 6px}small{color:#666}table{border-collapse:collapse;width:100%;margin-top:14px}td,th{border:1px solid #ccc;padding:6px 9px;text-align:left}td:first-child{background:#f5f5f5;font-weight:600;width:38%}th{background:#eee}.rt{margin-top:16px}#pm{height:430px;width:100%;border:1px solid #ccc;border-radius:10px;background:#f7fafc}.lg{font-size:12px;color:#444;margin:6px 0 0}</style></head><body>
  <h2>Trip ${T.n} details</h2><small>Fleet Tracker · Generated: ${new Date().toLocaleString()}</small>
- <div class="rt"><h3>Route</h3>${routeSvg(T)}<p class="lg"><b style="color:${T.col}">&#9644;</b> driven route &nbsp;·&nbsp; <span style="color:#27a46a">&#9679;</span> start ${esc(ls||gk(a))} &nbsp;·&nbsp; <span style="color:#d9534f">&#9679;</span> end ${esc(le||gk(z))}${T.evs.length?' &nbsp;·&nbsp; <span style="color:#d9534f">&#9650;</span> '+T.evs.length+' event(s)':''}</p></div>
+ <div class="rt"><h3>Route map</h3><div id="pm"></div><p class="lg"><b style="color:${T.col}">&#9644;</b> driven route &nbsp;·&nbsp; <span style="color:#27a46a">&#9679;</span> start ${esc(ls||gk(a))} &nbsp;·&nbsp; <span style="color:#d9534f">&#9679;</span> end ${esc(le||gk(z))}${T.evs.length?' &nbsp;·&nbsp; <span style="color:#f28c28">&#9679;</span> '+T.evs.length+' event(s)':''}</p></div>
  <table>${rows.map(r=>`<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join('')}</table>
- ${T.evs.length?`<h3>Events</h3><table><tr><th>Time</th><th>Event</th><th>Speed</th></tr>${T.evs.map(x=>`<tr><td style="background:none;font-weight:400">${new Date(x.recorded_at).toLocaleString()}</td><td>${esc(EVX(x.type)[0])}</td><td>${Math.round(x.speed||0)} km/h</td></tr>`).join('')}</table>`:''}</body></html>`);
- w.document.close();w.focus();setTimeout(()=>w.print(),300);
- logAct('Printed trip',(a.vehicle_name||'-')+' trip '+T.n+' '+new Date(T.st.s).toLocaleString()+' with route')}
+ ${T.evs.length?`<h3>Events</h3><table><tr><th>Time</th><th>Event</th><th>Speed</th></tr>${T.evs.map(x=>`<tr><td style="background:none;font-weight:400">${new Date(x.recorded_at).toLocaleString()}</td><td>${esc(EVX(x.type)[0])}</td><td>${Math.round(x.speed||0)} km/h</td></tr>`).join('')}</table>`:''}
+ <script>window.MAP=${MAP};window.addEventListener('load',function(){var m=L.map('pm',{zoomControl:false,attributionControl:false,scrollWheelZoom:false});L.tileLayer(MAP.u,MAP.o).addTo(m);var pl=L.polyline(MAP.pts,{color:MAP.col,weight:5,opacity:.95}).addTo(m);var dot=function(p,c){L.circleMarker(p,{radius:7,color:'#fff',weight:2,fillColor:c,fillOpacity:1}).addTo(m)};dot(MAP.pts[0],'#27a46a');dot(MAP.pts[MAP.pts.length-1],'#d9534f');MAP.evs.forEach(function(e){L.circleMarker(e,{radius:5,color:'#fff',weight:1.5,fillColor:'#f28c28',fillOpacity:1}).addTo(m)});m.fitBounds(pl.getBounds(),{padding:[26,26]});var done=false,go=function(){if(done)return;done=true;window.focus();window.print()};var chk=setInterval(function(){var a=document.querySelectorAll('#pm img.leaflet-tile'),b=document.querySelectorAll('#pm img.leaflet-tile-loaded');if(a.length&&a.length===b.length){clearInterval(chk);setTimeout(go,350)}},250);setTimeout(go,5000)});<\/script></body></html>`);
+ w.document.close();
+ logAct('Printed trip',(a.vehicle_name||'-')+' trip '+T.n+' '+new Date(T.st.s).toLocaleString()+' with route map')}
 // ---- playback. Long pauses inside a trip are shortened to 30 s so the
 // marker never sits still for minutes at high playback speeds.
 const pbIcon=T=>L.divIcon({className:'',html:`<div class="mk" style="background:${T.col};box-shadow:0 0 0 4px ${T.col}55"><i class="fa-solid ${vt(T.pts[0])}"></i></div>`,iconSize:[32,32],iconAnchor:[16,16]});
@@ -605,11 +609,16 @@ const UNIT={harsh_braking:'km/h per second',harsh_acceleration:'km/h per second'
 const WARNED={};
 const vlOf=r=>r.voice_lang&&VLANG[r.voice_lang]?r.voice_lang:(r.voice_lang==='off'||r.voice===false?'off':(SET.voice_lang&&VLANG[SET.voice_lang]?SET.voice_lang:'en'));
 const vlOpts=r=>{const c=vlOf(r);return '<option value="off">Off</option>'+Object.entries(VLANG).map(([k,n])=>`<option value="${k}" ${c===k?'selected':''}>${n[0]}</option>`).join('')};
+// a Play button beside an Off choice has nothing to play, so it is greyed out
+function syncPl(sel){const b=sel.closest('td').querySelector('.play');if(!b)return;if(!b.dataset.t)b.dataset.t=b.title;
+ const off=sel.value==='off';b.disabled=off;b.style.opacity=off?.35:1;b.title=off?'Off — nothing to play':b.dataset.t}
+function toneSync(sel){const d=sel.closest('tr').querySelector('.bd');if(d)d.style.opacity=sel.value==='off'?.4:1;syncPl(sel)}
 async function loadRules(){const {data}=await sb.from('event_rules').select('*').order('type');RULES={};(data||[]).forEach(r=>RULES[r.type]=r);
  if(data&&data.length&&(!('hold_s'in data[0])||!('voice'in data[0])||!RULES.road_overspeed)&&!WARNED.hold){WARNED.hold=1;toast('The database is missing the newest columns (tolerance, voice, road speed limit). Run schema.sql in Supabase (SQL Editor) once to add them.')}
  if(data&&data.length&&!('voice_lang'in data[0])&&!WARNED.vl){WARNED.vl=1;toast('Per-event voice languages need the newest schema: run schema.sql in Supabase once. Until then the phone keeps the single fleet language.')}
  const num=(id,v,w,st)=>`<input type="number" step="${st||'any'}" min="0" id="${id}" value="${v??''}" style="width:${w||58}px">`;
- $('ruleT').innerHTML=`<table><tr><th>Event</th><th>Trigger limit</th><th>Tolerance (seconds)</th><th>Recorded</th><th>Visual alert</th><th>Buzzer alert</th><th>Buzzer seconds</th><th>Voice alert</th></tr>${(data||[]).map(r=>`<tr><td><b>${esc(r.label)}</b></td><td>${num('rt_'+r.type,r.threshold,66,'0.1')} <small>${UNIT[r.type]||''}</small></td><td>${num('rh_'+r.type,r.hold_s??0)}</td><td><input type="checkbox" id="re_${r.type}" ${r.enabled?'checked':''}></td><td><input type="checkbox" id="ra_${r.type}" ${r.alert?'checked':''}></td><td style="white-space:nowrap"><select id="bt_${r.type}" style="width:126px" onchange="if(this.value==='off')this.closest('tr').querySelector('.bd').style.opacity=.4">${Object.entries(TONES).map(([k,n])=>`<option value="${k}" ${(r.beep_type||'discontinuous')===k?'selected':''}>${n}</option>`).join('')}</select><button type="button" class="play" onclick="tryTone('${r.type}')" title="Play this tone"><i class="fa-solid fa-play"></i></button></td><td class="bd">${num('bd_'+r.type,r.beep_duration??5)}</td><td style="white-space:nowrap"><select id="vl_${r.type}" style="width:96px">${vlOpts(r)}</select><button type="button" class="play" onclick="tryVoice('${r.type}')" title="Speak this message"><i class="fa-solid fa-volume-high"></i></button></td></tr>`).join('')}</table>`}
+ $('ruleT').innerHTML=`<table><tr><th>Event</th><th>Trigger limit</th><th>Tolerance (seconds)</th><th>Recorded</th><th>Visual alert</th><th>Buzzer alert</th><th>Buzzer seconds</th><th>Voice alert</th></tr>${(data||[]).map(r=>`<tr><td><b>${esc(r.label)}</b></td><td>${num('rt_'+r.type,r.threshold,66,'0.1')} <small>${UNIT[r.type]||''}</small></td><td>${num('rh_'+r.type,r.hold_s??0)}</td><td><input type="checkbox" id="re_${r.type}" ${r.enabled?'checked':''}></td><td><input type="checkbox" id="ra_${r.type}" ${r.alert?'checked':''}></td><td style="white-space:nowrap"><select id="bt_${r.type}" style="width:126px" onchange="toneSync(this)">${Object.entries(TONES).map(([k,n])=>`<option value="${k}" ${(r.beep_type||'discontinuous')===k?'selected':''}>${n}</option>`).join('')}</select><button type="button" class="play" onclick="tryTone('${r.type}')" title="Play this tone"><i class="fa-solid fa-play"></i></button></td><td class="bd">${num('bd_'+r.type,r.beep_duration??5)}</td><td style="white-space:nowrap"><select id="vl_${r.type}" style="width:96px" onchange="syncPl(this)">${vlOpts(r)}</select><button type="button" class="play" onclick="tryVoice('${r.type}')" title="Speak this message"><i class="fa-solid fa-volume-high"></i></button></td></tr>`).join('')}</table>`;
+ [...$('ruleT').querySelectorAll('select')].forEach(s=>s.id.startsWith('bt_')?toneSync(s):s.id.startsWith('vl_')&&syncPl(s))}
 async function getSet(){const {data}=await sb.from('app_settings').select('*');SET={};(data||[]).forEach(x=>SET[x.key]=x.value);
  const e=$('offH');if(e){e.value=OFFH();e.disabled=!ADMIN}}
 async function saveOff(){const h=Math.min(720,Math.max(0.5,+$('offH').value||24));$('offH').value=h;SET.offline_after_h=String(h);
