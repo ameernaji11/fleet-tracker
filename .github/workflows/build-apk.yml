@@ -64,18 +64,26 @@ jobs:
           echo "window.CapPlugins = { BG: registerPlugin('BackgroundGeolocation'), Device: registerPlugin('Device'), LN: registerPlugin('LocalNotifications'), Browser: registerPlugin('Browser'), TTS: registerPlugin('TextToSpeech') };" >> bridge.js
           npx esbuild bridge.js --bundle --minify --outfile=www/bridge.js
           npx cap add android
-          sed -i 's#</manifest>#<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/><uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/><uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/><uses-permission android:name="android.permission.POST_NOTIFICATIONS"/></manifest>#' android/app/src/main/AndroidManifest.xml
+          sed -i 's#</manifest>#<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/><uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/><uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/><uses-permission android:name="android.permission.POST_NOTIFICATIONS"/><uses-permission android:name="android.permission.VIBRATE"/></manifest>#' android/app/src/main/AndroidManifest.xml
           sed -i 's/android:allowBackup="true"/android:allowBackup="false"/; s/<application/<application android:usesCleartextTraffic="false"/' android/app/src/main/AndroidManifest.xml
+          # The buzzer tones double as notification-channel sounds, which is how an
+          # alert is still heard when Android has frozen this app's JavaScript. A
+          # channel points at res/raw by file name, and Android silently plays
+          # nothing if that file is missing, so this step has to succeed.
+          mkdir -p android/app/src/main/res/raw
+          cp www/tones/*.wav android/app/src/main/res/raw/
+          ls -l android/app/src/main/res/raw/ | grep -c '\.wav'
           npx cap sync android
       # One artwork for the browser tab and the phone: both come from www/icon.svg.
-      # If the generator ever fails, the fallback writes the mipmaps by hand, and the
-      # step itself is non-fatal so a broken icon never blocks the build.
+      # @capacitor/assets is not used here - its v3 CLI has no icon-only flag and it
+      # insists on a splash.png we don't ship, so the mipmaps are written straight
+      # into res/ by tools/make-icons.js. The step stays non-fatal: a broken icon
+      # must never block an APK the drivers are waiting for.
       - name: Generate app icons
         continue-on-error: true
         run: |
-          npm i --no-save sharp@0.33.5 @capacitor/assets@3.0.5
-          node tools/make-icons.js
-          ./node_modules/.bin/capacitor-assets generate --android --icon-only || node tools/make-icons.js --direct
+          npm i --no-save sharp@0.33.5
+          node tools/make-icons.js --direct
           ls -l android/app/src/main/res/mipmap-xxxhdpi/
       - name: Build signed release APK
         env:
@@ -94,9 +102,14 @@ jobs:
         with:
           name: fleet-tracker-apk
           path: fleet-tracker.apk
+      # The APK is already an artifact at this point, so a hiccup here (a stale
+      # "latest" tag, a dropped asset upload) must not turn a good build red and
+      # make it look as if the phones got nothing.
       - name: Publish APK as a release
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete latest --yes --cleanup-tag --repo ${{ github.repository }} || true
-          gh release create latest fleet-tracker.apk --title "Fleet Tracker APK" --notes "Latest build" --repo ${{ github.repository }}
+          gh release create latest fleet-tracker.apk --title "Fleet Tracker APK" --notes "Latest build" --repo ${{ github.repository }} \
+            || echo "::warning::The APK built fine and is in the Artifacts list, but the 'latest' release was not updated."
