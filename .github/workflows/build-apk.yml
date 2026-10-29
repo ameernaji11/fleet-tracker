@@ -56,25 +56,49 @@ jobs:
             exit 1
           fi
           echo "Signing key verified (source: $SRC)."
-      - name: Create Android project
+      # This one long step used to be a single "Create Android project" box, so any
+      # command inside it that failed printed nothing but "Process completed with
+      # exit code 1" and the run could not be read. It is now four named steps, each
+      # of which says what it was doing when it broke.
+      - name: Install the build packages
         run: |
+          trap 'echo "::error::npm could not install the Capacitor packages (failing line $LINENO)"; exit 1' ERR
           npm init -y
           npm i @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7 @capacitor/device@7 @capacitor/local-notifications@7 @capacitor/browser@7 @capacitor-community/background-geolocation@1.2.26 @capacitor-community/text-to-speech@6.1.0 esbuild
+      - name: Bundle the plugin bridge
+        run: |
+          trap 'echo "::error::www/bridge.js could not be built (failing line $LINENO)"; exit 1' ERR
+          echo "import { registerPlugin } from '@capacitor/core';" > bridge.js
+          echo "window.CapPlugins = { BG: registerPlugin('BackgroundGeolocation'), Device: registerPlugin('Device'), LN: registerPlugin('LocalNotifications'), Browser: registerPlugin('Browser'), TTS: registerPlugin('TextToSpeech') };" >> bridge.js
+          npx esbuild bridge.js --bundle --minify --outfile=www/bridge.js
+      - name: Copy the map libraries into the app
+        run: |
           # The app has to open in a basement, a tunnel or a dead spot, so the map
           # library, the database client and the icon font travel inside the APK
-          # instead of being fetched from a CDN at start-up. Pinned versions, taken
-          # from npm here; index.html falls back to the CDN if these are missing.
+          # instead of being fetched from a CDN at start-up. index.html falls back to
+          # the CDN only if these files are missing.
+          trap 'echo "::error::the offline copies of the map libraries were not built (failing line $LINENO)"; exit 1' ERR
           npm i --no-save leaflet@1.9.4 @supabase/supabase-js@2.45.4 @fortawesome/fontawesome-free@6.5.1
           mkdir -p www/vendor/fa/css www/vendor/fa/webfonts
           cp node_modules/leaflet/dist/leaflet.js www/vendor/leaflet.js
           cp node_modules/leaflet/dist/leaflet.css www/vendor/leaflet.css
-          cp node_modules/@supabase/supabase-js/dist/umd/supabase.min.js www/vendor/supabase.js
+          # There is no supabase.min.js inside the npm package - that name only
+          # exists on the CDN, which minifies on request - and the library keeps its
+          # realtime client in a separate webpack chunk that it loads from its own
+          # folder. Copying only supabase.js builds fine and then loses live tracking
+          # and the blackbox answers inside the APK, so both files are required.
+          cp node_modules/@supabase/supabase-js/dist/umd/supabase.js www/vendor/supabase.js
+          cp node_modules/@supabase/supabase-js/dist/umd/591.supabase.js www/vendor/591.supabase.js
           cp node_modules/@fortawesome/fontawesome-free/css/all.min.css www/vendor/fa/css/all.min.css
           cp node_modules/@fortawesome/fontawesome-free/webfonts/fa-*-*.woff2 www/vendor/fa/webfonts/
+          for f in www/vendor/leaflet.js www/vendor/leaflet.css www/vendor/supabase.js www/vendor/591.supabase.js www/vendor/fa/css/all.min.css; do
+            [ -s "$f" ] || { echo "::error::$f is missing or empty after the copy."; exit 1; }
+          done
+          [ "$(ls www/vendor/fa/webfonts/*.woff2 2>/dev/null | wc -l)" -ge 3 ] || { echo "::error::no icon fonts in www/vendor/fa/webfonts - the buttons would render as empty boxes."; exit 1; }
           ls -l www/vendor www/vendor/fa/css www/vendor/fa/webfonts
-          echo "import { registerPlugin } from '@capacitor/core';" > bridge.js
-          echo "window.CapPlugins = { BG: registerPlugin('BackgroundGeolocation'), Device: registerPlugin('Device'), LN: registerPlugin('LocalNotifications'), Browser: registerPlugin('Browser'), TTS: registerPlugin('TextToSpeech') };" >> bridge.js
-          npx esbuild bridge.js --bundle --minify --outfile=www/bridge.js
+      - name: Create the Android project
+        run: |
+          trap 'echo "::error::the Android project could not be created (failing line $LINENO)"; exit 1' ERR
           npx cap add android
           sed -i 's#</manifest>#<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/><uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/><uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/><uses-permission android:name="android.permission.POST_NOTIFICATIONS"/><uses-permission android:name="android.permission.VIBRATE"/></manifest>#' android/app/src/main/AndroidManifest.xml
           sed -i 's/android:allowBackup="true"/android:allowBackup="false"/; s/<application/<application android:usesCleartextTraffic="false"/' android/app/src/main/AndroidManifest.xml
