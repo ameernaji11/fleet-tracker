@@ -21,7 +21,8 @@
 --   event shows Event End and Duration instead of only a start, and
 --   event_rules.voice plus app_settings voice_on / voice_lang, which switch the
 --   spoken safety warning per event, fleet-wide and by language,
---   the seeded road_overspeed rule (the signed limit of the road being driven),
+--   the road_overspeed rule (the signed limit of the road being driven) — retired
+--   again in v17, see the notes at the end of this file,
 --   and the events update policy the phone needs to close the event it opened.
 --
 -- New in v13 (offline tile, per-event voice language, time on screen) -- adds:
@@ -94,7 +95,8 @@ create table if not exists events (
   id bigint generated always as identity primary key,
   user_id uuid not null, vehicle_id uuid, driver_id uuid,
   vehicle_name text, driver_name text,
-  type text not null,                            -- harsh_braking | harsh_acceleration | overspeed | road_overspeed
+  type text not null,                            -- harsh_braking | harsh_acceleration | overspeed
+                                                 -- | zone_enter | zone_exit | zone_overspeed
   lat double precision, lng double precision,
   speed double precision,
   value double precision,                        -- km/h per second, or km/h when overspeed
@@ -103,7 +105,9 @@ create table if not exists events (
   -- v12: the whole life of a breach. recorded_at stays the moment the limit was
   -- first broken, ended_at is written when it stopped, so the Events Report can
   -- show a duration. The readings belong to the breach-start fix, and
-  -- road_limit is the maxspeed signed on the road the phone was driving on.
+  -- road_limit is the signed limit that applied where the breach happened. Since
+  -- v17 only a geofence has one of its own, so this column holds a zone's
+  -- speed_limit; rows from the retired road lookup keep whatever they stored.
   ended_at timestamptz, accuracy real, altitude real, heading real,
   accel real, battery_pct real, charging boolean, ignition boolean,
   road_limit int);
@@ -283,10 +287,7 @@ create index if not exists assignments_user on assignments (user_id);
 insert into event_rules (type, label, enabled, threshold, alert, hold_s) values
   ('harsh_braking',     'Harsh braking',     true, 11,  true, 2),   -- km/h per second (v5 units)
   ('harsh_acceleration','Harsh acceleration', true,  9,  true, 2),  -- km/h per second
-  ('overspeed',         'Overspeed',         true, 100,  true, 10),  -- km/h
-  -- v12: the signed limit of the road being driven on, read from OpenStreetMap
-  -- data by the phone. threshold is the margin in km/h allowed over it.
-  ('road_overspeed',    'Road speed limit',  true, 10,  true, 5)     -- km/h over the road limit
+  ('overspeed',         'Overspeed',         true, 100,  true, 10)    -- km/h
   on conflict (type) do nothing;
 
 -- give the tolerance window its 2 s / 10 s defaults exactly once on a project
@@ -328,6 +329,13 @@ insert into event_rules (type, label, enabled, threshold, alert, hold_s) values
   ('zone_exit',     'Zone exited',     true, 0,  true, 0),
   ('zone_overspeed','Zone overspeed',  true, 10, true, 5)
   on conflict (type) do nothing;
+
+-- v17: the road speed limit is retired. It read the maxspeed OpenStreetMap keeps on
+-- a road through the public Overpass API, which answers slowly, rate-limits a phone
+-- on mobile data, and hardly tags our roads at all — so the alert never fired. The
+-- rule row is deleted rather than left switched off, because the Configuration page
+-- builds itself from this table and must stop offering an event no phone produces.
+delete from event_rules where type='road_overspeed';
 
 -- v14: bb_on switches the phone's 1-per-second blackbox recording, bb_days is how
 -- long the handset keeps it before overwriting the oldest fixes, zones_on lets an
@@ -544,7 +552,7 @@ create policy "pos insert own" on positions for insert with check (
 drop policy if exists "events insert own" on events;
 create policy "events insert own" on events for insert with check (
   user_id = auth.uid() and owns_vehicle(vehicle_id) and owns_pair(vehicle_id, driver_id)
-  and type in ('harsh_braking','harsh_acceleration','overspeed','road_overspeed',
+  and type in ('harsh_braking','harsh_acceleration','overspeed',
                'zone_enter','zone_exit','zone_overspeed'));
 
 -- An account may only close a breach on a row it already owns, and only one that
@@ -710,9 +718,9 @@ end $$;
 --        the driver app speaks the safety warning for that event in the chosen language.
 --   app_settings keys 'voice_on' (1) and 'voice_lang' (en)              -> the fleet-wide switch and the language
 --        (en, ar, hi or ur) for those spoken warnings.
---   seeded event_rules row 'road_overspeed' (threshold 10 km/h, hold 5 s)  -> a new event type: the phone looks up
---        the maxspeed signed on the road it is driving on (OpenStreetMap data) and records a breach when the vehicle
---        passes that limit by more than the threshold.
+--   seeded event_rules row 'road_overspeed' (threshold 10 km/h, hold 5 s)  -> a new event type: the phone looked up
+--        the maxspeed signed on the road it was driving on (OpenStreetMap data). v17 retired it again — that source
+--        cannot be relied on without an API key, so the rule row is deleted and the type is no longer accepted.
 -- v13, on top of the above:
 --   user_activity.duration_s                                           -> the Activity Log's Time on screen column.
 --        Both apps write a 'Session time' row (sign out, tab hidden, app backgrounded) holding the seconds spent
@@ -764,4 +772,14 @@ end $$;
 --        re-point an event at another name.
 --   Run this file BEFORE installing the rebuilt phone app: the new build writes cid, and an insert would be
 --   refused by a database that does not have the column yet.
+--
+-- v17, on top of the above (one event type retired, nothing added):
+--   deletes the 'road_overspeed' rule row                                -> the phone read the signed limit of the
+--        road it was on from OpenStreetMap through the public Overpass API. There is no key-free source that answers
+--        dependably: the public endpoints queue a handset on mobile data, answer slowly or not at all, and our roads
+--        are hardly tagged, so the alert never fired. Every part of it is gone from both apps - the lookup, the
+--        speed-sign badge on the driver screen, the rule and its Configuration row.
+--   events insert policy                                                 -> 'road_overspeed' is no longer an accepted
+--        type. Rows an older build already stored are read, reported and exported exactly as before.
+--   Overspeed (the vehicle's own limit) and Zone overspeed (a geofence's limit) are untouched and keep working.
 -- ============================================================================
