@@ -215,6 +215,39 @@ update event_rules set voice_lang = case
     else 'off' end
   where voice_lang is null;
 
+-- ---------------------------------------------------- geofences, v14 use ----
+-- A zone is a polygon drawn on the Live Tracking map. Besides its shape it carries
+-- the speed limit that applies inside it and which breaches make an event: driving
+-- in, driving out, or passing the zone's own limit. shape holds the ring the map
+-- draws, as {"type":"polygon","pts":[[lat,lng],…]} — a rectangle is stored as its
+-- four corners, so one reader handles both.
+alter table geofences add column if not exists speed_limit int,
+  add column if not exists enter boolean default true,
+  add column if not exists exit boolean default true,
+  add column if not exists overspeed boolean default true,
+  add column if not exists updated_at timestamptz default now();
+
+-- ------------------------------------------------------------ blackbox ----
+-- v14: the phone now records every fix it gets (one per second) and keeps them on
+-- the handset only — the server never sees that stream, so it stays small. When an
+-- accident has to be investigated, an admin asks that vehicle for a window of time
+-- and the phone pushes exactly the stored fixes in it as soon as it has a signal.
+-- status is pending until the phone answers; n_rows says how many arrived, so an
+-- empty or failed pull is visible instead of silently looking like no data.
+create table if not exists bb_requests (
+  id uuid primary key default gen_random_uuid(),
+  vehicle_id uuid not null, vehicle_name text,
+  from_ts timestamptz not null, to_ts timestamptz not null,
+  status text not null default 'pending',        -- pending | sent | failed
+  n_rows int, error text,
+  requested_by uuid, requested_at timestamptz default now(), answered_at timestamptz);
+create index if not exists bb_requests_vehicle on bb_requests (vehicle_id, requested_at desc);
+
+-- Blackbox fixes are uploaded as ordinary position rows, flagged so the history
+-- screen can tell a 1-per-second dump from the sampled stream the phone normally
+-- sends. recorded_at is the moment the fix was taken, never the upload time.
+alter table positions add column if not exists blackbox boolean default false;
+
 -- ------------------------------------------------- assignments, many-to-one ----
 -- v11: one login can now be linked to several vehicles and several drivers, so
 -- user_id can no longer be the primary key — each grant is its own row.
@@ -273,6 +306,23 @@ insert into app_settings (key, value) values ('voice_on','1'), ('voice_lang','en
 -- v13: Live Tracking shows a vehicle greyed out as Offline once it has been
 -- silent for longer than this many hours. Editable from the Offline tile.
 insert into app_settings (key, value) values ('offline_after_h','24')
+  on conflict (key) do nothing;
+
+-- v14: geofence breaches are events like any other, so each gets its own row in
+-- the Configuration events table — alert, buzzer, voice and tolerance included.
+-- zone_overspeed's threshold is the km/h allowed over a zone's own limit.
+insert into event_rules (type, label, enabled, threshold, alert, hold_s) values
+  ('zone_enter',    'Zone entered',    true, 0,  true, 0),
+  ('zone_exit',     'Zone exited',     true, 0,  true, 0),
+  ('zone_overspeed','Zone overspeed',  true, 10, true, 5)
+  on conflict (type) do nothing;
+
+-- v14: bb_on switches the phone's 1-per-second blackbox recording, bb_days is how
+-- long the handset keeps it before overwriting the oldest fixes, zones_on lets an
+-- admin stop all zone detection fleet-wide without deleting the zones, and places
+-- is the JSON list of saved place names the dashboard writes
+-- ([{n,la,lo,r},..]) — a name there beats every map service inside its radius.
+insert into app_settings (key, value) values ('bb_on','1'), ('bb_days','3'), ('zones_on','1'), ('places','[]')
   on conflict (key) do nothing;
 
 -- ------------------------------------------------------------ views/procs ----
@@ -340,6 +390,7 @@ alter table events      enable row level security;
 alter table event_rules enable row level security;
 alter table app_settings enable row level security;
 alter table geofences   enable row level security;
+alter table bb_requests enable row level security;
 alter table user_activity enable row level security;
 
 drop policy if exists "profiles read"  on profiles;
@@ -405,6 +456,20 @@ create policy "geo read" on geofences for select using (auth.uid() is not null);
 drop policy if exists "geo admin" on geofences;
 create policy "geo admin" on geofences for all using (is_admin()) with check (is_admin());
 
+-- v14 blackbox pull requests. Only an admin may ask for a window of stored fixes
+-- (insert) and see the whole list; a driver can only read and answer the requests
+-- made about a vehicle assigned to them, which is what lets the phone mark its own
+-- row done without being able to invent or rewrite anyone else's.
+drop policy if exists "bb admin" on bb_requests;
+create policy "bb admin" on bb_requests for all using (is_admin()) with check (is_admin());
+drop policy if exists "bb read own" on bb_requests;
+create policy "bb read own" on bb_requests for select to authenticated
+  using (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()));
+drop policy if exists "bb answer own" on bb_requests;
+create policy "bb answer own" on bb_requests for update to authenticated
+  using (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()))
+  with check (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()));
+
 -- Audit trail: an account may only write entries about itself, and only an admin
 -- can read them. There is deliberately no update or delete policy, so nobody —
 -- not even an admin — can alter or erase what was logged.
@@ -412,6 +477,96 @@ drop policy if exists "activity insert own" on user_activity;
 create policy "activity insert own" on user_activity for insert to authenticated with check (user_id = auth.uid());
 drop policy if exists "activity admin read" on user_activity;
 create policy "activity admin read" on user_activity for select to authenticated using (is_admin());
+
+-- ------------------------------------------------------ v15 write hardening ----
+-- The insert rules above prove an account owns a row by its user_id and its
+-- vehicle_id, but nothing stopped it from naming a DIFFERENT driver on that row, or
+-- from inventing an event type the Configuration page cannot switch off. Every
+-- report reads those copied columns straight off the row, so a driver holding the
+-- public key could have put words in someone else's mouth.
+--
+-- Two helpers do the checks a policy cannot express directly: inside a policy
+-- subquery a bare column name resolves to the inner table first, so writing
+-- "a.driver_id = driver_id" would quietly compare an assignment with itself. Both
+-- read the assignment table as security definer, which also keeps them independent
+-- of the caller's own row-level policies.
+create or replace function owns_vehicle(vid uuid) returns boolean
+  language sql security definer stable set search_path = public as
+$$ select vid is not null and exists
+     (select 1 from assignments where user_id = auth.uid() and vehicle_id = vid) $$;
+
+create or replace function owns_pair(vid uuid, did uuid) returns boolean
+  language sql security definer stable set search_path = public as
+$$ select did is null or exists
+     (select 1 from assignments where user_id = auth.uid() and vehicle_id = vid and driver_id = did) $$;
+
+revoke all on function owns_vehicle(uuid) from public;
+revoke all on function owns_pair(uuid, uuid) from public;
+grant execute on function owns_vehicle(uuid) to authenticated, anon, service_role;
+grant execute on function owns_pair(uuid, uuid) to authenticated, anon, service_role;
+
+-- The copied names are not checked, they are rewritten: the database puts the real
+-- name of the vehicle and driver on every row as it lands. A forged name cannot
+-- survive, and a rename or a phone still holding last week's cached name cannot
+-- make an upload fail — losing a fix would cost more than the label is worth.
+create or replace function stamp_names() returns trigger language plpgsql as $$
+begin
+  if new.vehicle_id is null then new.vehicle_name := null;
+  else select name into new.vehicle_name from vehicles where id = new.vehicle_id; end if;
+  if new.driver_id is null then new.driver_name := null;
+  else select name into new.driver_name from drivers where id = new.driver_id; end if;
+  return new;
+end $$;
+
+drop trigger if exists names_stamp on positions;
+create trigger names_stamp before insert on positions for each row execute function stamp_names();
+drop trigger if exists names_stamp on events;
+create trigger names_stamp before insert on events for each row execute function stamp_names();
+
+drop policy if exists "pos insert own" on positions;
+create policy "pos insert own" on positions for insert with check (
+  user_id = auth.uid() and owns_vehicle(vehicle_id) and owns_pair(vehicle_id, driver_id));
+
+-- Every event type the phone can produce. A row of any other type is refused, so
+-- nobody can invent a category the Configuration page cannot switch off.
+drop policy if exists "events insert own" on events;
+create policy "events insert own" on events for insert with check (
+  user_id = auth.uid() and owns_vehicle(vehicle_id) and owns_pair(vehicle_id, driver_id)
+  and type in ('harsh_braking','harsh_acceleration','overspeed','road_overspeed',
+               'zone_enter','zone_exit','zone_overspeed'));
+
+-- An account may only close a breach on a row it already owns, and only one that
+-- is still open. A policy can only look at the row as it is being written, so the
+-- columns that must not move are pinned by the trigger below instead: opening an
+-- event, then filling in its end time, peak and duration is all a phone may do.
+drop policy if exists "events update own" on events;
+create policy "events update own" on events for update to authenticated
+  using (user_id = auth.uid() and ended_at is null)
+  with check (user_id = auth.uid());
+
+create or replace function guard_events() returns trigger language plpgsql as $$
+begin
+  if is_admin() then return new; end if;
+  if new.id          is distinct from old.id
+  or new.user_id     is distinct from old.user_id
+  or new.vehicle_id  is distinct from old.vehicle_id
+  or new.driver_id   is distinct from old.driver_id
+  or new.type        is distinct from old.type
+  or new.recorded_at is distinct from old.recorded_at then
+    raise exception 'an event row cannot be rewritten';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists events_guard on events;
+create trigger events_guard before update on events for each row execute function guard_events();
+
+-- A log entry may only ever be about the account writing it, and only with a
+-- sensible action label. There is still no update or delete policy above, so the
+-- audit trail stays append-only for everyone — admin included.
+drop policy if exists "activity insert own" on user_activity;
+create policy "activity insert own" on user_activity for insert to authenticated
+  with check (user_id = auth.uid() and action is not null and length(action) <= 80);
 
 -- ------------------------------------------------------------- realtime ----
 -- the dashboard listens for position and event inserts; both must be in the
@@ -422,6 +577,12 @@ do $$ begin
   end if;
   if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='events') then
     alter publication supabase_realtime add table events;
+  end if;
+  -- v14: the phone listens for a blackbox request so a pull starts the moment an
+  -- admin presses Download; it also polls, so a handset that was offline still
+  -- answers the request when it next gets a signal.
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='bb_requests') then
+    alter publication supabase_realtime add table bb_requests;
   end if;
 end $$;
 
@@ -548,4 +709,36 @@ end $$;
 --        fallback only.
 --   app_settings key 'offline_after_h' (24)                            -> Live Tracking greys a vehicle out as
 --        Offline after this many hours without a position; the number is editable in the Offline tile itself.
+-- v14, on top of the above:
+--   geofences gains speed_limit / enter / exit / overspeed / updated_at  -> zones are no longer a dead table. An
+--        admin draws them on the Live Tracking map, gives each a speed limit, and chooses whether driving in, out or
+--        over the limit makes an event. The phone reads the shapes and evaluates every fix against them.
+--   seeded event_rules rows 'zone_enter', 'zone_exit', 'zone_overspeed'  -> the three new event types, so they
+--        appear in the Configuration events list with their own alert, buzzer, voice and tolerance settings.
+--   bb_requests table + 3 policies + publication entry                   -> the blackbox pull: an admin asks a
+--        vehicle for a window of its locally stored fixes, the phone answers it (realtime or its own poll) and
+--        reports how many rows arrived. A driver can only see and answer requests about an assigned vehicle.
+--   positions.blackbox (false)                                           -> marks a fix that came from the
+--        blackbox dump rather than the normal sampled stream.
+--   app_settings keys 'bb_on' (1), 'bb_days' (3), 'zones_on' (1)          -> blackbox recording on/off, how many
+--        days the handset keeps before overwriting the oldest fixes, and a fleet-wide switch for zone detection.
+--   app_settings key 'places' ('[]')                                      -> the saved place names. A JSON list of
+--        {n,la,lo,r} the admin edits on the Configuration page; any position inside r metres of la,lo is reported
+--        with that name instead of whatever the map services call it. Written only by an admin, read by everyone.
+--
+-- v15, on top of the above (write hardening — no new tables, nothing to migrate):
+--   owns_vehicle / owns_pair functions                                    -> the two checks a policy subquery
+--        cannot express on its own. They prove the vehicle and the driver on a written row really belong to the
+--        account writing it.
+--   names_stamp trigger on positions and events                           -> the database writes the true
+--        vehicle_name / driver_name onto every row as it lands, so a forged name cannot be stored and a renamed
+--        vehicle never makes an upload fail.
+--   positions and events insert policies                                  -> use both helpers, and an event may
+--        only be one of the seven types the phone can produce. Before this, an account holding the public key
+--        could have stored a position or an event under ANOTHER driver's name on a vehicle it is assigned to.
+--   events update policy + events_guard trigger                           -> a phone may only close its own breach
+--        that is still open: id, vehicle, driver, type and start time are pinned by the trigger, so an event
+--        cannot be moved onto another vehicle or rewritten after the fact.
+--   user_activity insert policy                                           -> an entry must be about the account
+--        writing it and the action label kept short. The trail is still append-only for everyone, admin included.
 -- ============================================================================
