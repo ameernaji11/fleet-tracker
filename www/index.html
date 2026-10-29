@@ -1,6 +1,9 @@
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://overpass-api.de https://overpass.kumi.systems; media-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" crossorigin="anonymous" integrity="sha384-c6Rcwz4e4CITMbu/NBmnNS8yN2sC3cUElMEMfP3vqqKFp7GOYaaBBCqmaWBjmkjb">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" integrity="sha384-t1nt8BQoYMLFN5p42tRAtuAAFQaCQODekUVeKKZrEnEyp4H2R0RHFz0KWpmj7i8g">
 <link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icon.svg">
 <style>
 :root{--bg:#fff7ee;--ink:#26323a;--mut:#6b7a85;--line:#efe3d4;--or:#f28c28;--orl:#ffe9d2;--gr:#27a46a;--grl:#ddf4e8;--bl:#2f7fe6;--bll:#dcebfd;--rd:#d9534f;--rdl:#fde4e2}
@@ -94,14 +97,14 @@ window.addEventListener('unhandledrejection',e=>{$('err').textContent='Error: '+
 </script>
 <script src="config.js"></script>
 <script src="bridge.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous" integrity="sha384-NElt3Op+9NBMCYaef5HxeJmU4Xeard/Lku8ek6hoPTvYkQPh3zLIrJP7KiRocsxO"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" crossorigin="anonymous" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug"></script>
 <script>
 const DASH=(typeof DASH_URL==='string'&&/^https:\/\/.+\/$/.test(DASH_URL.trim()))?DASH_URL.trim():'https://ameernaji11.github.io/fleet-tracker/dashboard/';
 const mail=u=>u.includes('@')?u.trim():u.trim().toLowerCase()+'@fleet.local';
 const TI={Car:'fa-car',Sedan:'fa-car-side',Hatchback:'fa-car',SUV:'fa-car-rear',Pickup:'fa-truck-pickup',Van:'fa-van-shuttle',Minibus:'fa-van-shuttle',Bus:'fa-bus',Truck:'fa-truck','Heavy Truck':'fa-truck-moving',Tanker:'fa-truck-droplet',Taxi:'fa-taxi',Ambulance:'fa-truck-medical',Motorbike:'fa-motorcycle',Tractor:'fa-tractor',Trailer:'fa-trailer',Equipment:'fa-tractor'};
 let REM=localStorage.rem!=='0',sb=null,me,asg,watcher,lastSent=0,HSENT=null,queue=JSON.parse(localStorage.q||'[]'),SENT=0,ASGS=[],PICK=localStorage.pick||null;
-const mk=r=>supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storage:r?localStorage:sessionStorage}});
+const mk=r=>supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storage:r?localStorage:sessionStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'implicit'}});
 try{if(!/^https:\/\/[a-z0-9]{15,30}\.supabase\.co$/.test(SUPABASE_URL)||!String(SUPABASE_KEY).startsWith('eyJ'))throw new Error('config.js has a wrong address or key');sb=mk(REM)}catch(e){$('err').textContent='Setup error: '+(e.message||e)}
 const show=s=>{['lg','pm','app'].forEach(x=>$(x).classList.toggle('hide',x!==s));if(s==='app'&&map)setTimeout(()=>map.invalidateSize(),100)};
 function eye(){const i=$('pw');i.type=i.type==='password'?'text':'password';$('eyei').className='fa-solid '+(i.type==='password'?'fa-eye':'fa-eye-slash')}
@@ -143,7 +146,12 @@ async function init(fresh){
  const v=asg?.vehicles;$('vn').textContent=v?.name||'No vehicle linked';$('dn').textContent=asg?.drivers?.name||'No driver linked';$('vi').className='fa-solid '+(TI[v?.type]||'fa-car');
  logAct(fresh?'Signed in':'Opened app',$('vn').textContent);sessStart();
  $('dash').classList.remove('hide');
- [['acc','Accuracy','fa-bullseye'],['alt','Elevation','fa-mountain'],['dir','Direction','fa-compass'],['ac','Accel.','fa-gauge'],['bat','Battery','fa-battery-half'],['sent','Sent','fa-cloud-arrow-up']].forEach(x=>{if(!$('v_'+x[0]))$('vals').insertAdjacentHTML('beforeend',`<div class="${x[3]||''}"><small><i class="fa-solid ${x[2]}"></i> ${x[1]}</small><b id="v_${x[0]}">-</b></div>`)});
+ [['acc','Accuracy','fa-bullseye'],['alt','Elevation','fa-mountain'],['dir','Direction','fa-compass'],['ac','Accel.','fa-gauge'],['bat','Battery','fa-battery-half'],['sent','Sent','fa-cloud-arrow-up'],['trip','This trip','fa-road'],['bbox','Stored on phone','fa-box-archive','w2']].forEach(x=>{if(!$('v_'+x[0]))$('vals').insertAdjacentHTML('beforeend',`<div class="${x[3]||''}"><small><i class="fa-solid ${x[2]}"></i> ${x[1]}</small><b id="v_${x[0]}">-</b></div>`)});
+ // the blackbox opens after the tiles exist so its count has somewhere to show
+ bbInit();bbWatch();
+ // a driver keeps this app open for a whole shift, so touch the session every
+ // 10 minutes — getSession() is what makes supabase-js refresh it early.
+ setInterval(()=>{if(!document.hidden)sb.auth.getSession().catch(()=>{})},10*60*1000);
  enter()}
 function enter(){show('app');initMap();showLast()}
 // ---- map
@@ -151,7 +159,7 @@ let map,mrk,trail,tiles,sat=false,follow=true;
 const G=l=>'https://{s}.google.com/vt/lyrs='+l+'&x={x}&y={y}&z={z}';
 function initMap(){if(map)return;map=L.map('map',{zoomControl:false}).setView([23.6,58.5],12);map.on('dragstart',()=>{follow=false;pinUi()});
  document.addEventListener('fullscreenchange',()=>{const on=!!document.fullscreenElement,b=$('fsB');if(b){b.title=on?'Shrink back':'Full screen';const i=b.querySelector('i');if(i)i.className='fa-solid '+(on?'fa-minimize':'fa-expand')}setTimeout(()=>map.invalidateSize(),250)});
- tiles=L.tileLayer(G('m'),{maxZoom:20,subdomains:['mt0','mt1','mt2','mt3'],attribution:'Map data © Google'}).addTo(map);trail=L.polyline([],{color:'#2f7fe6',weight:4}).addTo(map);setTimeout(()=>map.invalidateSize(),200)}
+ tiles=L.tileLayer(G('m'),{maxZoom:20,subdomains:['mt0','mt1','mt2','mt3'],attribution:'Map data © Google'}).addTo(map);trail=L.polyline([],{color:'#2f7fe6',weight:4}).addTo(map);zDraw();setTimeout(()=>map.invalidateSize(),200)}
 function togMap(){sat=!sat;tiles.setUrl(G(sat?'y':'m'))}
 function fsMap(){document.fullscreenElement?document.exitFullscreen():$('map').requestFullscreen()}
 function pinUi(){const b=$('pinB');b.classList.toggle('on',follow);
@@ -175,7 +183,7 @@ function alertRing(){ALRM=Date.now()+8000;$('fr').classList.add('on');if(mrk)mrk
 async function pAsk(){try{const id=await CapPlugins.BG.addWatcher({requestPermissions:true,backgroundTitle:'Fleet Tracker',backgroundMessage:'Checking permissions'},()=>{});setTimeout(()=>CapPlugins.BG.removeWatcher({id}),3000)}catch(e){$('err').textContent='Location: '+(e.message||e)}
  await askNotif()}
 // ---- alerts on the phone
-let RUL={};const EVN={harsh_braking:'Harsh braking',harsh_acceleration:'Harsh acceleration',overspeed:'Overspeed',road_overspeed:'Road speed limit'};
+let RUL={};const EVN={harsh_braking:'Harsh braking',harsh_acceleration:'Harsh acceleration',overspeed:'Overspeed',road_overspeed:'Road speed limit',zone_enter:'Entered zone',zone_exit:'Left zone',zone_overspeed:'Zone overspeed'};
 let AC=null;
 // One shared AudioContext: the WebView kills a context created outside a user gesture, so it is
 // opened by the Start trip tap and only resumed here (the alert callbacks run in the background).
@@ -213,10 +221,10 @@ function playTone(a,type,dur,vol){if(!a||type==='off')return;stopTone();const t0
 // the on/off switches come from the dashboard Configuration page.
 const VLANG={en:['English','en-US'],ar:['Arabic','ar-SA'],hi:['Hindi','hi-IN'],ur:['Urdu','ur-PK']};
 const VMSG={
- en:{overspeed:'You are over the speed limit. Please slow down.',road_overspeed:'You are over the speed limit for this road. Please slow down.',harsh_braking:'Harsh braking detected. Keep a safe distance and brake gently.',harsh_acceleration:'Harsh acceleration detected. Please accelerate smoothly.'},
- ar:{overspeed:'لقد تجاوزت حد السرعة. يرجى تخفيف السرعة.',road_overspeed:'لقد تجاوزت السرعة المحددة لهذا الطريق. يرجى تخفيف السرعة.',harsh_braking:'تم رصد فرملة قوية. حافظ على مسافة آمنة واضغط على الفرامل بهدوء.',harsh_acceleration:'تم رصد تسارع قوي. يرجى التسارع بسلاسة.'},
- hi:{overspeed:'आप गति सीमा से ऊपर हैं। कृपया गति कम करें।',road_overspeed:'आप इस सड़क की गति सीमा से ऊपर हैं। कृपया गति कम करें।',harsh_braking:'तेज़ ब्रेक लगाया गया। सुरक्षित दूरी रखें और धीरे ब्रेक लगाएँ।',harsh_acceleration:'तेज़ रफ़्तार पकड़ी गई। कृपया धीरे-धीरे गति बढ़ाएँ।'},
- ur:{overspeed:'آپ رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',road_overspeed:'آپ اس سڑک کی رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',harsh_braking:'سخت بریک لگائی گئی۔ محفوظ فاصلہ رکھیں اور آہستہ بریک لگائیں۔',harsh_acceleration:'تیز رفتاری پکڑی گئی۔ براہ کرم آہستہ آہستہ رفتار بڑھائیں۔'}};
+ en:{overspeed:'You are over the speed limit. Please slow down.',road_overspeed:'You are over the speed limit for this road. Please slow down.',harsh_braking:'Harsh braking detected. Keep a safe distance and brake gently.',harsh_acceleration:'Harsh acceleration detected. Please accelerate smoothly.',zone_enter:'You have entered a restricted zone.',zone_exit:'You have left the zone.',zone_overspeed:'You are over the speed limit for this zone. Please slow down.'},
+ ar:{overspeed:'لقد تجاوزت حد السرعة. يرجى تخفيف السرعة.',road_overspeed:'لقد تجاوزت السرعة المحددة لهذا الطريق. يرجى تخفيف السرعة.',harsh_braking:'تم رصد فرملة قوية. حافظ على مسافة آمنة واضغط على الفرامل بهدوء.',harsh_acceleration:'تم رصد تسارع قوي. يرجى التسارع بسلاسة.',zone_enter:'لقد دخلت المنطقة المحددة.',zone_exit:'لقد غادرت المنطقة المحددة.',zone_overspeed:'لقد تجاوزت السرعة المحددة داخل هذه المنطقة. يرجى تخفيف السرعة.'},
+ hi:{overspeed:'आप गति सीमा से ऊपर हैं। कृपया गति कम करें।',road_overspeed:'आप इस सड़क की गति सीमा से ऊपर हैं। कृपया गति कम करें।',harsh_braking:'तेज़ ब्रेक लगाया गया। सुरक्षित दूरी रखें और धीरे ब्रेक लगाएँ।',harsh_acceleration:'तेज़ रफ़्तार पकड़ी गई। कृपया धीरे-धीरे गति बढ़ाएँ।',zone_enter:'आप निर्धारित क्षेत्र में प्रवेश कर गए हैं।',zone_exit:'आप निर्धारित क्षेत्र से बाहर निकल गए हैं।',zone_overspeed:'इस क्षेत्र की गति सीमा से ऊपर चल रहे हैं। कृपया गति कम करें।'},
+ ur:{overspeed:'آپ رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',road_overspeed:'آپ اس سڑک کی رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',harsh_braking:'سخت بریک لگائی گئی۔ محفوظ فاصلہ رکھیں اور آہستہ بریک لگائیں۔',harsh_acceleration:'تیز رفتاری پکڑی گئی۔ براہ کرم آہستہ آہستہ رفتار بڑھائیں۔',zone_enter:'آپ مقررہ علاقے میں داخل ہو گئے ہیں۔',zone_exit:'آپ مقررہ علاقے سے باہر نکل گئے ہیں۔',zone_overspeed:'اس علاقے کی رفتار کی حد سے اوپر جا رہے ہیں۔ براہ کرم رفتار کم کریں۔'}};
 const vrMsg=(t,l)=>(VMSG[l]||VMSG.en)[t]||VMSG.en[t]||'';
 // the WebView's own speechSynthesis is unreliable on Android, so the native
 // text-to-speech plugin is tried first and the browser voice is the fallback.
@@ -247,7 +255,7 @@ function notify(type,kmh,lvl){const R=RUL[type]||{},txt=Math.round(kmh)+' km/h'+
 // ---- driving events and telemetry
 const MIN_MOVING_KMH=2;
 const sepm=(a,b)=>{const r=x=>x*Math.PI/180,dLa=r(b.latitude-a.latitude),dLo=r(b.longitude-a.longitude),x=Math.sin(dLa/2)**2+Math.cos(r(a.latitude))*Math.cos(r(b.latitude))*Math.sin(dLo/2)**2;return 12742000*Math.asin(Math.sqrt(x))};
-let V={voice_on:1,lang:'en'};const LIM={speed:100,brake:-3,accel:2.5,buf:0,warn:0,dist:0,rbuf:0},HOLD={harsh_braking:0,harsh_acceleration:0,overspeed:0,road_overspeed:0},ON={},lastEv={},lastNotify={},VS={},ANN={};let prev=null,lastA=0,lastLoc=null,ODOM=0,pp=null,bat={},fl=false,batT,cfgT,MOV=10,STP=60;
+let V={voice_on:1,lang:'en',zones_on:1,bb_on:1,bb_days:3};const LIM={speed:100,brake:-3,accel:2.5,buf:0,warn:0,dist:0,rbuf:0,zbuf:0},HOLD={harsh_braking:0,harsh_acceleration:0,overspeed:0,road_overspeed:0,zone_overspeed:0},ON={},lastEv={},lastNotify={},VS={},ANN={};let prev=null,lastA=0,lastLoc=null,ODOM=0,pp=null,bat={},fl=false,batT,cfgT,MOV=10,STP=60;
 let ROAD=null,RT=0,RS=0,ROQP=false;
 // ---- the signed limit of the road being driven on. OpenStreetMap keeps a
 // maxspeed tag on mapped roads; Overpass is free and needs no key, so the phone
@@ -276,6 +284,45 @@ function rlUi(){const s=$('rl');if(!s)return;
  if(ROAD==null){s.classList.add('hide');return}
  s.classList.remove('hide');s.textContent=Math.round(ROAD)}
 
+// ---- geofences. An admin draws these on the dashboard's Live Tracking map and
+// gives each one a speed limit; the phone reads the shapes, tests every fix against
+// them and reports driving in, driving out or passing the zone's own limit.
+let ZONES=[],INZ={},ZNA=null,zLayer=null;
+const inPoly=(lat,lng,pts)=>{let c=false;
+ for(let i=0,j=pts.length-1;i<pts.length;j=i++){const a=pts[i],b=pts[j];
+  if((a[1]>lng)!==(b[1]>lng)&&lat<(b[0]-a[0])*(lng-a[1])/(b[1]-a[1])+a[0])c=!c}
+ return c};
+function zDraw(){if(!map)return;if(zLayer){zLayer.remove();zLayer=null}
+ if(!ZONES.length)return;zLayer=L.layerGroup().addTo(map);
+ ZONES.forEach(z=>{if(!z.pts||z.pts.length<3)return;
+  L.polygon(z.pts,{color:z.color||'#2f7fe6',weight:2,fillOpacity:.08,dashArray:'6 4'})
+   .bindTooltip(z.name+(z.speed_limit?' · '+z.speed_limit+' km/h':''),{permanent:false}).addTo(zLayer)})}
+function zEv(type,z,loc,kmh){if(!ON[type])return;
+ // a zone change is a moment, not a breach that grows, so it is written straight
+ // away with the readings of the fix that crossed the line
+ sb.from('events').insert({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,
+  vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,type,lat:loc.latitude,lng:loc.longitude,
+  speed:Math.round(kmh),value:Math.round(kmh),
+  details:(type==='zone_enter'?'Entered ':'Left ')+(z.name||'zone')+(z.speed_limit?' · limit '+z.speed_limit+' km/h':''),
+  recorded_at:new Date(loc.time||Date.now()).toISOString(),
+  accuracy:loc.accuracy,altitude:loc.altitude,heading:loc.bearing,accel:+(lastA*3.6).toFixed(1),
+  battery_pct:bat.p,charging:bat.c,ignition:true,road_limit:+z.speed_limit||null}).then(({error})=>{
+  if(error)$('err').textContent='Event error: '+error.message})}
+// the zones a fix falls inside, tightest speed limit first
+const zin=loc=>ZONES.filter(z=>z.pts&&z.pts.length>2&&inPoly(loc.latitude,loc.longitude,z.pts))
+ .sort((a,b)=>((+a.speed_limit||999)-(+b.speed_limit||999)));
+function zonesCheck(loc,kmh,t){
+ const zs=V.zones_on?zin(loc):[],tight=zs[0];
+ ZONES.forEach(z=>{const on=zs.some(x=>x.id===z.id),was=INZ[z.id];INZ[z.id]=on;
+  // the first fix after a start or a zone list change only sets the baseline: it can
+  // say nothing about a crossing that happened while the phone was quiet
+  if(was===undefined)return;
+  if(on&&!was)zEv('zone_enter',z,loc,kmh);else if(!on&&was)zEv('zone_exit',z,loc,kmh)});
+ // overspeed inside a zone rides the same breach machinery as the road limit, so it
+ // keeps the driver's alert, the tolerance window and the open/close event row
+ ZNA=tight&&+tight.speed_limit>0?{lim:+tight.speed_limit,name:tight.name||'zone'}:null;
+ hold('zone_overspeed',!!ZNA&&kmh>ZNA.lim+LIM.zbuf,loc,kmh,kmh,t)}
+
 // the alert fires the moment a limit is broken; the event row is written once
 // the breach outlasts its tolerance and is then closed when the limit is
 // respected again, so the dashboard can show Event End and Duration.
@@ -295,6 +342,7 @@ function detect(loc,kmh){
  if(!prev||t-prev.t>=0.8)prev={t,v};
  hold('overspeed',kmh>LIM.speed+LIM.buf,loc,kmh,kmh,t);
  if(ROAD)hold('road_overspeed',kmh>ROAD+LIM.rbuf,loc,kmh,kmh,t);
+ if(ZONES.length)zonesCheck(loc,kmh,t);
  // write the row once the breach has outlasted its tolerance time
  Object.keys(VS).forEach(k=>{const b=VS[k];if(b&&RST[k]==null&&t-b.t>=(HOLD[k]||0))ev(k)})}
 function hold(type,bad,loc,kmh,val,t){if(!ON[type])return;
@@ -308,21 +356,23 @@ function hold(type,bad,loc,kmh,val,t){if(!ON[type])return;
   // so it is pushed and flushed instead of waiting for the next sampling tick
   lastLoc=loc;queue.push(row(loc,Math.round(kmh),true));flush()}
  else if(Math.abs(val)>Math.abs(VS[type].peak))VS[type].peak=val}
+const isSp=t=>t==='overspeed'||t==='road_overspeed'||t==='zone_overspeed';
 const evLvl=type=>type==='overspeed'?Math.round(LIM.speed+LIM.buf)+' km/h':
  type==='road_overspeed'?(ROAD!=null?Math.round(ROAD+LIM.rbuf)+' km/h':'the road limit'):
+ type==='zone_overspeed'?(ZNA?Math.round(ZNA.lim+LIM.zbuf)+' km/h in '+ZNA.name:'the zone limit'):
  Math.abs(+(type==='harsh_braking'?LIM.brake:LIM.accel)*3.6).toFixed(1)+' km/h/s';
 function evTxt(type,kmh,val,peak,lvl,dur){
- if(type==='overspeed'||type==='road_overspeed')return `${Math.round(kmh)} km/h against a ${lvl} alert level${HOLD[type]?' held over '+HOLD[type]+' s':''}${dur?' · lasted '+hm(dur):''}${peak&&peak>kmh?' · peak '+Math.round(peak)+' km/h':''}`;
+ if(isSp(type))return `${Math.round(kmh)} km/h against a ${lvl} alert level${HOLD[type]?' held over '+HOLD[type]+' s':''}${dur?' · lasted '+hm(dur):''}${peak&&peak>kmh?' · peak '+Math.round(peak)+' km/h':''}`;
  return `${Math.abs(val).toFixed(1)} km/h/s ${type==='harsh_braking'?'deceleration':'acceleration'} against a ${lvl} limit${HOLD[type]?' held over '+HOLD[type]+' s':''}${dur?' · lasted '+hm(dur):''}${peak&&Math.abs(peak)>Math.abs(val)?' · peak '+Math.abs(peak).toFixed(1)+' km/h/s':''}`}
 const hm=x=>Math.floor(x/3600)+'h '+String(Math.floor(x%3600/60)).padStart(2,'0')+'m '+String(Math.round(x%60)).padStart(2,'0')+'s';
 function ev(type){const b=VS[type];if(!b)return;RST[type]='';
- const lvl=evLvl(type),loc=b.loc,road=type==='road_overspeed'?Math.round(ROAD||0):null;
+ const lvl=evLvl(type),loc=b.loc,road=type==='road_overspeed'?Math.round(ROAD||0):type==='zone_overspeed'?(ZNA?Math.round(ZNA.lim):null):null;
  if(!ANN[type])notify(type,b.kmh,lvl);ANN[type]=false;
  // every reading of the fix that opened the breach is stored with the event, so
  // the dashboard popup and report need no second query
  sb.from('events').insert({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,
   vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,type,lat:loc.latitude,lng:loc.longitude,
-  speed:Math.round(b.kmh),value:+(type==='road_overspeed'||type==='overspeed'?b.kmh:b.val).toFixed(1),
+  speed:Math.round(b.kmh),value:+(isSp(type)?b.kmh:b.val).toFixed(1),
   details:evTxt(type,b.kmh,b.val,b.peak,lvl),recorded_at:new Date(loc.time||b.t*1000).toISOString(),
   accuracy:loc.accuracy,altitude:loc.altitude,heading:loc.bearing,accel:+(lastA*3.6).toFixed(1),
   battery_pct:bat.p,charging:bat.c,ignition:true,road_limit:road}).select('id').single().then(({data,error})=>{
@@ -333,7 +383,7 @@ function endEv(type,t){const b=VS[type];if(!b)return;VS[type]=null;
  // a dab shorter than its tolerance never reached ev(), so there is no row to close
  if(id){const lvl=evLvl(type),peak=b.peak;
   sb.from('events').update({ended_at:new Date(t*1000).toISOString(),
-   value:+(type==='overspeed'||type==='road_overspeed'?Math.max(b.kmh,peak||0).toFixed(1):peak.toFixed(1)),
+   value:+(isSp(type)?Math.max(b.kmh,peak||0).toFixed(1):peak.toFixed(1)),
    details:evTxt(type,b.kmh,b.val,peak,lvl,dur)}).eq('id',id).then(({error})=>{if(error&&RST[type]===id)RST[type]=null})}
  RST[type]=null;
  // and the fix that closed it, so the breach has an end point on the map too
@@ -348,24 +398,107 @@ function pickUi(){const s=$('pk');if(!s)return;
 function pickV(){PICK=$('pk').value;localStorage.pick=PICK;if(watcher){stop();watcher=null}
  $('err').textContent='';logAct('Switched vehicle',$('pk').selectedOptions[0]?.textContent||PICK);loadRules();showLast()}
 async function loadRules(){
- const [a,r,t]=await Promise.all([sb.from('assignments').select('vehicle_id,driver_id,vehicles(name,type,speed_limit,moving_interval,stopped_interval,brake_limit,accel_limit,speed_buffer,max_accel_warning,min_moving_distance),drivers(name)').eq('user_id',me.id),sb.from('event_rules').select('*'),sb.from('app_settings').select('*')]);
+ const [a,r,t,g]=await Promise.all([sb.from('assignments').select('vehicle_id,driver_id,vehicles(name,type,speed_limit,moving_interval,stopped_interval,brake_limit,accel_limit,speed_buffer,max_accel_warning,min_moving_distance),drivers(name)').eq('user_id',me.id),sb.from('event_rules').select('*'),sb.from('app_settings').select('*'),sb.from('geofences').select('*').eq('enabled',true).order('name')]);
  if(a.data){ASGS=a.data.filter(x=>x.vehicle_id);if(!ASGS.some(x=>x.vehicle_id===PICK))PICK=ASGS[0]?.vehicle_id||null;asg=ASGS.find(x=>x.vehicle_id===PICK)||a.data[0]||null;pickUi()}const S={},VC={};Object.keys(ON).forEach(k=>delete ON[k]);(t.data||[]).forEach(x=>VC[x.key]=x.value);(t.data||[]).forEach(x=>S[x.key]=+x.value);const v=asg?.vehicles||{};
  // voice_on is only 0 when the dashboard switches it off; voice_lang stays text
  // because app_settings stores every value as a string
- V={voice_on:VC.voice_on==='0'?0:1,lang:VLANG[VC.voice_lang]?VC.voice_lang:'en'};
+ V={voice_on:VC.voice_on==='0'?0:1,lang:VLANG[VC.voice_lang]?VC.voice_lang:'en',
+  zones_on:VC.zones_on==='0'?0:1,bb_on:VC.bb_on==='0'?0:1,bb_days:Math.min(14,Math.max(1,+VC.bb_days||3))};
+ // the zones drawn on the dashboard map, ready for the point-in-polygon test
+ ZONES=(g.data||[]).map(x=>({id:x.id,name:x.name,color:x.color,speed_limit:x.speed_limit,
+  enter:x.enter!==false,exit:x.exit!==false,overspeed:x.overspeed!==false,
+  pts:((x.shape||{}).pts||[]).map(p=>[+p[0],+p[1]]).filter(p=>p.length===2)})).filter(x=>x.pts.length>2);
+ zDraw();
  (r.data||[]).forEach(x=>{RUL[x.type]=x;if('voice'in x)x.voice=x.voice!==false;ON[x.type]=x.enabled;const h=Math.max(0,+x.hold_s||0);
   if(x.type==='overspeed'){LIM.speed=v.speed_limit||x.threshold;LIM.buf=Math.max(0,+v.speed_buffer||0);HOLD.overspeed=h}
   if(x.type==='harsh_braking'){LIM.brake=-(v.brake_limit||x.threshold)/3.6;HOLD.harsh_braking=h}
   if(x.type==='harsh_acceleration'){LIM.accel=(v.accel_limit||x.threshold)/3.6;HOLD.harsh_acceleration=h}
-   if(x.type==='road_overspeed'){LIM.rbuf=Math.max(0,+x.threshold||0);HOLD.road_overspeed=h}});
+   if(x.type==='road_overspeed'){LIM.rbuf=Math.max(0,+x.threshold||0);HOLD.road_overspeed=h}
+   // a zone's own limit plus the km/h allowed over it, the same way a road limit works
+   if(x.type==='zone_overspeed'){LIM.zbuf=Math.max(0,+x.threshold||0);HOLD.zone_overspeed=h}});
  LIM.warn=Math.max(0,+v.max_accel_warning||0);LIM.dist=Math.max(0,+v.min_moving_distance||0);
  MOV=Math.max(1,v.moving_interval||S.moving_interval||10);STP=Math.max(1,v.stopped_interval||S.stopped_interval||60)}
 async function pollBat(){try{const b=await CapPlugins.Device.getBatteryInfo();bat={p:Math.round(b.batteryLevel*100),c:b.isCharging};$('v_bat').textContent=bat.p+'%'+(bat.c?' ⚡':'')}catch(e){}}
 const row=(loc,speed,ign)=>({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,lat:loc.latitude,lng:loc.longitude,speed,accuracy:loc.accuracy,altitude:loc.altitude,heading:loc.bearing,ignition:ign,accel:+(lastA*3.6).toFixed(1),battery_pct:bat.p,charging:bat.c,recorded_at:new Date(loc.time||Date.now()).toISOString()});
 async function flush(){if(fl)return;fl=true;try{localStorage.q=JSON.stringify(queue);while(queue.length){const b=queue.slice(0,200);const {error}=await sb.from('positions').insert(b);if(error){$('err').textContent='Upload error: '+error.message;break}queue=queue.slice(b.length);SENT+=b.length;localStorage.q=JSON.stringify(queue)}$('v_sent').textContent=SENT+(queue.length?' ('+queue.length+' waiting)':'')}finally{fl=false}}
+// ---- blackbox. Every fix the location watcher delivers (about one per second on
+// the move) is stored on the handset in IndexedDB and never uploaded, so the server
+// keeps only the sampled stream. An admin asks for a window of time on the Vehicles
+// page; this answers that request by pushing exactly the stored fixes in it, each
+// stamped with the moment it was taken.
+let BB=null,BBW=0,BBN=+(localStorage.bbn||0),bbBusy=false,BBT=null;
+const bbDays=()=>Math.min(14,Math.max(1,+V.bb_days||3));
+// 240 000 fixes is a little over two days at one per second. Stored in the compact
+// form below that is roughly 30 MB, which a handset can hold without being evicted.
+const BBM=240000;
+function bbOpen(){return new Promise(res=>{if(!window.indexedDB||!indexedDB.open)return res(false);let req;
+ try{req=indexedDB.open('fleetbb',1)}catch(e){return res(false)}
+ req.onupgradeneeded=()=>{const db=req.result;
+  if(!db.objectStoreNames.contains('bb'))db.createObjectStore('bb',{keyPath:'k',autoIncrement:true}).createIndex('at','at')};
+ req.onsuccess=()=>{BB=req.result;res(!!BB&&BB.objectStoreNames.contains('bb'))};
+ req.onerror=()=>res(false);setTimeout(()=>res(false),5000)})}
+const bbSt=m=>{try{return BB&&BB.transaction('bb',m).objectStore('bb')}catch(e){return null}};
+// compact form: [taken ms, lat, lng, km/h, heading, accuracy, altitude, battery, charging]
+const bbPack=(loc,kmh)=>[loc.time||Date.now(),loc.latitude,loc.longitude,Math.round(kmh*10)/10,
+ loc.bearing==null?null:Math.round(loc.bearing),loc.accuracy==null?null:Math.round(loc.accuracy),
+ loc.altitude==null?null:Math.round(loc.altitude),bat.p||null,bat.c?1:0];
+function bbPut(arr){if(!V.bb_on||!BB||!arr)return;
+ if(!bbSt('readwrite'))return;
+ try{bbSt('readwrite').add({at:arr[0],d:arr});BBN++;BBW++;
+  if(BBW%200===0){localStorage.bbn=BBN;bbPrune()}
+  bbUi('')}catch(e){}}
+// drop what aged out, then the oldest surplus if the handset went over the cap.
+// BBN is an estimate held in localStorage — counting the store on every fix would
+// cost more than the write itself.
+function bbPrune(){const s=bbSt('readwrite');if(!s)return;
+ try{let gone=0;const cut=Date.now()-bbDays()*864e5;
+  s.index('at').openCursor(IDBKeyRange.upperBound(cut)).onsuccess=e=>{const c=e.target.result;if(!c)return;
+   c.delete();c.continue();if(++gone===400){BBN=Math.max(0,BBN-gone);localStorage.bbn=BBN;gone=0}};
+  let over=Math.max(0,+(localStorage.bbn||BBN)-BBM),cut2=0;
+  if(over>4000){const cu=s.index('at').openCursor();cu.onsuccess=e=>{const c=e.target.result;if(!c||over<=0)return;
+   c.delete();over--;cut2++;c.continue();
+   if(over<=0){BBN=Math.max(0,BBN-cut2);localStorage.bbn=BBN}}}}catch(e){}}
+function bbRange(from,to){return new Promise(res=>{const s=bbSt('readonly');if(!s)return res([]);
+ try{s.index('at').getAll(IDBKeyRange.bound(from,to)).onsuccess=e=>res(e.target.result||[])}catch(e){res([])}})}
+// the compact rows become position rows the server already accepts
+function bbRows(list){const v=asg&&asg.vehicles||{};
+ return (list||[]).map(x=>{const d=x.d||[];return {user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,
+  vehicle_name:v.name,driver_name:asg.drivers&&asg.drivers.name,lat:d[1],lng:d[2],speed:d[3]||0,
+  heading:d[4]==null?null:d[4],accuracy:d[5]==null?null:d[5],altitude:d[6]==null?null:d[6],
+  ignition:true,battery_pct:d[7]==null?null:d[7],charging:!!d[8],blackbox:true,
+  recorded_at:new Date(d[0]).toISOString()}})}
+function bbUi(pre){const t=$('v_bbox');if(t)t.textContent=(pre||'')+BBN.toLocaleString()}
+async function bbDone(id,status,n,error){try{await sb.from('bb_requests').update({status,n_rows:n,
+ error:error||null,answered_at:new Date().toISOString()}).eq('id',id)}catch(e){}}
+// answer every pending request about a vehicle this login is assigned to
+async function bbAnswer(){if(bbBusy||!BB||!me||!ASGS.length)return;bbBusy=true;
+ try{const ids=ASGS.map(x=>x.vehicle_id);
+  const {data:qs}=await sb.from('bb_requests').select('*').eq('status','pending').in('vehicle_id',ids).order('requested_at');
+  for(const q of qs||[]){
+   const from=Date.parse(q.from_ts),to=Date.parse(q.to_ts);
+   if(isNaN(from)||isNaN(to)){await bbDone(q.id,'failed',0,'The period in the request is not a date');continue}
+   const rows=bbRows(await bbRange(from,to));
+   if(!rows.length){await bbDone(q.id,'sent',0,'Nothing stored for that period');continue}
+   banner('<i class="fa-solid fa-cloud-arrow-up"></i> Blackbox: sending '+rows.length.toLocaleString()+' fixes',9000);
+   let sent=0,err='';
+   for(let i=0;i<rows.length&&!err;i+=300){const b=rows.slice(i,i+300);
+    const {error}=await sb.from('positions').insert(b);if(error)err=error.message;else sent+=b.length;bbUi('↑ ')}
+   await bbDone(q.id,err?'failed':'sent',sent,err);bbUi('');
+   logAct('Blackbox sent',(q.vehicle_name||'')+' '+new Date(from).toLocaleString()+' to '+new Date(to).toLocaleString()+
+    ' - '+sent+' fixes'+(err?' - '+err:''))}
+ }catch(e){$('err').textContent='Blackbox: '+(e.message||e)}
+ bbBusy=false}
+// the phone may be off, or out of coverage, when the request is made: the channel
+// catches it live and this poll catches it whenever the app next runs
+function bbWatch(){clearInterval(BBT);BBT=setInterval(()=>{if(!document.hidden)bbAnswer()},60000);
+ try{sb.channel('bbq').on('postgres_changes',{event:'INSERT',schema:'public',table:'bb_requests'},()=>bbAnswer()).subscribe()}catch(e){}}
+// open the store once at startup; a handset without IndexedDB simply shows "off"
+async function bbInit(){if(!await bbOpen()){bbUi('off');return}
+ try{if(navigator.storage&&navigator.storage.persist)await navigator.storage.persist()}catch(e){}
+ bbPrune();bbUi(V.bb_on?'':'⏸ ')}
 function upd(loc,kmh,moving){const c=$('stc');c.textContent=moving?'Moving':'Idling';c.style.background=moving?'var(--grl)':'var(--orl)';c.style.color=moving?'var(--gr)':'var(--or)';
  $('sp').textContent=Math.round(kmh);const V=(k,v)=>$('v_'+k).textContent=v;
- V('pos',loc.latitude.toFixed(5)+', '+loc.longitude.toFixed(5));V('acc',loc.accuracy!=null?Math.round(loc.accuracy)+' m':'-');V('alt',loc.altitude!=null?Math.round(loc.altitude)+' m':'-');V('dir',loc.bearing!=null?Math.round(loc.bearing)+'°':'-');V('ac',(lastA*3.6).toFixed(1)+' km/h/s');$('lt').textContent='Last record '+new Date().toLocaleTimeString('en-GB');mpos(loc,moving)}
+ V('pos',loc.latitude.toFixed(5)+', '+loc.longitude.toFixed(5));V('acc',loc.accuracy!=null?Math.round(loc.accuracy)+' m':'-');V('alt',loc.altitude!=null?Math.round(loc.altitude)+' m':'-');V('dir',loc.bearing!=null?Math.round(loc.bearing)+'°':'-');V('ac',(lastA*3.6).toFixed(1)+' km/h/s');V('trip',(ODOM/1000).toFixed(1)+' km');$('lt').textContent='Last record '+new Date().toLocaleTimeString('en-GB');mpos(loc,moving)}
 // the driver sees where the vehicle last was before pressing Start trip: the
 // newest stored fix is plotted and its readings fill the tiles
 async function showLast(){if(!asg?.vehicle_id)return;
@@ -387,6 +520,8 @@ async function start(){
  async(loc,err)=>{
   if(err){if(err.code==='NOT_AUTHORIZED')$('err').textContent='Allow location "All the time" in app settings (Permissions button).';return}
   const kmh=Math.max(0,(loc.speed||0)*3.6),moving=kmh>=MIN_MOVING_KMH,every=(moving?MOV:STP)*1000,n=Date.now();
+  // the blackbox takes every fix, before the upload throttle below drops most
+  bbPut(bbPack(loc,kmh));
   // detect first: the Accel. tile then shows the value that just triggered the alert
   detect(loc,kmh);upd(loc,kmh,moving);
   // a corner is worth a point of its own: two fixes spaced by the recording
