@@ -598,7 +598,9 @@ create policy "activity insert own" on user_activity for insert to authenticated
 
 -- --------------------------------------------------------- v18 lockout ----
 -- Five wrong passwords in a row lock that account until an administrator unlocks
--- it on the Users page. The counter has to be reachable from the sign-in screen,
+-- it on the Users page. An administrator can also set and clear the same stamp by
+-- hand from that page, which is why login_gate can answer "locked" for an account
+-- that has never typed a wrong password at all. The counter has to be reachable from the sign-in screen,
 -- where nobody is logged in yet, so these functions are security definer: each
 -- touches one row of profiles by its own address and nothing else. They answer
 -- identically for an address that has never signed in here, so the sign-in screen
