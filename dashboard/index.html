@@ -274,7 +274,7 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <div class="field"><label>Type</label><select name="type"><option value="">-</option><option>Sedan</option><option>Hatchback</option><option>SUV</option><option>Pickup</option><option>Van</option><option>Minibus</option><option>Bus</option><option>Truck</option><option>Heavy Truck</option><option>Tanker</option><option>Taxi</option><option>Ambulance</option><option>Motorbike</option><option>Tractor</option><option>Trailer</option><option>Equipment</option><option>Car</option></select></div>
 <div class="field"><label>Make / model</label><input name="make_model"></div><div class="field"><label>Year</label><input name="year" type="number" min="1980" max="2100"></div><div class="field"><label>VIN / chassis</label><input name="vin"></div>
 <div class="field"><label>Fuel</label><select name="fuel_type"><option value="">-</option><option>Petrol</option><option>Diesel</option><option>Hybrid</option><option>Electric</option></select></div>
-<div class="field"><label>Speed limit (km/h)</label><input name="speed_limit" type="number" min="10" max="250"></div><div class="field"><label>Fuel moving (L/100 km)</label><input name="fuel_moving" type="number" step="0.1" min="0"></div><div class="field"><label>Fuel idling (L/hour)</label><input name="fuel_idle" type="number" step="0.1" min="0"></div><div class="field"><label>Notes</label><input name="notes"></div><button class="btn g"><i class="fa-solid fa-plus"></i>Add vehicle</button></form></div><div class="tw" id="vehT"></div>
+<div class="field"><label>Speed limit (km/h) <span class="hp" data-tip="Leave empty to use the fleet default speed limit from the Configuration page for overspeed alerts. A number here applies to this vehicle only.">?</span></label><input name="speed_limit" type="number" min="10" max="250"></div><div class="field"><label>Fuel moving (L/100 km)</label><input name="fuel_moving" type="number" step="0.1" min="0"></div><div class="field"><label>Fuel idling (L/hour)</label><input name="fuel_idle" type="number" step="0.1" min="0"></div><div class="field"><label>Notes</label><input name="notes"></div><button class="btn g"><i class="fa-solid fa-plus"></i>Add vehicle</button></form></div><div class="tw" id="vehT"></div>
 <div class="card"><div class="csh"><i class="fa-solid fa-box-archive"></i><div><b>Blackbox download <span class="hp" data-tip="Each phone keeps &lt;b&gt;every&lt;/b&gt; fix it receives - about one per second - in its own storage, and never uploads that stream. Pick the vehicle and the period around an incident and press Download: the request reaches the phone over realtime (or on its next minute-long poll), and the phone then pushes exactly the stored fixes in that window, each stamped with the moment it was taken. They appear in Historical Tracking and the Tacho report as Blackbox rows. A phone that is switched off or out of coverage answers as soon as it is back. Every second exists once on the phone and is uploaded once: a request for a period that was already downloaded, or one that overlaps an earlier request, pushes only the seconds the server does not have, and a pull that stops halfway resumes where it left off.">?</span></b><small>Ask one vehicle for its stored 1-per-second fixes for a period — for accident investigation.</small></div><button class="btn gh sm" onclick="bbTable()" title="Check whether the phone has answered yet"><i class="fa-solid fa-rotate"></i>Refresh</button></div>
 <div class="frow mt10"><div class="field"><label>Vehicle</label><select id="bb_v"></select></div>
 <div class="field"><label>From</label><input id="bb_f" type="text"></div><div class="field"><label>To</label><input id="bb_t" type="text"></div>
@@ -346,16 +346,18 @@ const OFFH=()=>{const h=+SET.offline_after_h;return Number.isFinite(h)&&h>0?h:24
 const off=p=>Date.now()-new Date(p.recorded_at)>OFFH()*36e5;
 const st=p=>off(p)?'off':(p.ignition===false||Date.now()-new Date(p.recorded_at)>STALE_MIN*6e4)?'park':(p.speed>0?'go':'idle');
 // tile sources, shared by every map on the page and by the trip print-out window.
-// 'Street Map' used to be tile.openstreetmap.org, which answers this app with a
-// 403 "Access blocked - not following the tile usage policy" tile, so the street
-// view was unusable on both tracking pages; Esri's street tiles are keyless and
-// allow an app of this size, and are the same service the satellite layer and the
-// address lookup already use.
-const BASES={'Street Map':['https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}','Tiles © Esri',19,{}],
- 'Google Map':['https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}','Map data © Google',20,{subdomains:['mt0','mt1','mt2','mt3']}],
- 'Google Satellite':['https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}','Map data © Google',20,{subdomains:['mt0','mt1','mt2','mt3']}],
+// Every name says who draws the picture. Google leads because that is the style
+// drivers and managers recognise; the two Esri rows are Esri's own street and
+// imagery tiles. OpenStreetMap sits last on purpose - it is the server that answered
+// this app with a 403 "not following the tile usage policy" block when it was the
+// default street view, so if it starts blocking again this entry is the only line
+// to delete and nothing else changes.
+const BASES={'Google Map':['https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}','Map data © Google',20,{subdomains:['mt0','mt1','mt2','mt3']}],
  'Google Hybrid':['https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}','Map data © Google',20,{subdomains:['mt0','mt1','mt2','mt3']}],
- 'Satellite':['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}','Tiles © Esri',20,{}]};
+ 'Google Satellite':['https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}','Map data © Google',20,{subdomains:['mt0','mt1','mt2','mt3']}],
+ 'Esri Street Map':['https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}','Tiles © Esri',19,{}],
+ 'Esri Satellite':['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}','Tiles © Esri',20,{}],
+ 'OpenStreetMap':['https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png','© OpenStreetMap contributors',19,{subdomains:['a','b','c']}]};
 const baseN=()=>BASES[localStorage.base]?localStorage.base:'Google Map';
 const baseL=n=>{const b=BASES[n||baseN()];return L.tileLayer(b[0],{attribution:b[1],maxZoom:b[2],...b[3]})};
 function mkMap(id,fit,extra){
@@ -702,7 +704,7 @@ async function signIn(){
  const b=$('sib');b.disabled=true;b.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i>Signing in...';$('lerr').textContent='';
  const em=mail($('em').value),done=()=>{b.disabled=false;b.innerHTML='<i class="fa-solid fa-right-to-bracket"></i>Sign in'};
  const g=await lockCall('login_gate',em);
- if(g&&g.locked){$('lerr').textContent='Your account is locked after '+LOCK_AT+' wrong passwords. Please contact the administrator.';return done()}
+ if(g&&g.locked){$('lerr').textContent='Your account is locked. Please contact the administrator.';return done()}
  try{const {error}=await sb.auth.signInWithPassword({email:em,password:$('pw').value});if(error)throw error;
   await lockCall('login_ok',em);
   want?localStorage.user=$('em').value.trim():localStorage.removeItem('user');await boot(1);toast('Welcome, '+UNAME+'!',1)}
@@ -774,9 +776,11 @@ async function boot(fresh){
  if(!KA)KA=setInterval(keepAlive,10*60*1000);
  const {data:p}=await sb.from('profiles').select('role,fails,locked_at,must_change').eq('id',session.user.id).single();
  // a lock set while this tab was already open steps straight back out: the lock is
-// the administrator's decision, not something a page left open all day rides through
- if(p&&p.locked_at){await sb.auth.signOut();$('login').classList.remove('hide');
-  return $('lerr').textContent='Your account was locked while this page was open. Please contact the administrator.'}
+// the administrator's decision, not something a page left open all day rides through.
+// It says nothing about the lock on the sign-in screen - that sentence belongs to the
+// moment the person actually tries to sign in, not to simply opening the page.
+ if(p&&p.locked_at){await sb.auth.signOut();clearInterval(KA);KA=null;$('login').classList.remove('hide');
+  $('lerr').textContent='';return}
  ADMIN=p?.role==='admin';UID=session.user.id;document.body.classList.toggle('usr',!ADMIN);
  $('login').classList.add('hide');$('app').classList.remove('hide');UNAME=(session.user.email||'').replace('@fleet.local','');$('me').textContent=UNAME;$('accWho').textContent='Welcome, '+UNAME+'!';if(localStorage.pin==='1')document.querySelector('aside').classList.add('pin');pinBtn();themeBtn();
  // a password the administrator typed for somebody else is only ever temporary:
@@ -827,24 +831,32 @@ async function users(){
  const HP=t=>`<span class="hp" data-tip="${t}">?</span>`;
  // the lock lives in the database, so this column only reports what it says: a lock
  // is either still on or on its way there, and a count of wrong tries that has not
- // reached five is only a warning
- const stat=p=>p.locked_at?`<span class="chip" style="background:var(--rdl);color:var(--rd)"><i class="fa-solid fa-lock"></i> Locked</span><br><small class="mut">5 wrong passwords<br>${new Date(p.locked_at).toLocaleString()}</small>`
+ // reached five is only a warning. A lock with a count below five is one this page
+ // set by hand, so the row says which of the two it is.
+ const stat=p=>p.locked_at?`<span class="chip" style="background:var(--rdl);color:var(--rd)"><i class="fa-solid fa-lock"></i> Locked</span><br><small class="mut">${+p.fails>=LOCK_AT?'5 wrong passwords':'Locked by you'}<br>${new Date(p.locked_at).toLocaleString()}</small>`
   :+p.fails>0?`<span class="chip chipO">${p.fails} wrong ${p.fails==1?'try':'tries'}</span><br><small class="mut">locks at ${LOCK_AT}</small>`
   :p.must_change?`<span class="chip chipO">Temp password</span><br><small class="mut">must set their own</small>`
   :`<span class="chip" style="background:var(--grl);color:var(--gr)">Active</span>`;
- $('usrT').innerHTML=`<table><tr><th>User</th><th>Vehicles ${HP('Open the list and tick every vehicle this login should see - use Select all or the search box when the fleet is large. A phone signed in here gets a vehicle picker on its own screen.')}</th><th>Drivers ${HP('Tick every driver profile this login should see. The first tick is paired with the first vehicle tick, the second with the second, and so on - that pairing is what the phone stamps on each position and event.')}</th><th>Role</th><th>Status ${HP('Five wrong passwords on the sign-in screen lock an account out of the dashboard and the phone until you press Unlock here. A count below five is only a warning: the account still signs in normally.')}</th><th></th></tr>${USRS.map(p=>`<tr><td><i class="fa-solid fa-user"></i> ${esc((p.email||'').replace('@fleet.local',''))}${p.role==='admin'?' <span class="chip chipB">admin</span>':''}</td><td><div id="v_${p.id}"></div></td><td><div id="d_${p.id}"></div></td><td><select id="r_${p.id}" style="height:34px"><option value="user" ${p.role!=='admin'?'selected':''}>User</option><option value="admin" ${p.role==='admin'?'selected':''}>Admin</option></select></td><td class="nw">${stat(p)}</td><td class="act"><button class="btn g sm" onclick="link('${p.id}')"><i class="fa-solid fa-floppy-disk"></i>Save</button> <button class="btn ${p.locked_at?'b':'gh'} sm" onclick="unlockU('${p.id}')" title="Clear the lock and the count of wrong passwords so this account can sign in again. It changes nothing else."><i class="fa-solid fa-lock-open"></i>Unlock</button> <button class="btn gh sm" onclick="resetPw('${p.id}')" title="Give this account a new password. It has no mailbox, so hand the password to the person yourself; they must replace it with their own at their next sign-in."><i class="fa-solid fa-key"></i>Reset</button></td></tr>`).join('')}</table>`;
+ $('usrT').innerHTML=`<table><tr><th>User</th><th>Vehicles ${HP('Open the list and tick every vehicle this login should see - use Select all or the search box when the fleet is large. A phone signed in here gets a vehicle picker on its own screen.')}</th><th>Drivers ${HP('Tick every driver profile this login should see. The first tick is paired with the first vehicle tick, the second with the second, and so on - that pairing is what the phone stamps on each position and event.')}</th><th>Role</th><th>Status ${HP('Five wrong passwords on the sign-in screen lock an account out of the dashboard and the phone until you press Unlock here. Press Lock to shut an account out straight away, without waiting for the five tries. A count below five is only a warning: the account still signs in normally.')}</th><th></th></tr>${USRS.map(p=>`<tr><td><i class="fa-solid fa-user"></i> ${esc((p.email||'').replace('@fleet.local',''))}${p.role==='admin'?' <span class="chip chipB">admin</span>':''}</td><td><div id="v_${p.id}"></div></td><td><div id="d_${p.id}"></div></td><td><select id="r_${p.id}" style="height:34px"><option value="user" ${p.role!=='admin'?'selected':''}>User</option><option value="admin" ${p.role==='admin'?'selected':''}>Admin</option></select></td><td class="nw">${stat(p)}</td><td class="act"><button class="btn g sm" onclick="link('${p.id}')"><i class="fa-solid fa-floppy-disk"></i>Save</button> <button class="btn ${p.locked_at?'b':'r'} sm" onclick="lockU('${p.id}')" title="${p.locked_at?'Clear the lock and the count of wrong passwords so this account can sign in again. It changes nothing else.':'Shut this account out straight away: the dashboard and the phone both refuse it until you press Unlock here.'}"><i class="fa-solid ${p.locked_at?'fa-lock-open':'fa-lock'}"></i>${p.locked_at?'Unlock':'Lock'}</button> <button class="btn gh sm" onclick="resetPw('${p.id}')" title="Give this account a new password. It has no mailbox, so hand the password to the person yourself; they must replace it with their own at their next sign-in."><i class="fa-solid fa-key"></i>Reset</button></td></tr>`).join('')}</table>`;
  USRS.forEach(p=>{msel('v_'+p.id,vehicles,'None selected',mine(p.id,'vehicle_id'));msel('d_'+p.id,drivers,'None selected',mine(p.id,'driver_id'))});tools($('usrT'))}
-// ---- the two administrator actions on an account. Unlock is an ordinary profiles
-// update, which the existing admin policy already allows, so it works even before
-// the newest schema and even if the reset service below is not deployed. Setting a
-// password for somebody else cannot be done with the key this page carries - only a
-// server-only key can - so it goes to the fleet-admin Edge function, which checks
-// this session and that its profile says admin before it acts.
-async function unlockU(id){if(!ADMIN)return;
- const nm=uname(id);if(!confirm('Unlock '+nm+'? They can sign in again straight away.'))return;
- const {error}=await sb.from('profiles').update({fails:0,locked_at:null}).eq('id',id);
+// ---- the administrator actions on an account. Locking and unlocking are each one
+// ordinary profiles update, which the existing admin policy already allows, so they
+// work even before the newest schema and even if the reset service below is not
+// deployed. Both sign-in screens ask the database about the lock before they accept a
+// password and the phone re-checks it every time it starts, so a lock here shuts both
+// apps; only a handset with no signal can still let a driver in, because offline it
+// judges from what it saw last time it had a network. Setting a password for somebody
+// else cannot be done with the key this page carries - only a server-only key can - so
+// it goes to the fleet-admin Edge function, which checks this session and that its
+// profile says admin before it acts.
+async function lockU(id){if(!ADMIN)return;const p=USRS.find(x=>x.id===id)||{},nm=uname(id),on=!p.locked_at;
+ // locking the account you are signed in with would leave nobody holding the key to
+ // unlock it again, so this page refuses its own row
+ if(on&&id===UID)return toast('You cannot lock the account you are signed in with.');
+ if(!confirm(on?'Lock '+nm+'? The dashboard and the phone both refuse this account until you press Unlock here.':'Unlock '+nm+'? They can sign in again straight away.'))return;
+ const {error}=await sb.from('profiles').update(on?{locked_at:new Date().toISOString()}:{fails:0,locked_at:null}).eq('id',id);
  if(error)return toast(error.message);
- logAct('Unlocked user',nm);toast(nm+' can sign in again',1);users()}
+ logAct(on?'Locked user':'Unlocked user',nm);toast(nm+(on?' is locked out':' can sign in again'),on?0:1);users()}
 // a password someone has to read out over the phone or type in front of them: no
 // look-alike characters (no I, O, 0 or 1) and split into two short groups
 function tmpPw(){const A='ABCDEFGHJKLMNPQRSTUVWXYZ',B='abcdefghijkmnopqrstuvwxyz',D='23456789',
