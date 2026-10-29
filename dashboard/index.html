@@ -15,6 +15,9 @@
 .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:17px;padding:4px 6px 10px}.brand i{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--or),#f6b25f);color:#fff;display:grid;place-items:center}
 .nb{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:10px;font-weight:600;color:var(--mut)}
 .nb i{width:20px;text-align:center}.nb:hover{background:var(--gyl)}.nb.on{background:var(--orl);color:var(--ord)}.nb:focus-visible{outline:2px solid var(--bl)}
+/* the menu is two jobs, not ten: watch the fleet, then set it up. The labels are
+   only shown when the menu is actually wide enough to read them. */
+.ngrp{font-size:10px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;color:var(--mut);padding:9px 10px 1px}
 .wrap{flex:1;display:flex;flex-direction:column;min-width:0}
 header{display:flex;align-items:center;gap:10px;padding:9px 16px;background:var(--card);border-bottom:1px solid var(--line)}
 header h1{font-size:19px;margin:0;flex:1;font-weight:800}#me{color:var(--mut)}
@@ -37,8 +40,8 @@ section{display:none;height:100%;flex-direction:column;gap:10px;min-width:0}sect
 .ck input{width:20px;height:20px;margin:0}
 /* page title outside a card, and the icon+title+note header every Configuration block uses */
 .ctitle{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding:0 2px}.ctitle b{font-size:17px}.ctitle small{color:var(--mut)}
-.csh{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}.csh>i{width:32px;height:32px;border-radius:10px;background:var(--bll);color:var(--bl);display:grid;place-items:center;font-size:14px;flex:none}
-.csh>div{flex:1;min-width:180px}.csh b{font-size:15px}.csh small{display:block;color:var(--mut);margin-top:2px;font-weight:400}
+.csh{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}.csh>i,.info>i{width:32px;height:32px;border-radius:10px;background:var(--bll);color:var(--bl);display:grid;place-items:center;font-size:14px;flex:none}
+.csh>div,.info>div{flex:1;min-width:180px}.csh b{font-size:15px}.csh small{display:block;color:var(--mut);margin-top:2px;font-weight:400}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
 .kpi{display:flex;align-items:center;gap:10px;padding:9px 11px}.kpi .ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-size:18px}
 .kpi b{font-size:22px;display:block;line-height:1.1;white-space:nowrap}.kpi span{color:var(--mut);font-size:12px}
@@ -51,6 +54,28 @@ section{display:none;height:100%;flex-direction:column;gap:10px;min-width:0}sect
 .veh{display:flex;gap:9px;align-items:center;padding:7px 9px;border-radius:10px;cursor:pointer}.veh:hover{background:var(--bg)}
 .veh.on{background:var(--bll)}.veh .av{width:34px;height:34px;border-radius:50%;color:#fff;display:grid;place-items:center;flex:none}.veh .t{flex:1;min-width:0}.veh small{color:var(--mut)}
 .chip{font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px}
+/* the handful of one-off styles that were written inline on dozens of elements.
+   Gathering them here is what keeps every card, toolbar, dialog and action
+   column on this page laid out the same way. */
+.mt10{margin-top:10px}.nw{white-space:nowrap}.taR{text-align:right}.taC{text-align:center}
+.mut{color:var(--mut)}.mutS{color:var(--mut);font-size:12px}.fl1{flex:1}
+.chipB{background:var(--bll);color:var(--bl)}.chipO{background:var(--orl);color:var(--or)}
+.w110{width:110px}
+/* a heading on the left with its buttons pushed to the right edge */
+.od{display:flex;align-items:center;gap:6px}.od>b{flex:1}
+/* the filter row that sits between the report controls and the table they filter */
+.fbar{display:flex;gap:8px;align-items:center;min-height:30px;flex-wrap:wrap}
+/* the button column at the right-hand edge of a table */
+.act{text-align:right;white-space:nowrap}
+/* the one row a table shows when it has no data — the same quiet line everywhere */
+.empty{color:var(--mut);text-align:center;padding:14px 12px}
+/* a full-width notice card: the same left-hand icon chip as a block header, then
+   the explanation. Used by the pages that teach rather than edit. */
+.info{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap;line-height:1.55}
+/* the two fixed lines of a dialog: its title and the note under its buttons */
+.dlgT{font-size:15px;font-weight:800;margin-bottom:8px}
+.dlgB{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:14px}
+.dlgN{color:var(--mut);display:block;margin-top:8px}
 .field{display:flex;flex-direction:column;gap:4px;min-width:0}.field label{font-weight:700;font-size:12px;color:var(--mut)}
 .pick{max-height:132px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:6px 9px;min-width:180px;text-align:left;background:var(--card)}.pick label{display:flex;gap:8px;align-items:center;font-size:13px;font-weight:600;padding:3px 0;cursor:pointer}.pick input[type=checkbox]{width:17px;height:17px;flex:0 0 auto;margin:0;accent-color:var(--bl)}.pick small{color:var(--mut)}
 input,select{font:inherit;height:40px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);width:100%;min-width:0}
@@ -78,7 +103,7 @@ td select{height:36px}#evt,#rep,#trip,#cfg,#hist{height:auto;min-height:100%}.cg
 .err{color:var(--rd);min-height:18px;margin:0;font-weight:600}
 .zgo{background:none;border:0;padding:0;color:var(--bl);cursor:pointer;text-align:left;text-decoration:underline}
 #toast{position:fixed;z-index:4100;bottom:20px;left:50%;transform:translateX(-50%);padding:10px 18px;border-radius:10px;color:#fff;font-weight:700;opacity:0;pointer-events:none;transition:opacity .2s}#toast.show{opacity:1}#toast.ok{background:var(--gr)}#toast.bad{background:var(--rd)}
-@media(max-width:820px){#app{flex-direction:column}aside{width:auto;flex-direction:row;overflow-x:auto;padding:8px}.brand,.nb span{display:none}.split{grid-template-columns:1fr;grid-template-rows:230px 1fr}#me{display:none}}
+@media(max-width:820px){#app{flex-direction:column}aside{width:auto;flex-direction:row;overflow-x:auto;padding:8px}.brand,.nb span,.ngrp{display:none}.split{grid-template-columns:1fr;grid-template-rows:230px 1fr}#me{display:none}}
 /* Configuration holds two wide editing tables. Below this width their fixed-size
    inputs and selects shrink rather than pushing the page sideways, because a
    dashboard page must never need a horizontal scrollbar. */
@@ -87,7 +112,7 @@ td select{height:36px}#evt,#rep,#trip,#cfg,#hist{height:auto;min-height:100%}.cg
 input,select{color:var(--ink)}input[type=checkbox]{width:20px;height:20px}
 body.usr .adm{display:none!important}
 .pulse{width:44px;height:44px;border-radius:50%;background:#d9534f55;border:3px solid #d9534f;animation:pl 1s infinite}@keyframes pl{50%{transform:scale(1.6);opacity:.3}}
-aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,aside.pin{width:210px}aside:not(:hover):not(.pin) .nb span,aside:not(:hover):not(.pin) .brand span,aside:not(:hover):not(.pin) .pinb span{display:none}
+aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,aside.pin{width:210px}aside:not(:hover):not(.pin) .nb span,aside:not(:hover):not(.pin) .brand span,aside:not(:hover):not(.pin) .pinb span,aside:not(:hover):not(.pin) .ngrp{display:none}
 .foot{font-size:11px;color:var(--mut);text-align:center;padding:8px 0 0;line-height:1.4}
 .pagefoot{flex:none;padding:5px 16px;font-size:11px;color:var(--mut);text-align:center;background:var(--card);border-top:1px solid var(--line)}.printheader{display:none}
 .click{cursor:pointer}.click.on{outline:2px solid var(--bl)}
@@ -179,17 +204,19 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 </svg>
 <div class="field"><input id="em" placeholder="Username or email" autocomplete="username"></div>
 <div class="field" style="position:relative"><input id="pw" type="password" placeholder="Password" autocomplete="current-password" onkeydown="if(event.key==='Enter')signIn()"><button type="button" class="eye" onclick="eye()" title="Show / hide password"><i class="fa-solid fa-eye" id="eyei"></i></button></div>
-<label style="display:flex;gap:8px;align-items:center;font-weight:600;justify-content:flex-start"><input type="checkbox" id="rem" style="width:18px;height:18px"> Remember me</label>
+<label class="ck" style="justify-content:flex-start"><input type="checkbox" id="rem"> Remember me</label>
 <button class="btn b" id="sib" onclick="signIn()"><i class="fa-solid fa-right-to-bracket"></i>Sign in</button><p class="err" id="lerr"></p>
 <div class="foot" style="display:block">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</div></div>
 
-<div id="modal" class="hide" style="position:fixed;inset:0;background:#0006;z-index:3000;place-items:center;display:grid"></div>
+<div id="modal" class="mdl"></div>
 <div id="app" class="hide"><aside><div class="brand"><i class="fa-solid fa-truck-fast"></i><span>Fleet Tracker</span></div>
+<div class="ngrp">Tracking</div>
 <button class="nb on" data-t="live" data-h="Live Tracking"><i class="fa-solid fa-location-crosshairs"></i><span>Live Tracking</span></button>
 <button class="nb" data-t="hist" data-h="Historical Tracking"><i class="fa-solid fa-route"></i><span>Historical Tracking</span></button>
 <button class="nb" data-t="rep" data-h="Fleet Summary Report"><i class="fa-solid fa-chart-column"></i><span>Fleet Summary Report</span></button>
 <button class="nb" data-t="evt" data-h="Events Report"><i class="fa-solid fa-triangle-exclamation"></i><span>Events Report <b id="evb" class="chip" style="background:var(--rd);color:#fff;display:none">0</b></span></button>
 <button class="nb" data-t="trip" data-h="Tacho Graph Report"><i class="fa-solid fa-stopwatch"></i><span>Tacho Graph Report</span></button>
+<div class="ngrp adm">Administration</div>
 <button class="nb adm" data-t="veh" data-h="Vehicles"><i class="fa-solid fa-truck"></i><span>Vehicles</span></button>
 <button class="nb adm" data-t="drv" data-h="Drivers"><i class="fa-solid fa-id-card"></i><span>Drivers</span></button>
 <button class="nb adm" data-t="cfg" data-h="Configuration"><i class="fa-solid fa-gear"></i><span>Configuration</span></button>
@@ -219,54 +246,54 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <div class="field"><label>Events</label><div id="ev_t"></div></div>
 <div class="field"><label>From</label><input id="ev_f" type="text"></div><div class="field"><label>To</label><input id="ev_to" type="text"></div>
 <button class="btn b" onclick="loadEvt()"><i class="fa-solid fa-play"></i>Generate</button></div>
-<div id="evFl" style="display:flex;gap:8px;align-items:center;min-height:30px"></div><div class="kpis" id="evK"></div><div class="cgrid"><div class="card"><canvas id="c1"></canvas></div><div class="card"><canvas id="c2"></canvas></div><div class="card"><canvas id="c3"></canvas></div></div><div class="tw" id="evT"></div></section>
+<div id="evFl" class="fbar"></div><div class="kpis" id="evK"></div><div class="cgrid"><div class="card"><canvas id="c1"></canvas></div><div class="card"><canvas id="c2"></canvas></div><div class="card"><canvas id="c3"></canvas></div></div><div class="tw" id="evT"></div></section>
 <section id="cfg"><div class="ctitle"><b><i class="fa-solid fa-gear"></i> Configuration</b><small>An empty box in a vehicle row means "use the default". Press Save at the bottom of this page to keep every change on it.</small></div>
-<div class="card"><div class="csh"><i class="fa-solid fa-sliders"></i><div><b>Fleet defaults</b><small>Values every vehicle follows unless it carries its own further down this page.</small></div></div><div class="tw" style="margin-top:10px"><table><tr><th>Setting</th><th>Value</th><th>What it does</th></tr>
-<tr><td>Recording interval — while moving</td><td><input id="s_mov" type="number" min="1" style="width:110px"></td><td><small>Seconds between positions while the vehicle is moving.</small></td></tr>
-<tr><td>Recording interval — while stopped</td><td><input id="s_stp" type="number" min="1" style="width:110px"></td><td><small>Seconds between positions while the vehicle is standing still.</small></td></tr>
-<tr><td>Safety score — green at or below <span class="hp" data-tip="Fleet Summary scores every vehicle with &lt;b&gt;(harsh acceleration events + harsh braking events + overspeed seconds) &times; (100 &divide; distance in km)&lt;/b&gt;, so a lower number is safer. Set where green stops and red starts; everything between the two is amber.">?</span></td><td><input id="sc_g" type="number" step="0.1" min="0" style="width:110px"></td><td><small>A vehicle at or under this score is shown green.</small></td></tr>
-<tr><td>Safety score — red at or above</td><td><input id="sc_r" type="number" step="0.1" min="0" style="width:110px"></td><td><small>A vehicle at or over this score is shown red; in between is amber.</small></td></tr>
+<div class="card"><div class="csh"><i class="fa-solid fa-sliders"></i><div><b>Fleet defaults</b><small>Values every vehicle follows unless it carries its own further down this page.</small></div></div><div class="tw mt10"><table><tr><th>Setting</th><th>Value</th><th>What it does</th></tr>
+<tr><td>Recording interval — while moving</td><td><input id="s_mov" type="number" min="1" class="w110"></td><td><small>Seconds between positions while the vehicle is moving.</small></td></tr>
+<tr><td>Recording interval — while stopped</td><td><input id="s_stp" type="number" min="1" class="w110"></td><td><small>Seconds between positions while the vehicle is standing still.</small></td></tr>
+<tr><td>Safety score — green at or below <span class="hp" data-tip="Fleet Summary scores every vehicle with &lt;b&gt;(harsh acceleration events + harsh braking events + overspeed seconds) &times; (100 &divide; distance in km)&lt;/b&gt;, so a lower number is safer. Set where green stops and red starts; everything between the two is amber.">?</span></td><td><input id="sc_g" type="number" step="0.1" min="0" class="w110"></td><td><small>A vehicle at or under this score is shown green.</small></td></tr>
+<tr><td>Safety score — red at or above</td><td><input id="sc_r" type="number" step="0.1" min="0" class="w110"></td><td><small>A vehicle at or over this score is shown red; in between is amber.</small></td></tr>
 <tr><td>Blackbox recording on the phone <span class="hp" data-tip="The phone keeps &lt;b&gt;every&lt;/b&gt; fix it receives - about one per second - in its own storage and never uploads them, so the server stays small. When an incident has to be investigated, choose the vehicle and the period on the Vehicles page and press Download: the phone then pushes exactly the fixes in that window, each stamped with the moment it was taken.">?</span></td><td><label class="ck"><input id="s_bb" type="checkbox"> Keep every fix on the handset</label></td><td><small>Off stops the recording; anything already stored stays until it ages out.</small></td></tr>
-<tr><td>Blackbox kept for</td><td><input id="s_bbd" type="number" min="1" max="14" style="width:110px"></td><td><small>Days the phone holds before it overwrites the oldest fixes.</small></td></tr>
+<tr><td>Blackbox kept for</td><td><input id="s_bbd" type="number" min="1" max="14" class="w110"></td><td><small>Days the phone holds before it overwrites the oldest fixes.</small></td></tr>
 <tr><td>Zone detection <span class="hp" data-tip="Turns zone checking off for the whole fleet without deleting any shape. Draw, name and limit your zones in the Zones table below.">?</span></td><td><label class="ck"><input id="s_z" type="checkbox"> Report entry, exit and overspeed</label></td><td><small>Each zone's own limit and alerts are set in the Zones table below.</small></td></tr></table></div></div>
-<div class="card"><div class="csh"><i class="fa-solid fa-triangle-exclamation"></i><div><b>Events (defaults for all vehicles) <span class="hp" data-tip="&lt;b&gt;Tolerance&lt;/b&gt; is how long the driver must keep breaking the rule before it is written to the database. The buzzer and the on-screen alert fire immediately; the event is only recorded once the violation lasts longer than the tolerance. Use 2 s for harsh braking/acceleration and 10 s for overspeed. &lt;b&gt;Trigger limit&lt;/b&gt; is the fleet default that a vehicle uses unless it has its own value below. Zone entered and Zone exited have no trigger limit: crossing the line is itself the event.">?</span></b><small>The limit, the buzzer and the spoken message the whole fleet starts from.</small></div></div><div class="tw" id="ruleT" style="margin-top:10px"></div></div>
-<div class="card"><div class="csh"><i class="fa-solid fa-truck"></i><div><b>Settings per vehicle <span class="hp" data-tip="A vehicle marked &lt;b&gt;custom&lt;/b&gt; keeps its own values; leave a box empty to follow the fleet default above. Phones apply changes within 5 minutes or at the next trip start. &lt;b&gt;Overspeed buffer&lt;/b&gt; is added on top of the limit before the alert starts. &lt;b&gt;Warning level&lt;/b&gt; buzzes the phone without recording an event. &lt;b&gt;Min. distance&lt;/b&gt; suppresses events until the vehicle has actually moved that far. Tick the box beside a vehicle and press Reset to send it back to the fleet defaults.">?</span></b><small>Overrides for one vehicle. Tick the box beside it to include it in Reset.</small></div><button class="btn o sm" onclick="resetSelV()" title="Clears the own values of every vehicle you ticked in the table below, so it follows the fleet defaults on this page again. Unticked vehicles are left exactly as they are. Phones apply the change within 5 minutes."><i class="fa-solid fa-rotate-left"></i>Reset selected</button></div><div class="tw" id="cfgV" style="margin-top:10px"></div></div>
+<div class="card"><div class="csh"><i class="fa-solid fa-triangle-exclamation"></i><div><b>Events (defaults for all vehicles) <span class="hp" data-tip="&lt;b&gt;Tolerance&lt;/b&gt; is how long the driver must keep breaking the rule before it is written to the database. The buzzer and the on-screen alert fire immediately; the event is only recorded once the violation lasts longer than the tolerance. Use 2 s for harsh braking/acceleration and 10 s for overspeed. &lt;b&gt;Trigger limit&lt;/b&gt; is the fleet default that a vehicle uses unless it has its own value below. Zone entered and Zone exited have no trigger limit: crossing the line is itself the event.">?</span></b><small>The limit, the buzzer and the spoken message the whole fleet starts from.</small></div></div><div class="tw mt10" id="ruleT"></div></div>
+<div class="card"><div class="csh"><i class="fa-solid fa-truck"></i><div><b>Settings per vehicle <span class="hp" data-tip="A vehicle marked &lt;b&gt;custom&lt;/b&gt; keeps its own values; leave a box empty to follow the fleet default above. Phones apply changes within 5 minutes or at the next trip start. &lt;b&gt;Overspeed buffer&lt;/b&gt; is added on top of the limit before the alert starts. &lt;b&gt;Warning level&lt;/b&gt; buzzes the phone without recording an event. &lt;b&gt;Min. distance&lt;/b&gt; suppresses events until the vehicle has actually moved that far. Tick the box beside a vehicle and press Reset to send it back to the fleet defaults.">?</span></b><small>Overrides for one vehicle. Tick the box beside it to include it in Reset.</small></div><button class="btn o sm" onclick="resetSelV()" title="Clears the own values of every vehicle you ticked in the table below, so it follows the fleet defaults on this page again. Unticked vehicles are left exactly as they are. Phones apply the change within 5 minutes."><i class="fa-solid fa-rotate-left"></i>Reset selected</button></div><div class="tw mt10" id="cfgV"></div></div>
 <div class="card"><div class="csh"><i class="fa-solid fa-draw-polygon"></i><div><b>Zones (geofences) <span class="hp" data-tip="A zone is a shape you draw on the Live Tracking map. Every phone tests each position against it, so driving in, driving out or passing the zone's own speed limit makes an event - and each of those three has its own alert, buzzer, voice and tolerance in the Events table above. &lt;b&gt;Leave a limit empty&lt;/b&gt; and the zone only reports entries and exits. Phones reload the shapes within 5 minutes.">?</span></b><small>The areas the whole fleet is watched against, and what each one reports. Type in the box below to search by name, or press a name to open that shape on the Live Tracking map. Press Edit, or click the shape on a map, to change its name, limit, alerts, colour, or to move, add and drop single corners without drawing the whole zone again.</small></div><button class="btn b sm" onclick="switchTab('live');setTimeout(()=>zAdd(mapL),200)" title="Switches to Live Tracking and starts the drawing tool"><i class="fa-solid fa-draw-polygon"></i>Draw a zone</button></div>
-<div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap"><input id="zQ" placeholder="Search zones by name" oninput="zFilter(this.value)" style="width:260px;max-width:100%"><small id="zC" style="opacity:.65"></small></div>
-<div class="tw" id="zT" style="margin-top:8px"></div></div>
+<div class="fbar mt10"><input id="zQ" placeholder="Search zones by name" oninput="zFilter(this.value)" style="width:260px;max-width:100%"><small id="zC" class="mut"></small></div>
+<div class="tw mt10" id="zT"></div></div>
 <div class="card"><div class="csh"><i class="fa-solid fa-signature"></i><div><b>Saved place names <span class="hp" data-tip="Map services name a place from their own data, so a private or newly built address often shows the wrong label - a neighbour's building, or just a street number. A saved name here wins over every map service: any position inside its radius is reported with this name in trip popups, the trip list and every report. Names already shown on screen are corrected as soon as the page reloads.">?</span></b><small>Names you choose yourself, overriding what the map services call a place. Each one is a small bookmark on the maps - hover it to read the name, press it to edit or delete, or press the bookmark button on a map and click the spot to add one.</small></div><button class="btn b sm" onclick="plAdd()"><i class="fa-solid fa-plus"></i>Add a place</button></div>
-<div class="tw" id="plT" style="margin-top:10px"></div></div>
-<div class="card" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><small style="flex:1;min-width:220px;color:var(--mut)">Everything on this page is saved together. Phones apply the changes within 5 minutes, or at the next trip start.</small><button class="btn g" onclick="saveCfg()"><i class="fa-solid fa-floppy-disk"></i>Save</button></div></section>
+<div class="tw mt10" id="plT"></div></div>
+<div class="card fbar"><small class="mut" style="flex:1;min-width:220px">Everything on this page is saved together. Phones apply the changes within 5 minutes, or at the next trip start.</small><button class="btn g" onclick="saveCfg()"><i class="fa-solid fa-floppy-disk"></i>Save</button></div></section>
 <section id="trip"><div class="card frow"><div class="field"><label>Vehicle</label><select id="tr_v"></select></div><div class="field"><label>From</label><input id="tr_f" type="text"></div><div class="field"><label>To</label><input id="tr_t" type="text"></div>
 <button class="btn b" onclick="loadTrip()"><i class="fa-solid fa-stopwatch"></i>Generate</button></div>
 <div class="kpis" id="trK"></div><div class="cgrid"><div class="card"><canvas id="t1"></canvas></div><div class="card"><canvas id="t2"></canvas></div><div class="card"><canvas id="t3"></canvas></div><div class="card"><canvas id="t4"></canvas></div></div><div class="tw" id="trT"></div></section>
 <section id="rep"><div class="card fgrid"><div class="field"><label>From</label><input id="rp_f" type="text"></div><div class="field"><label>To</label><input id="rp_t" type="text"></div>
 <button class="btn b" onclick="loadRep()"><i class="fa-solid fa-chart-column"></i>Build report</button></div>
 <div class="kpis" id="rpK"></div><div class="cgrid"><div class="card"><canvas id="r1"></canvas></div><div class="card"><canvas id="r2"></canvas></div><div class="card"><canvas id="r3"></canvas></div><div class="card"><canvas id="r4"></canvas></div></div><div class="tw" id="rpT"></div></section>
-<section id="veh"><div class="card"><form class="fgrid" onsubmit="add(event,'vehicles',['name','type','make_model','year','vin','fuel_type','speed_limit','fuel_moving','fuel_idle','notes'])"><div class="field"><label>Vehicle name / plate *</label><input name="name" required></div>
+<section id="veh"><div class="card"><div class="csh"><i class="fa-solid fa-truck"></i><div><b>Vehicles</b><small>The name or plate you type here is what every map, list and report shows. Only that one box is required.</small></div></div><form class="fgrid mt10" onsubmit="add(event,'vehicles',['name','type','make_model','year','vin','fuel_type','speed_limit','fuel_moving','fuel_idle','notes'])"><div class="field"><label>Vehicle name / plate *</label><input name="name" required></div>
 <div class="field"><label>Type</label><select name="type"><option value="">-</option><option>Sedan</option><option>Hatchback</option><option>SUV</option><option>Pickup</option><option>Van</option><option>Minibus</option><option>Bus</option><option>Truck</option><option>Heavy Truck</option><option>Tanker</option><option>Taxi</option><option>Ambulance</option><option>Motorbike</option><option>Tractor</option><option>Trailer</option><option>Equipment</option><option>Car</option></select></div>
 <div class="field"><label>Make / model</label><input name="make_model"></div><div class="field"><label>Year</label><input name="year" type="number" min="1980" max="2100"></div><div class="field"><label>VIN / chassis</label><input name="vin"></div>
 <div class="field"><label>Fuel</label><select name="fuel_type"><option value="">-</option><option>Petrol</option><option>Diesel</option><option>Hybrid</option><option>Electric</option></select></div>
 <div class="field"><label>Speed limit (km/h)</label><input name="speed_limit" type="number" min="10" max="250"></div><div class="field"><label>Fuel moving (L/100 km)</label><input name="fuel_moving" type="number" step="0.1" min="0"></div><div class="field"><label>Fuel idling (L/hour)</label><input name="fuel_idle" type="number" step="0.1" min="0"></div><div class="field"><label>Notes</label><input name="notes"></div><button class="btn g"><i class="fa-solid fa-plus"></i>Add vehicle</button></form></div><div class="tw" id="vehT"></div>
-<div class="card" style="margin-top:10px"><div class="csh"><i class="fa-solid fa-box-archive"></i><div><b>Blackbox download <span class="hp" data-tip="Each phone keeps &lt;b&gt;every&lt;/b&gt; fix it receives - about one per second - in its own storage, and never uploads that stream. Pick the vehicle and the period around an incident and press Download: the request reaches the phone over realtime (or on its next minute-long poll), and the phone then pushes exactly the stored fixes in that window, each stamped with the moment it was taken. They appear in Historical Tracking and the Tacho report as Blackbox rows. A phone that is switched off or out of coverage answers as soon as it is back. Every second exists once on the phone and is uploaded once: a request for a period that was already downloaded, or one that overlaps an earlier request, pushes only the seconds the server does not have, and a pull that stops halfway resumes where it left off.">?</span></b><small>Ask one vehicle for its stored 1-per-second fixes for a period — for accident investigation.</small></div><button class="btn gh sm" onclick="bbTable()" title="Check whether the phone has answered yet"><i class="fa-solid fa-rotate"></i>Refresh</button></div>
-<div class="frow" style="margin-top:10px"><div class="field"><label>Vehicle</label><select id="bb_v"></select></div>
+<div class="card"><div class="csh"><i class="fa-solid fa-box-archive"></i><div><b>Blackbox download <span class="hp" data-tip="Each phone keeps &lt;b&gt;every&lt;/b&gt; fix it receives - about one per second - in its own storage, and never uploads that stream. Pick the vehicle and the period around an incident and press Download: the request reaches the phone over realtime (or on its next minute-long poll), and the phone then pushes exactly the stored fixes in that window, each stamped with the moment it was taken. They appear in Historical Tracking and the Tacho report as Blackbox rows. A phone that is switched off or out of coverage answers as soon as it is back. Every second exists once on the phone and is uploaded once: a request for a period that was already downloaded, or one that overlaps an earlier request, pushes only the seconds the server does not have, and a pull that stops halfway resumes where it left off.">?</span></b><small>Ask one vehicle for its stored 1-per-second fixes for a period — for accident investigation.</small></div><button class="btn gh sm" onclick="bbTable()" title="Check whether the phone has answered yet"><i class="fa-solid fa-rotate"></i>Refresh</button></div>
+<div class="frow mt10"><div class="field"><label>Vehicle</label><select id="bb_v"></select></div>
 <div class="field"><label>From</label><input id="bb_f" type="text"></div><div class="field"><label>To</label><input id="bb_t" type="text"></div>
 <button class="btn b" onclick="bbAsk()"><i class="fa-solid fa-cloud-arrow-down"></i>Download</button></div>
 <div class="tw" id="bbT"></div></div></section>
-<section id="drv"><div class="card"><form class="fgrid" onsubmit="add(event,'drivers',['name','phone','employee_id','license_no','license_expiry','nationality','notes'])"><div class="field"><label>Driver name *</label><input name="name" required></div>
+<section id="drv"><div class="card"><div class="csh"><i class="fa-solid fa-id-card"></i><div><b>Drivers</b><small>A driver is named on the positions and events a phone uploads, so keep the phone number and licence details current.</small></div></div><form class="fgrid mt10" onsubmit="add(event,'drivers',['name','phone','employee_id','license_no','license_expiry','nationality','notes'])"><div class="field"><label>Driver name *</label><input name="name" required></div>
 <div class="field"><label>Phone</label><input name="phone"></div><div class="field"><label>Employee ID</label><input name="employee_id"></div><div class="field"><label>Licence number</label><input name="license_no"></div>
 <div class="field"><label>Licence expiry</label><input name="license_expiry" type="text"></div><div class="field"><label>Nationality</label><input name="nationality"></div><div class="field"><label>Notes</label><input name="notes"></div><button class="btn g"><i class="fa-solid fa-plus"></i>Add driver</button></form></div><div class="tw" id="drvT"></div></section>
-<section id="usr"><div class="card"><i class="fa-solid fa-circle-info" style="color:var(--bl)"></i> <b>Vehicles + Drivers</b> decide what this login is stamped with and which data a normal user can see — tick as many as the login needs, then press Save. <b>Role:</b> Admin sees and manages everything; User sees only what is ticked here. Passwords are reset in Supabase (Authentication → Users).</div><div class="card"><form class="fgrid" onsubmit="addUser(event)"><div class="field"><label>Username (or email)</label><input name="u" required></div><div class="field"><label>Password (min 6)</label><input name="p" type="text" minlength="6" required></div><button class="btn g"><i class="fa-solid fa-user-plus"></i>Create user</button></form></div>
+<section id="usr"><div class="card info"><i class="fa-solid fa-circle-info"></i><div><b>Vehicles + Drivers</b> decide what this login is stamped with and which data a normal user can see — tick as many as the login needs, then press Save. <b>Role:</b> Admin sees and manages everything; User sees only what is ticked here. <b>Status:</b> five wrong passwords on the sign-in screen lock that login out of both apps — Unlock clears it. <b>Reset</b> gives a login a new temporary password, which they must replace at their next sign-in.</div></div><div class="card"><div class="csh"><i class="fa-solid fa-user-plus"></i><div><b>New login</b><small>Signs in on both the dashboard and the phone with the username and password you set here.</small></div></div><form class="fgrid mt10" onsubmit="addUser(event)"><div class="field"><label>Username (or email)</label><input name="u" required></div><div class="field"><label>Password (min 6)</label><input name="p" type="text" minlength="6" required></div><button class="btn g"><i class="fa-solid fa-user-plus"></i>Create user</button></form></div>
 <div class="tw" id="usrT"></div></section>
 <section id="act"><div class="card frow"><div class="field"><label>User</label><select id="ac_u"><option value="">All users</option></select></div>
 <div class="field"><label>Activity</label><select id="ac_t"><option value="">All activities</option></select></div>
 <div class="field"><label>From</label><input id="ac_f" type="text"></div><div class="field"><label>To</label><input id="ac_to" type="text"></div>
 <button class="btn b" onclick="loadAct()"><i class="fa-solid fa-play"></i>Generate</button></div>
-<div class="card"><i class="fa-solid fa-circle-info" style="color:var(--bl)"></i> <b>Who did what, and when.</b> Every sign-in, saved configuration, vehicle, driver or user change, trip start or end and exported report is listed here. <span class="hp" data-tip="Entries are written by the account they describe, so an anonymous or signed-out visit never appears. The log cannot be edited or deleted by anyone, including admins - it is the proof a change was not made by you. Use the search box or the User filter to read one person's history, then CSV, Excel or PDF to hand it over.">?</span> Only admins can see this page.</div>
-<div id="acFl" style="display:flex;gap:8px;align-items:center;min-height:30px"></div><div class="kpis" id="acK"></div><div class="tw" id="acT"></div></section>
+<div class="card info"><i class="fa-solid fa-circle-info"></i><div><b>Who did what, and when.</b> Every sign-in, saved configuration, vehicle, driver or user change, trip start or end and exported report is listed here. <span class="hp" data-tip="Entries are written by the account they describe, so an anonymous or signed-out visit never appears. The log cannot be edited or deleted by anyone, including admins - it is the proof a change was not made by you. Use the search box or the User filter to read one person's history, then CSV, Excel or PDF to hand it over.">?</span> Only admins can see this page.</div></div>
+<div id="acFl" class="fbar"></div><div class="kpis" id="acK"></div><div class="tw" id="acT"></div></section>
 </main><footer class="pagefoot">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</footer></div></div><div id="toast"></div><div id="tip"></div>
 <div id="zHint" class="hide"></div>
-<div id="zdlg" class="mdl"><div><div id="zTitle" style="font-size:15px;font-weight:800;margin-bottom:8px"></div>
+<div id="zdlg" class="mdl"><div><div id="zTitle" class="dlgT"></div>
 <div class="fg"><div class="field"><label>Zone name</label><input id="zName" maxlength="60" placeholder="Old port"></div>
 <div class="field"><label>Speed limit in this zone (km/h) — leave empty for no zone limit</label><input id="zLim" type="number" min="5" max="250"></div></div>
 <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:10px 0 4px">
@@ -276,18 +303,18 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <label class="ck"><input id="zOn" type="checkbox"> Watch this zone</label><span class="hp" data-tip="&lt;b&gt;Watched (ticked)&lt;/b&gt;: every phone checks each position it records against this shape, so driving in, driving out or going faster than the zone limit makes an event with the alert, buzzer and voice you set for it in Configuration.&lt;br&gt;&lt;b&gt;Not watched (empty)&lt;/b&gt;: the shape stays on the map and in this list, but nothing is reported for it. Use it while a zone is being moved or rebuilt instead of deleting it, or to rest a zone temporarily.">?</span>
 <label class="ck"><input id="zCol" type="color"> Colour</label></div>
 <p id="zShape" style="color:var(--mut);margin:6px 0 12px"></p>
-<div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap"><span style="margin-right:auto;display:flex;gap:8px;flex-wrap:wrap"><button class="btn o sm" onclick="zShapeBtn()" title="Closes this box and puts the outline on the Live Tracking map with grips on it: drag a corner, drag a white dot to make a new corner, right-click a corner to drop it, drag the blue dot to move the whole zone, or Grow / Shrink it. Press Apply shape to come back with the name, limit and alerts kept."><i class="fa-solid fa-vector-square"></i>Change the shape on the map</button><button class="btn gh sm" onclick="zRedraw()" title="Forget this outline and click a brand new one from the first corner."><i class="fa-solid fa-draw-polygon"></i>Draw it again</button></span><button class="btn r sm hide" id="zDelB" onclick="zDelById(ZED&&ZED.id)"><i class="fa-solid fa-trash"></i>Delete</button>
+<div class="dlgB"><span style="margin-right:auto;display:flex;gap:8px;flex-wrap:wrap"><button class="btn o sm" onclick="zShapeBtn()" title="Closes this box and puts the outline on the Live Tracking map with grips on it: drag a corner, drag a white dot to make a new corner, right-click a corner to drop it, drag the blue dot to move the whole zone, or Grow / Shrink it. Press Apply shape to come back with the name, limit and alerts kept."><i class="fa-solid fa-vector-square"></i>Change the shape on the map</button><button class="btn gh sm" onclick="zRedraw()" title="Forget this outline and click a brand new one from the first corner."><i class="fa-solid fa-draw-polygon"></i>Draw it again</button></span><button class="btn r sm hide" id="zDelB" onclick="zDelById(ZED&&ZED.id)"><i class="fa-solid fa-trash"></i>Delete</button>
 <button class="btn gh" onclick="zClose()">Cancel</button><button class="btn b" onclick="zSave()"><i class="fa-solid fa-floppy-disk"></i>Save zone</button></div>
-<small style="color:var(--mut);display:block;margin-top:8px">A vehicle crossing the line makes an event, and a vehicle faster than the limit above makes a Zone overspeed event — each with the alert, buzzer and voice you set for it in Configuration.</small></div></div>
-<div id="pdlg" class="mdl"><div><div id="plTitle" style="font-size:15px;font-weight:800;margin-bottom:8px"></div>
+<small class="dlgN">A vehicle crossing the line makes an event, and a vehicle faster than the limit above makes a Zone overspeed event — each with the alert, buzzer and voice you set for it in Configuration.</small></div></div>
+<div id="pdlg" class="mdl"><div><div id="plTitle" class="dlgT"></div>
 <div class="fg"><div class="field"><label>Name to show <span class="hp" data-tip="Written exactly as you type it, and used instead of the name the map services give.">?</span></label><input id="plN" maxlength="60" placeholder="Ameer's Home"></div>
 <div class="field"><label>Radius (metres)</label><input id="plR" type="number" min="20" max="5000" value="150"></div></div>
-<div class="fg" style="margin-top:10px"><div class="field"><label>Latitude</label><input id="plLa" type="number" step="0.00001" min="-90" max="90"></div>
+<div class="fg mt10"><div class="field"><label>Latitude</label><input id="plLa" type="number" step="0.00001" min="-90" max="90"></div>
 <div class="field"><label>Longitude</label><input id="plLo" type="number" step="0.00001" min="-180" max="180"></div></div>
-<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"><button class="btn gh sm" onclick="plPick()" title="Close this and click the spot on the Live Tracking map"><i class="fa-solid fa-crosshairs"></i>Pick on the map</button><small id="plMap" style="color:var(--mut);align-self:center"></small></div>
-<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn r sm hide" id="plDelB" onclick="plDel(+PLI.i)"><i class="fa-solid fa-trash"></i>Delete</button>
+<div class="fbar mt10"><button class="btn gh sm" onclick="plPick()" title="Close this and click the spot on the Live Tracking map"><i class="fa-solid fa-crosshairs"></i>Pick on the map</button><small id="plMap" class="mut"></small></div>
+<div class="dlgB"><button class="btn r sm hide" id="plDelB" onclick="plDel(+PLI.i)"><i class="fa-solid fa-trash"></i>Delete</button>
 <button class="btn gh" onclick="$('pdlg').classList.remove('on')">Cancel</button><button class="btn b" onclick="plSave()"><i class="fa-solid fa-floppy-disk"></i>Save place</button></div>
-<small style="color:var(--mut);display:block;margin-top:8px">Any vehicle position within the radius of this point is shown with the name above, in popups, trip lists and reports.</small></div></div>
+<small class="dlgN">Any vehicle position within the radius of this point is shown with the name above, in popups, trip lists and reports.</small></div></div>
 <script>
 document.documentElement.dataset.theme=localStorage.theme||'light';
 const p2=n=>String(n).padStart(2,'0');
@@ -318,12 +345,17 @@ const COL={go:'#27a46a',idle:'#f28c28',park:'#2f7fe6',off:'#8b98a5'},LBL={go:'Mo
 const OFFH=()=>{const h=+SET.offline_after_h;return Number.isFinite(h)&&h>0?h:24};
 const off=p=>Date.now()-new Date(p.recorded_at)>OFFH()*36e5;
 const st=p=>off(p)?'off':(p.ignition===false||Date.now()-new Date(p.recorded_at)>STALE_MIN*6e4)?'park':(p.speed>0?'go':'idle');
-// tile sources, shared by every map on the page and by the trip print-out window
-const BASES={'Street Map':['https://tile.openstreetmap.org/{z}/{x}/{y}.png','© OpenStreetMap',19,{}],
+// tile sources, shared by every map on the page and by the trip print-out window.
+// 'Street Map' used to be tile.openstreetmap.org, which answers this app with a
+// 403 "Access blocked - not following the tile usage policy" tile, so the street
+// view was unusable on both tracking pages; Esri's street tiles are keyless and
+// allow an app of this size, and are the same service the satellite layer and the
+// address lookup already use.
+const BASES={'Street Map':['https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}','Tiles © Esri',19,{}],
  'Google Map':['https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}','Map data © Google',20,{subdomains:['mt0','mt1','mt2','mt3']}],
  'Google Satellite':['https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}','Map data © Google',20,{subdomains:['mt0','mt1','mt2','mt3']}],
  'Google Hybrid':['https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}','Map data © Google',20,{subdomains:['mt0','mt1','mt2','mt3']}],
- 'Esri Satellite':['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}','Tiles © Esri',20,{}]};
+ 'Satellite':['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}','Tiles © Esri',20,{}]};
 const baseN=()=>BASES[localStorage.base]?localStorage.base:'Google Map';
 const baseL=n=>{const b=BASES[n||baseN()];return L.tileLayer(b[0],{attribution:b[1],maxZoom:b[2],...b[3]})};
 function mkMap(id,fit,extra){
@@ -556,9 +588,9 @@ function zTable(){const t=$('zT');if(!t)return;
  const ZS=zones.filter(z=>!ZQ||String(z.name||'').toLowerCase().includes(ZQ));
  const c=$('zC');if(c)c.textContent=zones.length?(ZQ?ZS.length+' of '+zones.length+' zones match':zones.length+' zones'):'';
  const nm=z=>`<td><button class="zgo" onclick="zGoto('${z.id}')" title="Show this zone on the Live Tracking map">${esc(z.name)}</button></td>`;
- const none=(n,m)=>`<tr><td colspan="${n}">${m}</td></tr>`;
+ const none=(n,m)=>`<tr><td colspan="${n}" class="empty">${m}</td></tr>`;
  t.innerHTML=ADMIN?`<table><tr><th>Zone</th><th>Corners</th><th>Area km2</th><th>Speed limit km/h</th><th>Alert on entry</th><th>Alert on exit</th><th>Alert on overspeed</th><th>Watched <span class="hp" data-tip="Ticked: the phones report entry, exit and overspeed for this zone. Empty: the shape stays on the map but nothing is reported - switch a zone off instead of deleting it while it is being moved or rebuilt.">?</span></th><th></th></tr>${ZS.map(z=>{const p=zPts(z.shape);
-  return `<tr>${nm(z)}<td>${p.length}</td><td>${p.length>2?zArea(p).toFixed(3):'-'}</td><td><input type="number" min="5" max="250" value="${z.speed_limit==null?'':z.speed_limit}" style="width:78px" onchange="zSet('${z.id}','speed_limit',this.value===''?null:+this.value)"></td>${['enter','exit','overspeed'].map(k=>`<td style="text-align:center"><input type="checkbox" ${z[k]!==false?'checked':''} onchange="zSet('${z.id}','${k}',this.checked)"></td>`).join('')}<td style="text-align:center"><input type="checkbox" ${z.enabled!==false?'checked':''} onchange="zSet('${z.id}','enabled',this.checked)"></td><td style="text-align:right;white-space:nowrap"><button class="btn b sm" onclick="zEdit('${z.id}')" title="Change this zone's name, speed limit, alerts, colour, whether it is watched, or its shape"><i class="fa-solid fa-pen"></i>Edit</button> <button class="btn r sm" onclick="zDelById('${z.id}')"><i class="fa-solid fa-trash"></i>Delete</button></td></tr>`}).join('')||none(9,ZQ?'No zone matches "'+esc(ZQ)+'".':'No zones yet. Press the <b>Geofences</b> button on the Live Tracking map, then <b>Draw a new zone</b>.')}</table>`
+  return `<tr>${nm(z)}<td>${p.length}</td><td>${p.length>2?zArea(p).toFixed(3):'-'}</td><td><input type="number" min="5" max="250" value="${z.speed_limit==null?'':z.speed_limit}" style="width:78px" onchange="zSet('${z.id}','speed_limit',this.value===''?null:+this.value)"></td>${['enter','exit','overspeed'].map(k=>`<td class="taC"><input type="checkbox" ${z[k]!==false?'checked':''} onchange="zSet('${z.id}','${k}',this.checked)"></td>`).join('')}<td class="taC"><input type="checkbox" ${z.enabled!==false?'checked':''} onchange="zSet('${z.id}','enabled',this.checked)"></td><td class="act"><button class="btn b sm" onclick="zEdit('${z.id}')" title="Change this zone's name, speed limit, alerts, colour, whether it is watched, or its shape"><i class="fa-solid fa-pen"></i>Edit</button> <button class="btn r sm" onclick="zDelById('${z.id}')"><i class="fa-solid fa-trash"></i>Delete</button></td></tr>`}).join('')||none(9,ZQ?'No zone matches "'+esc(ZQ)+'".':'No zones yet. Press the <b>Geofences</b> button on the Live Tracking map, then <b>Draw a new zone</b>.')}</table>`
   :`<table><tr><th>Zone</th><th>Speed limit km/h</th><th>Area km2</th></tr>${ZS.filter(z=>z.enabled!==false).map(z=>{const p=zPts(z.shape);return `<tr>${nm(z)}<td>${z.speed_limit==null?'-':z.speed_limit}</td><td>${p.length>2?zArea(p).toFixed(3):'-'}</td></tr>`}).join('')||none(3,ZQ?'No watched zone matches "'+esc(ZQ)+'".':'No zone is being watched.')}</table>`}
 async function zSet(id,k,v){if(!ADMIN)return;
  const u={updated_at:new Date().toISOString()};u[k]=k==='speed_limit'?(v==null||v===''?null:+v):!!v;
@@ -638,7 +670,7 @@ async function bbTable(){if(!ADMIN)return;const el=$('bbT');if(!el)return;
  const {data}=await sb.from('bb_requests').select('*').order('requested_at',{ascending:false}).limit(30);BBS=data||[];
  el.innerHTML=`<table><tr><th>Asked</th><th>Vehicle</th><th>From</th><th>To</th><th>Status</th><th>Fixes delivered</th><th>Phone answered</th><th></th></tr>${BBS.map(r=>`<tr><td>${new Date(r.requested_at).toLocaleString()}</td><td><b>${esc(r.vehicle_name||'-')}</b></td><td>${new Date(r.from_ts).toLocaleString()}</td><td>${new Date(r.to_ts).toLocaleString()}</td>
   <td><span class="chip" style="background:var(--${r.status==='sent'?'grl':r.status==='failed'?'rdl':'orl'});color:var(--${r.status==='sent'?'gr':r.status==='failed'?'rd':'or'})">${r.status}</span></td><td>${r.n_rows==null?'-':r.n_rows}</td><td>${r.answered_at?new Date(r.answered_at).toLocaleString():'-'}${r.error?'<br><small style="color:var(--rd)">'+esc(r.error).slice(0,90)+'</small>':''}</td>
-  <td style="text-align:right">${r.status==='pending'?`<button class="btn r sm" onclick="bbCancel('${r.id}')"><i class="fa-solid fa-xmark"></i>Cancel</button>`:''}</td></tr>`).join('')||'<tr><td colspan="8">No download has been asked for yet.</td></tr>'}</table>`}
+  <td class="taR">${r.status==='pending'?`<button class="btn r sm" onclick="bbCancel('${r.id}')"><i class="fa-solid fa-xmark"></i>Cancel</button>`:''}</td></tr>`).join('')||'<tr><td colspan="8" class="empty">No download has been asked for yet.</td></tr>'}</table>`}
 async function bbAsk(){if(!ADMIN)return;const v=$('bb_v').value,nm=(vehicles.find(x=>x.id===v)||{}).name||'';
  if(!v)return toast('Choose a vehicle first');
  const f=new Date($('bb_f').value),t=new Date($('bb_t').value);
@@ -654,13 +686,34 @@ async function bbCancel(id){if(!ADMIN)return;
  if(!confirm('Cancel this request? A phone that already started sending keeps what it pushed.'))return;
  await sb.from('bb_requests').delete().eq('id',id);bbTable();logAct('Blackbox request cancelled','')}
 
+// ---- account lockout (v18). Five wrong passwords and that account is locked until
+// an administrator unlocks it on the Users page. The database holds the count, not
+// this page, so reloading, closing the tab or trying from the phone cannot get past
+// it. All three calls answer the same way for an address that has never signed in
+// here as for an unlocked one, so the sign-in screen cannot be walked through to
+// find out which users exist; a missing function (a database that has not run
+// schema.sql yet) is simply read as "no lock information" and signing in continues.
+const LOCK_AT=5;let LOCKMISS=0;
+const lockCall=(f,e)=>sb.rpc(f,{p_email:e}).then(({data,error})=>{
+ if(error&&/could not find the function|does not exist/i.test(error.message||''))LOCKMISS=1;
+ return!error&&data&&data[0]||null});
 async function signIn(){
  const want=$('rem').checked;if(want!==REM){REM=want;localStorage.rem=want?'1':'0';sb=mk(REM)}
  const b=$('sib');b.disabled=true;b.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i>Signing in...';$('lerr').textContent='';
- try{const {error}=await sb.auth.signInWithPassword({email:mail($('em').value),password:$('pw').value});if(error)throw error;
+ const em=mail($('em').value),done=()=>{b.disabled=false;b.innerHTML='<i class="fa-solid fa-right-to-bracket"></i>Sign in'};
+ const g=await lockCall('login_gate',em);
+ if(g&&g.locked){$('lerr').textContent='Your account is locked after '+LOCK_AT+' wrong passwords. Please contact the administrator.';return done()}
+ try{const {error}=await sb.auth.signInWithPassword({email:em,password:$('pw').value});if(error)throw error;
+  await lockCall('login_ok',em);
   want?localStorage.user=$('em').value.trim():localStorage.removeItem('user');await boot(1);toast('Welcome, '+UNAME+'!',1)}
- catch(e){$('lerr').textContent='Error: '+(e.message||e)}
- b.disabled=false;b.innerHTML='<i class="fa-solid fa-right-to-bracket"></i>Sign in'}
+ catch(e){const m=e.message||String(e),bad=/invalid login credentials/i.test(m);
+  const r=bad?await lockCall('login_fail',em):null;
+  if(r&&r.locked)$('lerr').textContent='That was the '+LOCK_AT+'th wrong password: your account is now locked. Please contact the administrator.';
+  else if(r)$('lerr').textContent='Wrong password. '+(r.tries_left>1?r.tries_left+' attempts left':'One attempt left')+' before this account is locked.';
+  else if(/too many requests|rate limit/i.test(m))$('lerr').textContent='Too many attempts just now. Wait a minute, then try again.';
+  else $('lerr').textContent='Error: '+m;
+  if(LOCKMISS&&!WARNED.lock){WARNED.lock=1;toast('Account lockout needs the newest schema: run schema.sql in Supabase once.',0)}}
+ done()}
 function eye(){const i=$('pw');i.type=i.type==='password'?'text':'password';$('eyei').className='fa-solid '+(i.type==='password'?'fa-eye':'fa-eye-slash')}
 function pin(){document.querySelector('aside').classList.toggle('pin');localStorage.pin=document.querySelector('aside').classList.contains('pin')?'1':'0';pinBtn()}
 function pinBtn(){if(!document.getElementById('pinB'))return;const on=document.querySelector('aside').classList.contains('pin'),b=$('pinB');b.classList.toggle('on',on);
@@ -668,18 +721,25 @@ function pinBtn(){if(!document.getElementById('pinB'))return;const on=document.q
 function accMenu(){const m=$('accM');m.classList.toggle('hide',!m.classList.contains('hide'))}
 function accHide(){$('accM').classList.add('hide')}
 document.addEventListener('click',e=>{if(!$('accWrap').contains(e.target))accHide()});
-function pwForm(){const m=$('modal');m.innerHTML=`<div class="card" style="max-width:380px"><b>Change my password</b>
+// forced=1 when the administrator set this password: the box then has no Cancel
+// button, because signing in with somebody else's password must not be ignorable
+function pwForm(force){const m=$('modal');m.innerHTML=`<div class="card" style="max-width:380px"><div class="dlgT">Change my password</div>
  <div class="field"><label>New password</label><input type="password" id="np1" autocomplete="new-password"></div>
  <div class="field"><label>Repeat new password</label><input type="password" id="np2" autocomplete="new-password"></div>
- <p style="color:var(--mut);font-size:12px">At least 6 characters. These usernames have no real mailbox, so a forgotten password cannot be emailed — set it here while signed in, or change it in Supabase &gt; Authentication &gt; Users.</p>
- <div style="display:flex;gap:8px"><button class="btn b sm" onclick="changePw()">Save</button><button class="btn gh sm" onclick="$('modal').classList.add('hide')">Cancel</button></div></div>`;
- m.classList.remove('hide');$('np1').focus()}
-async function changePw(){const a=$('np1').value,b=$('np2').value;
+ <p class="mutS">${force?'The administrator set the password you signed in with. Choose your own — at least 6 characters. This box stays open until you do.'
+  :'At least 6 characters. These usernames have no real mailbox, so a forgotten password cannot be emailed — set it here while signed in, or ask the administrator to reset it on the Users page.'}</p>
+ <div class="dlgB">${force?'':'<button class="btn gh sm" onclick="$(\'modal\').classList.remove(\'on\')">Cancel</button>'}<button class="btn b sm" onclick="changePw(${force?1:0})">Save</button></div></div>`;
+ m.classList.add('on');$('np1').focus()}
+async function changePw(force){const a=$('np1').value,b=$('np2').value;
  if(a.length<6)return toast('The new password must be at least 6 characters');
  if(a!==b)return toast('The two new passwords do not match');
  const {error}=await sb.auth.updateUser({password:a});
  if(error)return toast(error.message);
- $('modal').classList.add('hide');toast('Password changed',1);logAct('Changed own password')}
+ // the "you must change this password" flag belongs to the database row, and an
+ // ordinary account has no update rights on profiles — this narrow function is the
+ // only way it can put the flag down, and only about itself
+ await sb.rpc('clear_pw_flag');
+ $('modal').classList.remove('on');toast('Password changed',1);logAct('Changed own password',force?'after an administrator reset':'')}
 function themeBtn(){const d=document.documentElement.dataset.theme==='dark';$('themeB').innerHTML=d?'<i class="fa-solid fa-sun"></i><span>Light mode</span>':'<i class="fa-solid fa-moon"></i><span>Dark mode</span>'}
 // ---- audit trail. Writes are fire-and-forget: the database is the only place
 // this can be read from (admin-only policy) and a failed insert must never block
@@ -712,9 +772,16 @@ async function boot(fresh){
  // Supabase refreshes quietly while the tab is used; this keeps a dashboard left
  // open all day signed in, and notices the moment the session really has ended
  if(!KA)KA=setInterval(keepAlive,10*60*1000);
- const {data:p}=await sb.from('profiles').select('role').eq('id',session.user.id).single();
+ const {data:p}=await sb.from('profiles').select('role,fails,locked_at,must_change').eq('id',session.user.id).single();
+ // a lock set while this tab was already open steps straight back out: the lock is
+// the administrator's decision, not something a page left open all day rides through
+ if(p&&p.locked_at){await sb.auth.signOut();$('login').classList.remove('hide');
+  return $('lerr').textContent='Your account was locked while this page was open. Please contact the administrator.'}
  ADMIN=p?.role==='admin';UID=session.user.id;document.body.classList.toggle('usr',!ADMIN);
  $('login').classList.add('hide');$('app').classList.remove('hide');UNAME=(session.user.email||'').replace('@fleet.local','');$('me').textContent=UNAME;$('accWho').textContent='Welcome, '+UNAME+'!';if(localStorage.pin==='1')document.querySelector('aside').classList.add('pin');pinBtn();themeBtn();
+ // a password the administrator typed for somebody else is only ever temporary:
+ // signing in with it opens the change box, and the box has no Cancel button
+ if(p?.must_change){pwForm(1);toast('That password was set for you. Choose your own before anything else.',0)}
  logAct(fresh?'Signed in':'Opened dashboard','Role: '+(ADMIN?'admin':'user'));sessStart();
  mapL=mkMap('mapLive',fitAll,[['fa-thumbtack','Pin: keep the selected vehicle in the centre of the map while it moves',pinV,'pin'],['fa-volume-high','Mute the alert buzzer',muteTog,'mute']]);mapH=mkMap('mapHist',hFit);muteUi();
  initDates();
@@ -741,7 +808,7 @@ async function refs(){
  msel('lv_v',vehicles,'All vehicles',mselVal('lv_v'));if(!LVW){LVW=1;$('lv_v').addEventListener('change',lvChg)}
  msel('ev_v',vehicles,'All vehicles',mselVal('ev_v'));msel('ev_d',drivers,'All drivers',mselVal('ev_d'));msel('ev_t',Object.keys(EV).map(k=>({id:k,name:EV[k][0]})),'All events',mselVal('ev_t'));
  $('tr_v').innerHTML=$('hv').innerHTML;$('bb_v').innerHTML=$('hv').innerHTML;$('vehT').innerHTML=tbl(vehicles,['name','type','make_model','year','speed_limit','fuel_moving','fuel_idle'],'vehicles');$('drvT').innerHTML=tbl(drivers,['name','phone','license_no','license_expiry'],'drivers');tools($('vehT'));tools($('drvT'))}
-const tbl=(rows,cols,t)=>`<table><tr>${cols.map(c=>`<th>${c.replace(/_/g,' ')}</th>`).join('')}<th></th></tr>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(r[c])}</td>`).join('')}<td style="text-align:right;white-space:nowrap"><button class="btn b sm" onclick="edit('${t}','${r.id}')"><i class="fa-solid fa-pen"></i>Edit</button> <button class="btn r sm" onclick="del('${t}','${r.id}')"><i class="fa-solid fa-trash"></i>Delete</button></td></tr>`).join('')||'<tr><td colspan="9">Nothing here yet. Add one above.</td></tr>'}</table>`;
+const tbl=(rows,cols,t)=>`<table><tr>${cols.map(c=>`<th>${c.replace(/_/g,' ')}</th>`).join('')}<th></th></tr>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(r[c])}</td>`).join('')}<td class="act"><button class="btn b sm" onclick="edit('${t}','${r.id}')"><i class="fa-solid fa-pen"></i>Edit</button> <button class="btn r sm" onclick="del('${t}','${r.id}')"><i class="fa-solid fa-trash"></i>Delete</button></td></tr>`).join('')||'<tr><td colspan="9" class="empty">Nothing here yet. Add one above.</td></tr>'}</table>`;
 async function add(e,t,cols){e.preventDefault();if(!ADMIN)return;const f=e.target,id=f.dataset.id,o={};cols.forEach(c=>o[c]=f[c].value||null);
  const {error}=id?await sb.from(t).update(o).eq('id',id):await sb.from(t).insert(o);if(error)return toast(error.message);
  logAct((id?'Edited ':'Added ')+t.replace(/s$/,''),o.name);
@@ -751,12 +818,63 @@ function edit(t,id){if(!ADMIN)return;const r=(t==='vehicles'?vehicles:drivers).f
  f.querySelector('button').innerHTML='<i class="fa-solid fa-floppy-disk"></i>Save changes';f.scrollIntoView({behavior:'smooth'});f.elements[0].focus()}
 async function del(t,id){if(!ADMIN)return;if(confirm('Delete this item?')){const nm=((t==='vehicles'?vehicles:drivers).find(x=>x.id===id)||{}).name||id;
  await sb.from(t).delete().eq('id',id);logAct('Deleted '+t.replace(/s$/,''),nm);refs()}}
+let USRS=[];
+const uname=id=>((USRS.find(x=>x.id===id)||{}).email||'').replace('@fleet.local','')||'this account';
 async function users(){
  const {data:ps}=await sb.from('profiles').select('*').order('email');const {data:as}=await sb.from('assignments').select('*');
+ USRS=ps||[];
  const mine=(id,k)=>(as||[]).filter(x=>x.user_id===id&&x[k]).map(x=>x[k]);
  const HP=t=>`<span class="hp" data-tip="${t}">?</span>`;
- $('usrT').innerHTML=`<table><tr><th>User</th><th>Vehicles ${HP('Open the list and tick every vehicle this login should see - use Select all or the search box when the fleet is large. A phone signed in here gets a vehicle picker on its own screen.')}</th><th>Drivers ${HP('Tick every driver profile this login should see. The first tick is paired with the first vehicle tick, the second with the second, and so on - that pairing is what the phone stamps on each position and event.')}</th><th>Role</th><th></th></tr>${(ps||[]).map(p=>`<tr><td><i class="fa-solid fa-user"></i> ${esc((p.email||'').replace('@fleet.local',''))}${p.role==='admin'?' <span class="chip" style="background:var(--bll);color:var(--bl)">admin</span>':''}</td><td><div id="v_${p.id}"></div></td><td><div id="d_${p.id}"></div></td><td><select id="r_${p.id}" style="height:34px"><option value="user" ${p.role!=='admin'?'selected':''}>User</option><option value="admin" ${p.role==='admin'?'selected':''}>Admin</option></select></td><td style="text-align:right"><button class="btn g sm" onclick="link('${p.id}')"><i class="fa-solid fa-floppy-disk"></i>Save</button></td></tr>`).join('')}</table>`;
- (ps||[]).forEach(p=>{msel('v_'+p.id,vehicles,'None selected',mine(p.id,'vehicle_id'));msel('d_'+p.id,drivers,'None selected',mine(p.id,'driver_id'))});tools($('usrT'))}
+ // the lock lives in the database, so this column only reports what it says: a lock
+ // is either still on or on its way there, and a count of wrong tries that has not
+ // reached five is only a warning
+ const stat=p=>p.locked_at?`<span class="chip" style="background:var(--rdl);color:var(--rd)"><i class="fa-solid fa-lock"></i> Locked</span><br><small class="mut">5 wrong passwords<br>${new Date(p.locked_at).toLocaleString()}</small>`
+  :+p.fails>0?`<span class="chip chipO">${p.fails} wrong ${p.fails==1?'try':'tries'}</span><br><small class="mut">locks at ${LOCK_AT}</small>`
+  :p.must_change?`<span class="chip chipO">Temp password</span><br><small class="mut">must set their own</small>`
+  :`<span class="chip" style="background:var(--grl);color:var(--gr)">Active</span>`;
+ $('usrT').innerHTML=`<table><tr><th>User</th><th>Vehicles ${HP('Open the list and tick every vehicle this login should see - use Select all or the search box when the fleet is large. A phone signed in here gets a vehicle picker on its own screen.')}</th><th>Drivers ${HP('Tick every driver profile this login should see. The first tick is paired with the first vehicle tick, the second with the second, and so on - that pairing is what the phone stamps on each position and event.')}</th><th>Role</th><th>Status ${HP('Five wrong passwords on the sign-in screen lock an account out of the dashboard and the phone until you press Unlock here. A count below five is only a warning: the account still signs in normally.')}</th><th></th></tr>${USRS.map(p=>`<tr><td><i class="fa-solid fa-user"></i> ${esc((p.email||'').replace('@fleet.local',''))}${p.role==='admin'?' <span class="chip chipB">admin</span>':''}</td><td><div id="v_${p.id}"></div></td><td><div id="d_${p.id}"></div></td><td><select id="r_${p.id}" style="height:34px"><option value="user" ${p.role!=='admin'?'selected':''}>User</option><option value="admin" ${p.role==='admin'?'selected':''}>Admin</option></select></td><td class="nw">${stat(p)}</td><td class="act"><button class="btn g sm" onclick="link('${p.id}')"><i class="fa-solid fa-floppy-disk"></i>Save</button> <button class="btn ${p.locked_at?'b':'gh'} sm" onclick="unlockU('${p.id}')" title="Clear the lock and the count of wrong passwords so this account can sign in again. It changes nothing else."><i class="fa-solid fa-lock-open"></i>Unlock</button> <button class="btn gh sm" onclick="resetPw('${p.id}')" title="Give this account a new password. It has no mailbox, so hand the password to the person yourself; they must replace it with their own at their next sign-in."><i class="fa-solid fa-key"></i>Reset</button></td></tr>`).join('')}</table>`;
+ USRS.forEach(p=>{msel('v_'+p.id,vehicles,'None selected',mine(p.id,'vehicle_id'));msel('d_'+p.id,drivers,'None selected',mine(p.id,'driver_id'))});tools($('usrT'))}
+// ---- the two administrator actions on an account. Unlock is an ordinary profiles
+// update, which the existing admin policy already allows, so it works even before
+// the newest schema and even if the reset service below is not deployed. Setting a
+// password for somebody else cannot be done with the key this page carries - only a
+// server-only key can - so it goes to the fleet-admin Edge function, which checks
+// this session and that its profile says admin before it acts.
+async function unlockU(id){if(!ADMIN)return;
+ const nm=uname(id);if(!confirm('Unlock '+nm+'? They can sign in again straight away.'))return;
+ const {error}=await sb.from('profiles').update({fails:0,locked_at:null}).eq('id',id);
+ if(error)return toast(error.message);
+ logAct('Unlocked user',nm);toast(nm+' can sign in again',1);users()}
+// a password someone has to read out over the phone or type in front of them: no
+// look-alike characters (no I, O, 0 or 1) and split into two short groups
+function tmpPw(){const A='ABCDEFGHJKLMNPQRSTUVWXYZ',B='abcdefghijkmnopqrstuvwxyz',D='23456789',
+ pick=(s,n)=>{const x=new Uint32Array(n);crypto.getRandomValues(x);return[...x].map(v=>s[v%s.length]).join('')};
+ return 'Fleet-'+pick(D,4)+'-'+pick(A,2)+pick(B,2)}
+function resetPw(id){if(!ADMIN)return;const nm=uname(id),m=$('modal');
+ m.innerHTML=`<div class="card" style="max-width:430px"><div class="dlgT"><i class="fa-solid fa-key"></i> New password for ${esc(nm)}</div>
+ <p class="mutS" style="margin:8px 0">These accounts have no mailbox, so a new password cannot be emailed. Set one here and pass it to the person yourself. They will be made to replace it with their own the next time they sign in, and any lock on the account is cleared at the same time.</p>
+ <div class="field"><label>Temporary password</label><div class="fbar"><input id="rpw" readonly value="${tmpPw()}" style="flex:1;font-family:ui-monospace,Consolas,monospace;letter-spacing:.5px"><button class="btn gh sm" onclick="rpwCopy()" title="Copy this password"><i class="fa-solid fa-copy"></i>Copy</button><button class="btn gh sm" onclick="$('rpw').value=tmpPw();rpwShow(0)" title="Make another one"><i class="fa-solid fa-rotate"></i></button></div></div>
+ <div class="field"><label>Or type your own</label><input id="rpw2" placeholder="Leave empty to use the one above" autocomplete="off" minlength="6"></div>
+ <small id="rpwMsg" class="mutS"></small>
+ <div class="dlgB"><button class="btn gh sm" onclick="$('modal').classList.remove('on')">Cancel</button><button class="btn b sm" onclick="rpwGo('${id}')"><i class="fa-solid fa-floppy-disk"></i>Set this password</button></div></div>`;
+ m.classList.add('on');$('rpw').focus()}
+function rpwShow(ok){const e=$('rpwMsg');if(!e)return;e.textContent=ok?'Copied. Hand it to the person now — this page keeps no copy of it.'
+ :'This box shows the new password once — copy it or write it down before closing it.';
+ e.style.color=ok?'var(--gr)':'var(--mut)';if(ok)setTimeout(()=>rpwShow(0),2500)}
+async function rpwCopy(){try{await navigator.clipboard.writeText($('rpw').value);rpwShow(1)}catch(e){$('rpw').select();toast('Copy it with Ctrl+C — the box is already selected',1)}}
+async function rpwGo(id){if(!ADMIN)return;const nm=uname(id),pw=($('rpw2').value||'').trim()||$('rpw').value;
+ if(pw.length<6)return toast('The new password must be at least 6 characters');
+ if(!confirm('Set this as '+nm+"'s new password?\n\n"+pw+"\n\nThey will be asked to change it at their next sign-in."))return;
+ const r=await callAdmin('set_password',{user_id:id,password:pw});
+ if(r.error)return toast(r.error);
+ logAct('Reset password',nm);$('modal').classList.remove('on');users();
+ toast('Password set for '+nm+'. Give it to them and ask them to change it.',1)}
+const FNURL=()=>SUPABASE_URL.replace(/\/+$/,'')+'/functions/v1/fleet-admin';
+async function callAdmin(action,body){const {data:{session}}=await sb.auth.getSession();
+ try{const res=await fetch(FNURL(),{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+((session&&session.access_token)||SUPABASE_KEY)},body:JSON.stringify({action,...body})});
+  const j=await res.json().catch(()=>({}));
+  if(!res.ok)return{error:j.error||(res.status===404?'The fleet-admin Edge function is not deployed in Supabase yet: Edge Functions > Deploy new function > name it fleet-admin.':'The reset service answered with HTTP '+res.status)};
+  return j}catch(e){return{error:'The reset service did not answer: '+(e.message||e)}}}
 const ticked=id=>mselVal(id);
 async function link(id){const role=$('r_'+id).value;if(id===UID&&role!=='admin')return toast('You cannot remove your own admin role');
  const vs=ticked('v_'+id),ds=ticked('d_'+id);
@@ -770,7 +888,7 @@ async function link(id){const role=$('r_'+id).value;if(id===UID&&role!=='admin')
 // ---- activity log (admin only). The action list below is what both this
 // dashboard and the driver phone write, so the filter offers every kind of
 // entry even when the current period happens to contain none of it.
-const ACTS=['Signed in','Signed out','Session time','Opened dashboard','Opened app','Opened dashboard from app','Allowed permissions','Switched vehicle','Changed own password','Added vehicle','Edited vehicle','Deleted vehicle','Added driver','Edited driver','Deleted driver','Created user','Saved user access','Saved configuration','Reset vehicles to fleet defaults','Exported report','Printed trip','Started trip','Ended trip'];
+const ACTS=['Signed in','Signed out','Session time','Opened dashboard','Opened app','Opened dashboard from app','Allowed permissions','Switched vehicle','Changed own password','Reset password','Unlocked user','Added vehicle','Edited vehicle','Deleted vehicle','Added driver','Edited driver','Deleted driver','Created user','Saved user access','Saved configuration','Reset vehicles to fleet defaults','Exported report','Printed trip','Started trip','Ended trip'];
 let ACT=[],ACTU=null,ACF='';
 async function loadAct(){if(!ADMIN)return;
  if(!ACTU){const {data}=await sb.from('profiles').select('id,email').order('email');
@@ -797,10 +915,10 @@ function renderAct(){
   +ct('or','fa-mobile-screen',ph,'From phones',"acSet('ph')",ACF==='ph')
   +ct('bl','fa-laptop',ACT.length-ph,'From computers',"acSet('pc')",ACF==='pc')
   +ct('gr','fa-stopwatch',hms(SEC),'Time on screen',"acSet('ss')",ACF==='ss');
- $('acFl').innerHTML=ACF?`<span class="chip" style="background:var(--bll);color:var(--bl)">${ACF_L[ACF]}</span> <button class="btn gh sm" onclick="acSet('')"><i class="fa-solid fa-rotate-left"></i>Reset filter</button>`:'';
+ $('acFl').innerHTML=ACF?`<span class="chip chipB">${ACF_L[ACF]}</span> <button class="btn gh sm" onclick="acSet('')"><i class="fa-solid fa-rotate-left"></i>Reset filter</button>`:'';
  const H=['Date and time','User','Activity','Details','Time on screen','From'];
  const R=r=>[new Date(r.recorded_at).toLocaleString('en-GB'),r.user_name||'-',r.action||'',r.details||'',r.duration_s==null?'':hms(+r.duration_s),r.device==='phone'?'Phone':'Computer'];
- $('acT').innerHTML=`<table><tr>${H.map(h=>`<th>${h}</th>`).join('')}</tr>${rows.map(r=>`<tr>${R(r).map(v=>`<td>${esc(v)}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="6">${ACT.length?'No entry matches this filter — press Reset.':'Nothing recorded in this period.'}</td></tr>`}</table>`;
+ $('acT').innerHTML=`<table><tr>${H.map(h=>`<th>${h}</th>`).join('')}</tr>${rows.map(r=>`<tr>${R(r).map(v=>`<td>${esc(v)}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="6" class="empty">${ACT.length?'No entry matches this filter — press Reset.':'Nothing recorded in this period.'}</td></tr>`}</table>`;
  tools($('acT'),{title:'Activity Log',full:()=>({head:H,rows:rows.map(R)})})}
 // ---- live
 const TI={Car:'fa-car',Sedan:'fa-car-side',Hatchback:'fa-car',SUV:'fa-car-rear',Pickup:'fa-truck-pickup',Van:'fa-van-shuttle',Minibus:'fa-van-shuttle',Bus:'fa-bus',Truck:'fa-truck','Heavy Truck':'fa-truck-moving',Tanker:'fa-truck-droplet',Taxi:'fa-taxi',Ambulance:'fa-truck-medical',Motorbike:'fa-motorcycle',Tractor:'fa-tractor',Trailer:'fa-trailer',Equipment:'fa-tractor'};
@@ -835,7 +953,7 @@ function renderList(){
  $('k_all').textContent=vehicles.length||all.length;$('k_go').textContent=n.go;$('k_idle').textContent=n.idle;$('k_park').textContent=n.park;$('k_off').textContent=n.off;
  const q=$('q').value.toLowerCase();
  $('liveList').innerHTML=all.filter(p=>shown(p)&&((p.vehicle_name||'')+(p.driver_name||'')).toLowerCase().includes(q)).sort((a,b)=>(a.vehicle_name||'').localeCompare(b.vehicle_name||'')).map(p=>{const s=st(p);
- return `<div class="veh" data-u="${p.user_id}" onclick="mapL.setView([${p.lat},${p.lng}],16);selLive('${p.user_id}');markers['${p.user_id}'].openPopup()"><div class="av" style="background:${COL[s]}"><i class="fa-solid ${vt(p)}"></i></div><div class="t"><b>${esc(p.vehicle_name||'Unassigned')}</b><br><small>${esc(p.driver_name||'-')} · ${new Date(p.recorded_at).toLocaleTimeString()}</small></div><div style="text-align:right"><b>${spd(p)}</b> <small>km/h</small><br><span class="chip" style="background:${COL[s]}22;color:${COL[s]}">${LBL[s]}</span></div></div>`}).join('')||'<p style="color:var(--mut);padding:8px">No vehicles to show.</p>'}
+ return `<div class="veh" data-u="${p.user_id}" onclick="mapL.setView([${p.lat},${p.lng}],16);selLive('${p.user_id}');markers['${p.user_id}'].openPopup()"><div class="av" style="background:${COL[s]}"><i class="fa-solid ${vt(p)}"></i></div><div class="t"><b>${esc(p.vehicle_name||'Unassigned')}</b><br><small>${esc(p.driver_name||'-')} · ${new Date(p.recorded_at).toLocaleTimeString()}</small></div><div class="taR"><b>${spd(p)}</b> <small>km/h</small><br><span class="chip" style="background:${COL[s]}22;color:${COL[s]}">${LBL[s]}</span></div></div>`}).join('')||'<p style="color:var(--mut);padding:8px">No vehicles to show.</p>'}
 // ---- history: the period is split into trips (a gap of 10 minutes or an ended
 // trip starts a new one), each with its own colour, layer, details and playback
 const km=(a,b)=>{const r=x=>x*Math.PI/180,h=Math.sin(r(b.lat-a.lat)/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(r(b.lng-a.lng)/2)**2;return 12742*Math.asin(Math.sqrt(h))};
@@ -914,14 +1032,14 @@ const HHINT='<small style="color:var(--mut);display:block">Click a trip to see i
 function hSide(){const s=$('hside');
  if(!TRIPS.length){s.innerHTML='<p style="color:var(--mut);margin:0">No trips in this period.</p>';return}
  const T=TRIPS[TSEL];
- s.innerHTML=`<div style="display:flex;align-items:center;gap:6px"><b style="flex:1"><i class="fa-solid fa-route"></i> Trips (${TRIPS.length})</b><button class="btn gh sm" onclick="tAll(1)" title="Show every trip">All</button><button class="btn gh sm" onclick="tAll(0)" title="Hide every trip">None</button></div>${HHINT}
+ s.innerHTML=`<div class="od"><b class="fl1"><i class="fa-solid fa-route"></i> Trips (${TRIPS.length})</b><button class="btn gh sm" onclick="tAll(1)" title="Show every trip">All</button><button class="btn gh sm" onclick="tAll(0)" title="Hide every trip">None</button></div>${HHINT}
  <div class="trl">${TRIPS.map((t,i)=>`<div class="trr${i===TSEL?' on':''}" onclick="tSel(${i})" title="Click to see this trip's details and play it back"><input type="checkbox" ${t.on?'checked':''} onclick="event.stopPropagation()" onchange="tTog(${i},this.checked)" title="Show this trip on the map"><span class="sw" style="background:${t.col}"></span><div style="flex:1;min-width:0"><b>Trip ${t.n}</b> <small>${new Date(t.st.s).toLocaleString()} → ${new Date(t.st.e).toLocaleTimeString()} · ${t.st.d.toFixed(1)} km</small></div></div>${i===TSEL?tdBox(t):''}`).join('')}</div>`;
  if(T){[['tdS',T.pts[0]],['tdE',T.pts.at(-1)]].forEach(([id,p])=>geoOne(gk(p)).then(nm=>{if($(id))$(id).textContent=nm||'Place name not found'}));
   $('pbR').onchange=e=>{if(PB)PB.rate=+e.target.value};pbShow()}}
 function tdBox(T){return `<div class="tbox" style="border-left:4px solid ${T.col};margin-top:2px">
- <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><b style="flex:1">Trip ${T.n} details</b><button class="btn gh sm" onclick="tPrint()" title="Print these trip details together with the route"><i class="fa-solid fa-print"></i>Print</button></div>
+ <div class="od" style="margin-bottom:6px"><b class="fl1">Trip ${T.n} details</b><button class="btn gh sm" onclick="tPrint()" title="Print these trip details together with the route"><i class="fa-solid fa-print"></i>Print</button></div>
  <div class="tdet">${tDet(T).map(r=>`<span>${r[0]}</span><b>${esc(r[1])}</b>`).join('')}<span>From</span><b id="tdS">${esc(plName(T.pts[0])||'…')}</b><span>To</span><b id="tdE">${esc(plName(T.pts.at(-1))||'…')}</b></div>
- <div class="tbox" style="margin-top:8px"><b><i class="fa-solid fa-film"></i> Playback</b><div class="pbk" style="margin-top:6px"><button class="btn g sm" id="pbB" onclick="pbToggle()" title="Play / pause"><i class="fa-solid ${PB&&PB.run?'fa-pause':'fa-play'}"></i></button><select id="pbR" title="Playback speed">${[1,2,4,8,16,32,64].map(x=>`<option value="${x}" ${x===(PB&&PB.rate||8)?'selected':''}>${x}×</option>`).join('')}</select><input type="range" id="pbS" min="0" max="${T.pts.length-1}" value="${PB?PB.i:0}" oninput="pbSeek(+this.value)"></div><div class="pvals" id="pbV"></div></div></div>`}
+ <div class="tbox mt10"><b><i class="fa-solid fa-film"></i> Playback</b><div class="pbk" style="margin-top:6px"><button class="btn g sm" id="pbB" onclick="pbToggle()" title="Play / pause"><i class="fa-solid ${PB&&PB.run?'fa-pause':'fa-play'}"></i></button><select id="pbR" title="Playback speed">${[1,2,4,8,16,32,64].map(x=>`<option value="${x}" ${x===(PB&&PB.rate||8)?'selected':''}>${x}×</option>`).join('')}</select><input type="range" id="pbS" min="0" max="${T.pts.length-1}" value="${PB?PB.i:0}" oninput="pbSeek(+this.value)"></div><div class="pvals" id="pbV"></div></div></div>`}
 async function tPrint(){const T=TRIPS[TSEL];if(!T)return;const a=T.pts[0],z=T.pts.at(-1);
  const w=open('','_blank');if(!w)return toast('Allow pop-ups for this site to print');
  const [ls,le]=await Promise.all([geoOne(gk(a)),geoOne(gk(z))]);
@@ -1020,7 +1138,7 @@ function evSet(k,val){EVF[k]=EVF[k]===val?undefined:val;renderEvt()}
 const dayOf=r=>new Date(r.recorded_at).toLocaleDateString('en-CA');
 function renderEvt(){
  const fx=r=>(!EVF.driver||(r.driver_name||'-')===EVF.driver)&&(!EVF.day||dayOf(r)===EVF.day),base=EVR.filter(fx),rows=base.filter(r=>!EVF.type||r.type===EVF.type),ty=cnt(rows,r=>r.type),K=Object.keys(EV);
- $('evFl').innerHTML=Object.entries(EVF).filter(x=>x[1]).map(x=>`<span class="chip" style="background:var(--bll);color:var(--bl)">${x[0]}: ${esc(x[0]==='type'?EVX(x[1])[0]:x[1])}</span>`).join(' ')+(Object.values(EVF).some(Boolean)?' <button class="btn gh sm" onclick="evReset()"><i class="fa-solid fa-rotate-left"></i>Reset filter</button>':'');
+ $('evFl').innerHTML=Object.entries(EVF).filter(x=>x[1]).map(x=>`<span class="chip chipB">${x[0]}: ${esc(x[0]==='type'?EVX(x[1])[0]:x[1])}</span>`).join(' ')+(Object.values(EVF).some(Boolean)?' <button class="btn gh sm" onclick="evReset()"><i class="fa-solid fa-rotate-left"></i>Reset filter</button>':'');
  // the tiles count without the type filter, so every type stays clickable
  const bt=cnt(base,r=>r.type),ct=(c,i,v,l,js,on)=>tile(c,i,v,l).replace('class="card kpi ',`onclick="${js}" title="Click to show only these" class="card kpi click${on?' on':''} `);
  $('evK').innerHTML=ct('gy','fa-bell',base.length,'Total events',"EVF.type=undefined;renderEvt()",!EVF.type)+K.map(k=>ct(EV[k][3],EV[k][1],bt[k]||0,EV[k][0],`evSet('type','${k}')`,EVF.type===k)).join('');
@@ -1032,7 +1150,7 @@ function renderEvt(){
  // only the two acceleration events hold a km/h/s reading; every other row keeps
  // the speed it breached in the Speed column, so this column has to stay empty
  const acc=r=>(r.type==='harsh_braking'||r.type==='harsh_acceleration')?(+r.value).toFixed(1):'-';
- $('evT').innerHTML=`<table><tr><th>Event Start</th><th>Event End</th><th>Duration</th><th>Vehicle</th><th>Driver</th><th>Event</th><th>Speed (km/h)</th><th>Acceleration / Deceleration (km/h/s)</th><th>Details</th><th>Location</th></tr>${rows.slice(0,1000).map(r=>{const E=EVX(r.type),d=evDur(r);return `<tr><td>${new Date(r.recorded_at).toLocaleString()}</td><td>${r.ended_at?new Date(r.ended_at).toLocaleString():'-'}</td><td style="white-space:nowrap">${d==null?'-':hms(d)}</td><td>${esc(r.vehicle_name)}</td><td>${esc(r.driver_name)}</td><td><span class="chip" style="background:${E[2]}22;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</span></td><td>${Math.round(r.speed||0)}</td><td>${acc(r)}</td><td>${esc(r.details||'-')}</td><td><a href="#" onclick="goHist('${r.vehicle_id}','${r.recorded_at}',${r.lat},${r.lng});return false"><i class="fa-solid fa-map-location-dot"></i> ${(+r.lat).toFixed(5)}, ${(+r.lng).toFixed(5)}</a></td></tr>`}).join('')||'<tr><td colspan="10">No events in this period.</td></tr>'}</table>`;tools($('evT'))}
+ $('evT').innerHTML=`<table><tr><th>Event Start</th><th>Event End</th><th>Duration</th><th>Vehicle</th><th>Driver</th><th>Event</th><th>Speed (km/h)</th><th>Acceleration / Deceleration (km/h/s)</th><th>Details</th><th>Location</th></tr>${rows.slice(0,1000).map(r=>{const E=EVX(r.type),d=evDur(r);return `<tr><td>${new Date(r.recorded_at).toLocaleString()}</td><td>${r.ended_at?new Date(r.ended_at).toLocaleString():'-'}</td><td class="nw">${d==null?'-':hms(d)}</td><td>${esc(r.vehicle_name)}</td><td>${esc(r.driver_name)}</td><td><span class="chip" style="background:${E[2]}22;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</span></td><td>${Math.round(r.speed||0)}</td><td>${acc(r)}</td><td>${esc(r.details||'-')}</td><td><a href="#" onclick="goHist('${r.vehicle_id}','${r.recorded_at}',${r.lat},${r.lng});return false"><i class="fa-solid fa-map-location-dot"></i> ${(+r.lat).toFixed(5)}, ${(+r.lng).toFixed(5)}</a></td></tr>`}).join('')||'<tr><td colspan="10" class="empty">No events in this period.</td></tr>'}</table>`;tools($('evT'))}
 async function goHist(vid,iso,lat,lng){document.querySelector('.nb[data-t=hist]').click();$('hv').value=vid;const t=new Date(iso).getTime();$('hf')._flatpickr.setDate(new Date(t-9e5),true);$('ht')._flatpickr.setDate(new Date(t+9e5),true);await loadHist();mapH.setView([lat,lng],17)}
 async function loadRep(){
  const F=new Date($('rp_f').value),T=new Date($('rp_t').value);
@@ -1054,7 +1172,7 @@ async function loadRep(){
  chart('r2','line',Object.keys(D),[{label:'km',borderColor:'#27a46a',backgroundColor:'#27a46a33',fill:true,tension:.3,data:Object.values(D).map(x=>+x.toFixed(1))}],{t:'Fleet distance per day (km)'});
  chart('r3','bar',n,[{label:'Driving (h)',backgroundColor:'#27a46a',data:rep.map(o=>+(o.dr/60).toFixed(1))},{label:'Idling (h)',backgroundColor:'#f28c28',data:rep.map(o=>+(o.sp/60).toFixed(1))}],{t:'Driving vs Idling time',s:1});
  chart('r4','bar',n,[{label:'Moving (L)',backgroundColor:'#2f7fe6',data:rep.map(o=>+o.fm.toFixed(1))},{label:'Idling (L)',backgroundColor:'#f28c28',data:rep.map(o=>+o.fi.toFixed(1))}],{t:'Estimated fuel (litres)',s:1});
- $('rpT').innerHTML=`<table><tr><th>Vehicle</th><th>Distance</th><th>Max speed</th><th>Driving</th><th>Idling</th><th>Braking</th><th>Accel.</th><th>Overspeed events</th><th>Overspeed seconds</th><th>Fuel moving</th><th>Fuel idling</th><th>Total fuel</th><th>L/100 km</th><th>Safety score <button class="ibtn" onclick="event.stopPropagation();msg('Safety score formula',SCF())" title="How is it calculated?">!</button></th></tr>${rep.sort((a,b)=>b.score-a.score).map(o=>`<tr><td><b>${esc(o.name)}</b></td><td>${o.km.toFixed(1)} km</td><td>${o.max} km/h</td><td style="white-space:nowrap">${hms(o.dr*60)}</td><td style="white-space:nowrap">${hms(o.sp*60)}</td><td>${o.b}</td><td>${o.a}</td><td>${o.o}</td><td>${Math.round(o.os)}</td><td>${o.fm.toFixed(1)} L</td><td>${o.fi.toFixed(1)} L</td><td><b>${o.ft.toFixed(1)} L</b></td><td>${o.l100.toFixed(1)}</td><td><span class="chip" style="background:var(--${sc(o.score)}l);color:var(--${sc(o.score)})">${o.score.toFixed(1)}</span></td></tr>`).join('')||'<tr><td colspan="14">No data in this period.</td></tr>'}</table>`;tools($('rpT'))}
+ $('rpT').innerHTML=`<table><tr><th>Vehicle</th><th>Distance</th><th>Max speed</th><th>Driving</th><th>Idling</th><th>Braking</th><th>Accel.</th><th>Overspeed events</th><th>Overspeed seconds</th><th>Fuel moving</th><th>Fuel idling</th><th>Total fuel</th><th>L/100 km</th><th>Safety score <button class="ibtn" onclick="event.stopPropagation();msg('Safety score formula',SCF())" title="How is it calculated?">!</button></th></tr>${rep.sort((a,b)=>b.score-a.score).map(o=>`<tr><td><b>${esc(o.name)}</b></td><td>${o.km.toFixed(1)} km</td><td>${o.max} km/h</td><td class="nw">${hms(o.dr*60)}</td><td class="nw">${hms(o.sp*60)}</td><td>${o.b}</td><td>${o.a}</td><td>${o.o}</td><td>${Math.round(o.os)}</td><td>${o.fm.toFixed(1)} L</td><td>${o.fi.toFixed(1)} L</td><td><b>${o.ft.toFixed(1)} L</b></td><td>${o.l100.toFixed(1)}</td><td><span class="chip" style="background:var(--${sc(o.score)}l);color:var(--${sc(o.score)})">${o.score.toFixed(1)}</span></td></tr>`).join('')||'<tr><td colspan="14" class="empty">No data in this period.</td></tr>'}</table>`;tools($('rpT'))}
 // ---- theme, users, event rules, alerts
 function theme(){const d=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=d;localStorage.theme=d;themeBtn()}
 const mail=u=>u.includes('@')?u.trim():u.trim().toLowerCase()+'@fleet.local';
@@ -1063,6 +1181,9 @@ async function addUser(e){e.preventDefault();if(!ADMIN)return toast('Only an adm
  const {data,error}=await c.auth.signUp({email:mail(e.target.u.value),password:e.target.p.value});
  if(error)return toast(error.message);
  if(!data.session)toast('User created but cannot sign in yet: turn OFF "Confirm email" in Supabase (see steps)');else toast('User created',1);
+ // the same rule as a reset: a password you typed for somebody else is temporary,
+ // so they are made to choose their own the first time they sign in
+ if(data.user)await sb.from('profiles').update({must_change:true}).eq('id',data.user.id);
  logAct('Created user',e.target.u.value);e.target.reset();users()}
 let RULES={},SET={},OV=['speed_limit','brake_limit','accel_limit','moving_interval','stopped_interval','speed_buffer','max_accel_warning','min_moving_distance'];
 const UNIT={harsh_braking:'km/h per second',harsh_acceleration:'km/h per second',overspeed:'km/h',zone_overspeed:'km/h above the zone limit'};
@@ -1084,7 +1205,7 @@ async function loadRules(){const {data}=await sb.from('event_rules').select('*')
  if(data&&data.length&&(!('hold_s'in data[0])||!('voice'in data[0])||!RULES.zone_overspeed)&&!WARNED.hold){WARNED.hold=1;toast('The database is missing the newest columns (tolerance, voice, geofence alerts). Run schema.sql in Supabase (SQL Editor) once to add them.')}
  if(data&&data.length&&!('voice_lang'in data[0])&&!WARNED.vl){WARNED.vl=1;toast('Per-event voice languages need the newest schema: run schema.sql in Supabase once. Until then the phone keeps the single fleet language.')}
  const num=(id,v,w,st)=>`<input type="number" step="${st||'any'}" min="0" id="${id}" value="${v??''}" style="width:${w||58}px">`;
- $('ruleT').innerHTML=`<table><tr><th>Event</th><th>Trigger limit</th><th>Tolerance (seconds)</th><th>Recorded</th><th>Visual alert</th><th>Buzzer alert</th><th>Buzzer seconds</th><th>Voice alert</th></tr>${list.map(r=>`<tr><td><b>${esc(r.label)}</b></td><td>${NOLIM[r.type]?'<small style="opacity:.5">no limit</small>':num('rt_'+r.type,r.threshold,66,'0.1')+' <small>'+(UNIT[r.type]||'')+'</small>'}</td><td>${num('rh_'+r.type,r.hold_s??0)}</td><td><input type="checkbox" id="re_${r.type}" ${r.enabled?'checked':''}></td><td><input type="checkbox" id="ra_${r.type}" ${r.alert?'checked':''}></td><td style="white-space:nowrap"><select id="bt_${r.type}" style="width:126px" onchange="toneSync(this)">${Object.entries(TONES).map(([k,n])=>`<option value="${k}" ${(r.beep_type||'discontinuous')===k?'selected':''}>${n}</option>`).join('')}</select><button type="button" class="play" onclick="tryTone('${r.type}')" title="Play this tone"><i class="fa-solid fa-play"></i></button></td><td class="bd">${num('bd_'+r.type,r.beep_duration??5)}</td><td style="white-space:nowrap"><select id="vl_${r.type}" style="width:96px" onchange="syncPl(this)">${vlOpts(r)}</select><button type="button" class="play" onclick="tryVoice('${r.type}')" title="Speak this message"><i class="fa-solid fa-volume-high"></i></button></td></tr>`).join('')}</table>`;
+ $('ruleT').innerHTML=`<table><tr><th>Event</th><th>Trigger limit</th><th>Tolerance (seconds)</th><th>Recorded</th><th>Visual alert</th><th>Buzzer alert</th><th>Buzzer seconds</th><th>Voice alert</th></tr>${list.map(r=>`<tr><td><b>${esc(r.label)}</b></td><td>${NOLIM[r.type]?'<small style="opacity:.5">no limit</small>':num('rt_'+r.type,r.threshold,66,'0.1')+' <small>'+(UNIT[r.type]||'')+'</small>'}</td><td>${num('rh_'+r.type,r.hold_s??0)}</td><td><input type="checkbox" id="re_${r.type}" ${r.enabled?'checked':''}></td><td><input type="checkbox" id="ra_${r.type}" ${r.alert?'checked':''}></td><td class="nw"><select id="bt_${r.type}" style="width:126px" onchange="toneSync(this)">${Object.entries(TONES).map(([k,n])=>`<option value="${k}" ${(r.beep_type||'discontinuous')===k?'selected':''}>${n}</option>`).join('')}</select><button type="button" class="play" onclick="tryTone('${r.type}')" title="Play this tone"><i class="fa-solid fa-play"></i></button></td><td class="bd">${num('bd_'+r.type,r.beep_duration??5)}</td><td class="nw"><select id="vl_${r.type}" style="width:96px" onchange="syncPl(this)">${vlOpts(r)}</select><button type="button" class="play" onclick="tryVoice('${r.type}')" title="Speak this message"><i class="fa-solid fa-volume-high"></i></button></td></tr>`).join('')}</table>`;
  [...$('ruleT').querySelectorAll('select')].forEach(s=>s.id.startsWith('bt_')?toneSync(s):s.id.startsWith('vl_')&&syncPl(s))}
 async function getSet(){const {data}=await sb.from('app_settings').select('*');SET={};(data||[]).forEach(x=>SET[x.key]=x.value);plLoad();
  const e=$('offH');if(e){e.value=OFFH();e.disabled=!ADMIN}}
@@ -1099,7 +1220,7 @@ async function loadCfg(){await loadRules();await getSet();
 
  const cols=[['speed_limit','Overspeed limit','km/h',RULES.overspeed?.threshold],['speed_buffer','Overspeed buffer','km/h',0],['brake_limit','Harsh braking','km/h/s',RULES.harsh_braking?.threshold],['accel_limit','Harsh accel.','km/h/s',RULES.harsh_acceleration?.threshold],['max_accel_warning','Warning level','km/h/s',0],['moving_interval','Record moving','seconds',SET.moving_interval||10],['stopped_interval','Record stopped','seconds',SET.stopped_interval||60],['min_moving_distance','Min. distance before events','metres',0],['fuel_moving','Fuel moving','L/100 km',''],['fuel_idle','Fuel idling','L/hour','']];
  $('cfgV').innerHTML=`<table><tr><th><input type="checkbox" onclick="selAllV(this)" title="Tick every vehicle"></th><th>Vehicle</th>${cols.map(c=>`<th>${c[1]}<br><small>${c[2]}${c[3]?' (default '+c[3]+')':''}</small></th>`).join('')}</tr>${vehicles.map(v=>{const cust=OV.some(k=>v[k]!=null&&v[k]!=='');
- return `<tr><td style="text-align:center"><input type="checkbox" class="vsel" data-v="${v.id}" ${cust?'checked':''} title="Tick to include this vehicle in Reset selected"></td><td style="white-space:nowrap"><b>${esc(v.name)}</b>${cust?' <span class="chip" style="background:var(--orl);color:var(--ord)" title="This vehicle uses its own values instead of the fleet defaults">custom</span>':''}</td>${cols.map(c=>`<td><input type="number" step="any" min="0" data-v="${v.id}" data-k="${c[0]}" value="${v[c[0]]??''}" placeholder="${c[3]??''}" style="width:72px" title="${c[1]} (${c[2]})"></td>`).join('')}</tr>`}).join('')||'<tr><td colspan="12">Add vehicles first.</td></tr>'}</table>`;tools($('cfgV'))}
+ return `<tr><td class="taC"><input type="checkbox" class="vsel" data-v="${v.id}" ${cust?'checked':''} title="Tick to include this vehicle in Reset selected"></td><td class="nw"><b>${esc(v.name)}</b>${cust?' <span class="chip" style="background:var(--orl);color:var(--ord)" title="This vehicle uses its own values instead of the fleet defaults">custom</span>':''}</td>${cols.map(c=>`<td><input type="number" step="any" min="0" data-v="${v.id}" data-k="${c[0]}" value="${v[c[0]]??''}" placeholder="${c[3]??''}" style="width:72px" title="${c[1]} (${c[2]})"></td>`).join('')}</tr>`}).join('')||'<tr><td colspan="12" class="empty">Add vehicles first.</td></tr>'}</table>`;tools($('cfgV'))}
 const selCfg=()=>[...document.querySelectorAll('#cfgV .vsel:checked')].map(i=>i.dataset.v);
 function selAllV(c){document.querySelectorAll('#cfgV .vsel').forEach(i=>i.checked=c.checked)}
 async function resetSelV(){if(!ADMIN)return;const ids=selCfg();
@@ -1251,7 +1372,7 @@ function plNear(lat,lng){let best=null,bd=1e9;
  PLACES.forEach(x=>{const d=plDist(lat,lng,+x.la,+x.lo);if(d<=plRad(x)&&d<bd){bd=d;best=x}});return best&&best.n}
 const plName=p=>plNear(+p.lat,+p.lng)||GC[gk(p)];
 function plTable(){const t=$('plT');if(!t)return;
- t.innerHTML=`<table><tr><th>Name shown</th><th>Latitude</th><th>Longitude</th><th>Radius (m)</th><th></th></tr>${PLACES.map((x,i)=>`<tr><td><b>${esc(x.n)}</b></td><td>${(+x.la).toFixed(5)}</td><td>${(+x.lo).toFixed(5)}</td><td>${plRad(x)}</td><td style="text-align:right;white-space:nowrap"><button class="btn gh sm" onclick="plEdit(${i})"><i class="fa-solid fa-pen"></i>Edit</button> <button class="btn r sm" onclick="plDel(${i})"><i class="fa-solid fa-trash"></i>Delete</button></td></tr>`).join('')||'<tr><td colspan="5">No saved names yet. Add one and it is shown instead of the name the map services give.</td></tr>'}</table>`;
+ t.innerHTML=`<table><tr><th>Name shown</th><th>Latitude</th><th>Longitude</th><th>Radius (m)</th><th></th></tr>${PLACES.map((x,i)=>`<tr><td><b>${esc(x.n)}</b></td><td>${(+x.la).toFixed(5)}</td><td>${(+x.lo).toFixed(5)}</td><td>${plRad(x)}</td><td class="act"><button class="btn gh sm" onclick="plEdit(${i})"><i class="fa-solid fa-pen"></i>Edit</button> <button class="btn r sm" onclick="plDel(${i})"><i class="fa-solid fa-trash"></i>Delete</button></td></tr>`).join('')||'<tr><td colspan="5" class="empty">No saved names yet. Add one and it is shown instead of the name the map services give.</td></tr>'}</table>`;
  tools(t)}
 // A name is chosen on the ground, so it is edited there too: the marker opens the
 // same dialog the table row does, and the bookmark arms a click anywhere on the map.
@@ -1363,7 +1484,7 @@ function initDates(){[['hf','ht','today'],['ev_f','ev_to','today'],['tr_f','tr_t
  const l=document.querySelector('[name=license_expiry]');if(l)flatpickr(l,{dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',disableMobile:true});
  ['evt','trip','rep'].forEach(panels)}
 const SCF=()=>'<b>Score = (harsh acceleration events + harsh braking events + overspeed seconds) &times; (100 &divide; distance driven in km)</b><br>Lower is safer. Distances under 1 km count as 1 km. Colour bands are set on the Configuration page: green at or below <b>'+(SET.score_green??1)+'</b>, amber up to <b>'+(SET.score_red??3)+'</b>, red at or above that.';
-function msg(t,h){const m=$('modal');m.innerHTML=`<div class="card" style="max-width:420px"><b>${t}</b><p>${h}</p><button class="btn b sm" onclick="$('modal').classList.add('hide')">OK</button></div>`;m.classList.remove('hide')}
+function msg(t,h){const m=$('modal');m.innerHTML=`<div class="card" style="max-width:420px"><div class="dlgT">${t}</div><p>${h}</p><div class="dlgB"><button class="btn b sm" onclick="$('modal').classList.remove('on')">OK</button></div></div>`;m.classList.add('on')}
 // one shared popup for every .hp "?" mark: fixed positioning keeps it readable
 // inside scrollable tables, where an element-local tooltip would be clipped
 function tipShow(h){const t=$('tip');t.innerHTML=h.dataset.tip||'';t.classList.add('on');
@@ -1385,7 +1506,7 @@ function tools(el,opt={}){const t=el.querySelector('table');if(!t)return;
  const ph=r=>r.cells.length===1&&r.cells[0].colSpan>1,dr=()=>rows().filter(r=>!ph(r));
  let cur=1,mask='';
  const matched=()=>dr().filter(r=>!mask||[...r.cells].map(cv).join(' ').toLowerCase().includes(mask));
- bar.innerHTML=(rangeInfo()?`<span class="chip" style="background:var(--bll);color:var(--bl)"><i class="fa-regular fa-calendar-days"></i> ${esc(rangeInfo())}</span>`:'')+'<input class="ts" placeholder="Search..."><button class="btn gh sm" data-x="csv"><i class="fa-solid fa-file-csv"></i>CSV</button><button class="btn gh sm" data-x="xlsx"><i class="fa-solid fa-file-excel"></i>Excel</button><button class="btn gh sm" data-x="pdf"><i class="fa-solid fa-file-pdf"></i>PDF</button><button class="btn gh sm" data-x="print"><i class="fa-solid fa-print"></i>Print</button>'+
+ bar.innerHTML=(rangeInfo()?`<span class="chip chipB"><i class="fa-regular fa-calendar-days"></i> ${esc(rangeInfo())}</span>`:'')+'<input class="ts" placeholder="Search..."><button class="btn gh sm" data-x="csv"><i class="fa-solid fa-file-csv"></i>CSV</button><button class="btn gh sm" data-x="xlsx"><i class="fa-solid fa-file-excel"></i>Excel</button><button class="btn gh sm" data-x="pdf"><i class="fa-solid fa-file-pdf"></i>PDF</button><button class="btn gh sm" data-x="print"><i class="fa-solid fa-print"></i>Print</button>'+
   '<span class="pgr"><select class="ps" title="Rows per page">'+[10,25,50,100,1000,'All'].map(v=>`<option value="${v}" ${String(TPS)===String(v)?'selected':''}>${v==='All'?'All rows':v+' rows'}</option>`).join('')+'</select><button class="btn gh sm" data-p="p" title="Previous page"><i class="fa-solid fa-chevron-left"></i></button><span class="pc"></span><button class="btn gh sm" data-p="n" title="Next page"><i class="fa-solid fa-chevron-right"></i></button></span>';
  el.prepend(bar);
  const pc=bar.querySelector('.pc');
