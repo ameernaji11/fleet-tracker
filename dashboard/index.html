@@ -40,6 +40,9 @@ section{display:none;height:100%;flex-direction:column;gap:10px;min-width:0}sect
 #camW{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:3/4;max-height:56vh}
 #camW img{width:100%;height:100%;object-fit:contain;display:block}
 #camW .msg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:16px;color:#fff;background:#000c;font-size:13px;line-height:1.55}
+/* a driver who opened his own camera lights the button until somebody looks at it */
+.mt .ic.new{background:var(--or);color:#fff;animation:camp 1.3s ease-in-out infinite}
+@keyframes camp{50%{box-shadow:0 0 0 7px #f28c2833}}
 .fg{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
 .ck{display:flex;gap:6px;align-items:center;font-weight:700;font-size:12px;cursor:pointer}
 .ck input{width:20px;height:20px;margin:0}
@@ -802,7 +805,8 @@ async function boot(fresh){
  mapL=mkMap('mapLive',fitAll,[['fa-thumbtack','Pin: keep the selected vehicle in the centre of the map while it moves',pinV,'pin'],['fa-volume-high','Mute the alert buzzer',muteTog,'mute']]
   // only a supervisor gets the camera button, and it is put with the other controls
   // that act on this map rather than on a page elsewhere
-  .concat(ADMIN?[['fa-video','Live camera: open the forward camera of the selected vehicle for '+LV_MIN+' minutes',camAsk,'cam']]:[]));mapH=mkMap('mapHist',hFit);muteUi();
+  .concat(ADMIN?[['fa-video','Live camera: open the forward camera of the selected vehicle for '+LV_MIN+' minutes, or join one he opened himself',camAsk,'cam']]:[]));
+ mapH=mkMap('mapHist',hFit);muteUi();camListen();
  initDates();
  await refs();await getSet();await zRefs();await loadLive();loadRules();evInit();
  sb.channel('pos').on('postgres_changes',{event:'INSERT',schema:'public',table:'positions'},e=>{if(e.new)upsert(e.new)}).subscribe(s=>{const ok=s==='SUBSCRIBED';$('conn').className='pill'+(ok?'':' bad');$('connT').textContent=ok?'Live':'Reconnecting'});
@@ -993,18 +997,30 @@ function renderList(){
 // showing a black square and calling it a broken lens. The driver sees who is watching,
 // on his own screen, for as long as the view lasts.
 const LV_MIN=3;
-let LVQ=null,LVC=null,LVP=0,LVT=0,LVF=0,LVL='',LVS=0;
+let LVQ=null,LVC=null,LVP=0,LVT=0,LVF=0,LVL='',LVS=0,LVA=0,LVM=0,CAMC=null,LVA2=0;
 async function camAsk(){if(!ADMIN)return;
  const p=SELV&&last[SELV];
  if(!p||!p.vehicle_id)return toast('Select a vehicle on the map or in the list first, then press the camera button');
  if(LVQ&&String(LVQ.vehicle_id)===String(p.vehicle_id)){$('modal').classList.add('on');return}
  const nm=p.vehicle_name||'that vehicle';
  if(LVQ)await camEnd('switched');
+ // a driver may have opened his own view a moment ago, or a colleague may already be
+ // watching one. Joining the session that exists beats starting a second camera on the
+ // same handset, which is the one thing that phone would have to refuse.
+ const {data:open}=(await sb.from('dms_live').select('*').eq('vehicle_id',p.vehicle_id)
+  .in('status',['pending','live']).gt('stop_at',new Date().toISOString())
+  .order('requested_at',{ascending:false}).limit(1))||{};
+ if(open&&open.length)return camTake(open[0],'joined');
  if(!confirm('Open the forward camera of '+nm+' for '+LV_MIN+' minutes?\n\nThe driver is told your name on his own screen while it runs, and the phone only answers when his app is open in front of him.'))return;
  const {data,error}=await sb.from('dms_live').insert({vehicle_id:p.vehicle_id,vehicle_name:nm,requested_by:UID,requested_name:UNAME,
   stop_at:new Date(Date.now()+LV_MIN*60000).toISOString()}).select().single();
  if(error)return toast('The database has no live camera table yet. Run the new schema.sql in the Supabase SQL editor, then press Refresh. ('+error.message+')',1);
- LVQ=data;LVF=0;LVL='';LVS=0;logAct('Live camera opened',nm);camPanel();camHooks()}
+ logAct('Live camera opened',nm);camTake(data)}
+// take a session row - one this page just made, one the phone made - and put it on screen
+function camTake(q,how){LVQ=q;LVF=0;LVL='';LVS=0;LVA=Date.now();LVM=0;
+ const b=mapL&&mapL._btn&&mapL._btn.cam;if(b)b.classList.remove('new');
+ if(how==='joined')logAct('Live camera joined',(String(q.requested_by||'')===String(UID)?'own request':'opened by the driver')+' - '+(q.vehicle_name||''));
+ camPanel();camHooks()}
 function camHooks(){if(LVC){sb.removeChannel(LVC);LVC=null}
  LVC=sb.channel('cam'+LVQ.id)
   .on('postgres_changes',{event:'INSERT',schema:'public',table:'dms_frame',filter:'live_id=eq.'+LVQ.id},e=>camShow(e.new))
@@ -1025,7 +1041,7 @@ function camShow(f){if(!LVQ||!f||!f.img)return;LVL=f.taken_at||'';LVS=Date.now()
  const i=$('camIm'),m=$('camMsg');if(i)i.src=f.img;if(m)m.style.display='none'}
 function camStat(row){if(!LVQ)return;const was=LVQ.status;LVQ=row;
  if(row.status==='live'&&was!=='live')camMsg('The phone answered. Waiting for its first picture.');
- else if(row.status==='pending')camMsg('Waiting for the phone of '+esc(row.vehicle_name||'this vehicle')+'. It answers only while the driver has his app open in front of him - the camera is never left running behind his back.');
+ else if(row.status==='pending')camMsg('Waiting for the phone of '+esc(row.vehicle_name||'this vehicle')+'. It answers only while his app is the screen he is looking at, with a trip started and driver alerts switched on - the camera is never left running behind his back.');
  else if(row.status==='ended')camMsg('The driver closed this view on his phone.',1);
  else if(row.status==='failed')camMsg('That phone could not open the camera: '+esc(row.error||'no reason given')+'.',1)}
 function camMsg(t,bad){const m=$('camMsg');if(!m)return;m.innerHTML=t?'<div><i class="fa-solid '+(bad?'fa-circle-exclamation':'fa-video-slash')+'" style="font-size:26px;display:block;margin:0 auto 10px"></i>'+t+'</div>':'';
@@ -1033,17 +1049,21 @@ function camMsg(t,bad){const m=$('camMsg');if(!m)return;m.innerHTML=t?'<div><i c
 function camTick(){if(!LVQ)return;const left=Math.max(0,Math.round((Date.parse(LVQ.stop_at)-Date.now())/1000));
  const el=$('camT');if(el)el.textContent=(LVQ.status==='live'?'Live':LVQ.status==='pending'?'Waiting':LVQ.status)+' · '+p2(Math.floor(left/60))+':'+p2(left%60)+' left · '+LVF+' picture'+(LVF===1?'':'s');
  if(left<=0)return camEnd('expired');
+ // a phone that never answers is the one failure this panel cannot see from here, so
+ // after a quarter of a minute it stops saying "waiting" and says what to go and check
+ if(LVQ.status==='pending'&&!LVM&&Date.now()-LVA>25000){LVM=1;
+  return camMsg('That phone has not answered. It has to run the new build with the live camera, be open on this screen with a trip started, and have driver alerts switched on in Configuration. He can also press the live view button on his own map, and this button then joins him.',1)}
  if(LVQ.status==='live'){const age=Date.now()-LVS;
   if(LVS&&age>8000)camMsg('No picture in the last '+Math.round(age/1000)+' seconds: the driver has probably left his app or the signal went.',1);
   else if(LVS&&age<=8000)camMsg('')}}
-function camPanel(){const q=LVQ,m=$('modal');
+function camPanel(){const q=LVQ,m=$('modal'),own=String(q.requested_by||'')===String(UID);
  m.innerHTML=`<div class="card" style="max-width:400px">
- <div class="dlgT"><i class="fa-solid fa-video"></i> Live camera - <b>${esc(q.vehicle_name||'')}</b></div>
+ <div class="dlgT"><i class="fa-solid fa-video"></i> Live camera - <b>${esc(q.vehicle_name||'')}</b>${own?'':' <small style="font-weight:400;color:var(--mut)">opened on the phone</small>'}</div>
  <div id="camW"><img id="camIm" alt="Picture from the driver camera"><div class="msg" id="camMsg"></div></div>
  <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:9px;flex-wrap:wrap">
  <small id="camT" style="color:var(--mut)"></small>
  <button class="btn r sm" onclick="camEnd('closed')"><i class="fa-solid fa-stop"></i>Stop watching</button></div>
- <small style="color:var(--mut);display:block;margin-top:7px">Asked at ${new Date(q.requested_at).toLocaleString()}. The view closes by itself when the time runs out or when the driver leaves his app, and the pictures are deleted from the database afterwards.</small></div>`;
+ <small style="color:var(--mut);display:block;margin-top:7px">Opened by ${esc(q.requested_name||'the driver')} at ${new Date(q.requested_at).toLocaleString()}. The view closes by itself when the time runs out or when the driver leaves his app, and the pictures are deleted from the database afterwards.</small></div>`;
  m.classList.add('on');camStat(q);camTick()}
 async function camEnd(reason){if(!LVQ)return;const q=LVQ,nm=q.vehicle_name||'the vehicle',n=LVF;LVQ=null;
  clearInterval(LVP);clearInterval(LVT);LVP=LVT=0;
@@ -1060,6 +1080,29 @@ async function camEnd(reason){if(!LVQ)return;const q=LVQ,nm=q.vehicle_name||'the
  logAct('Live camera closed',nm+' - '+reason+' - '+n+' picture(s)');
  if(reason==='expired')toast('The '+LV_MIN+' minute watch of '+nm+' ended',1);
  else if(reason==='closed')toast('Stopped watching '+nm)}
+// ---- the other direction. A driver pressing the live view button on his own map makes
+// a session this supervisor never asked for, and there is nothing on this side to show
+// that it exists unless somebody listens. Realtime is what catches it the second it
+// happens; one look at boot catches a page that opened onto a view already running. The
+// camera button then joins that session instead of starting a second one.
+const LVSEEN={};
+function camListen(){if(!ADMIN)return;
+ try{CAMC=sb.channel('cams').on('postgres_changes',{event:'INSERT',schema:'public',table:'dms_live'},e=>camHeard(e.new)).subscribe()}catch(e){}
+ // the minute check is only there to put the light out again: a view that has run
+ // itself out must not leave this button asking for attention for the rest of the shift
+ LVA2=setInterval(camCheck,60000);setTimeout(camCheck,2000)}
+async function camCheck(){if(!ADMIN)return;
+ const r=await sb.from('dms_live').select('*').in('status',['pending','live'])
+  .gt('stop_at',new Date().toISOString()).order('requested_at',{ascending:false}).limit(8);
+ const rows=(r&&r.data)||[];rows.forEach(camHeard);
+ if(!rows.some(x=>String(x.requested_by||'')!==String(UID))){const b=mapL&&mapL._btn&&mapL._btn.cam;
+  if(b)b.classList.remove('new')}}
+function camHeard(q){if(!q||String(q.requested_by||'')===String(UID))return;
+ if(LVQ&&String(LVQ.id)===String(q.id))return;
+ if(LVSEEN[q.id])return;LVSEEN[q.id]=1;
+ const b=mapL&&mapL._btn&&mapL._btn.cam;if(b)b.classList.add('new');
+ toast((q.requested_name||'A driver')+' opened a live camera on '+(q.vehicle_name||'a vehicle')+' - select it and press the camera button to watch',1);
+ logAct('Live view opened on the phone',(q.requested_name||'')+' - '+(q.vehicle_name||''))}
 // ---- history: the period is split into trips (a gap of 10 minutes or an ended
 // trip starts a new one), each with its own colour, layer, details and playback
 const km=(a,b)=>{const r=x=>x*Math.PI/180,h=Math.sin(r(b.lat-a.lat)/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(r(b.lng-a.lng)/2)**2;return 12742*Math.asin(Math.sqrt(h))};
