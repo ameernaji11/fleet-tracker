@@ -749,15 +749,21 @@ alter table dms_frame enable row level security;
 -- about a vehicle assigned to him and may answer those — which is what lets the
 -- phone mark its own row live, stamp who answered and end it, without inventing a
 -- session or rewriting anybody else's. Same shape as the three blackbox rules.
+-- Every driver-side rule also accepts is_admin(), because the person who tests this
+-- feature from a handset is signed in with his own supervisor login, and a login
+-- that holds no vehicle would otherwise be refused without a word on either screen.
 drop policy if exists "dms live admin" on dms_live;
 create policy "dms live admin" on dms_live for all using (is_admin()) with check (is_admin());
+drop policy if exists "dms live open own" on dms_live;
+create policy "dms live open own" on dms_live for insert to authenticated
+  with check (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()) or is_admin());
 drop policy if exists "dms live read own" on dms_live;
 create policy "dms live read own" on dms_live for select to authenticated
-  using (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()));
+  using (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()) or is_admin());
 drop policy if exists "dms live answer own" on dms_live;
 create policy "dms live answer own" on dms_live for update to authenticated
-  using (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()))
-  with check (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()));
+  using (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()) or is_admin())
+  with check (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()) or is_admin());
 
 -- Frames travel one way: the handset of that vehicle writes them, an administrator
 -- reads them. A handset may also delete its own pictures, which is how an abandoned
@@ -766,12 +772,12 @@ create policy "dms live answer own" on dms_live for update to authenticated
 -- Postgres applies the frame rules even to its own cascade delete.
 drop policy if exists "dms frame write own" on dms_frame;
 create policy "dms frame write own" on dms_frame for insert to authenticated
-  with check (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()));
+  with check (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()) or is_admin());
 drop policy if exists "dms frame admin" on dms_frame;
 create policy "dms frame admin" on dms_frame for all using (is_admin()) with check (is_admin());
 drop policy if exists "dms frame clear own" on dms_frame;
 create policy "dms frame clear own" on dms_frame for delete to authenticated
-  using (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()));
+  using (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()) or is_admin());
 
 -- ------------------------------------------------------------- realtime ----
 -- the dashboard listens for position and event inserts; both must be in the
@@ -1014,11 +1020,16 @@ end $$;
 --   The clip bucket itself is created in the next phase, together with the rights that let a handset write into
 --   it and an administrator read it back.
 --
--- v20, on top of the above (a supervisor opens the driver's camera on demand):
---   dms_live table + 3 policies + publication entry                       -> one row per "show me the driver"
+-- v20, on top of the above (a supervisor opens the driver's camera on demand, and the
+-- driver can open his own and invite the office to look):
+--   dms_live table + 4 policies + publication entry                       -> one row per "show me the driver"
 --        press: the vehicle, who asked and by what name, pending until the handset answers, and stop_at — the
 --        moment the watch ends by itself. An administrator opens, reads and closes any session; a driver only sees
---        and answers requests about a vehicle assigned to him, the same trio of rules the blackbox pull uses.
+--        and answers requests about a vehicle assigned to him, the same shape as the blackbox pull rules, plus the
+--        right to insert a session of his own so he can start the view from his phone. Every driver-side rule also
+--        accepts is_admin(), because the handset used for testing is usually signed in with a supervisor login that
+--        holds no vehicle - without that the phone could neither read the request nor push its pictures and would
+--        fail without a word on either screen.
 --   dms_frame table + 3 policies + publication entry                      -> the short-lived base64 pictures the
 --        phone pushes about once a second while a session is live. Only that vehicle's handset may write them, only
 --        an administrator reads them, and the handset may delete its own, so an abandoned viewer cannot leave a
