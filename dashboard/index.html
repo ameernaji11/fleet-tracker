@@ -1233,12 +1233,22 @@ const cnt=(rows,f)=>rows.reduce((o,r)=>{const k=f(r)||'-';o[k]=(o[k]||0)+1;retur
 async function loadEvt(){fSave('evt');
  const v=mselVal('ev_v'),d=mselVal('ev_d'),t=mselVal('ev_t'),f=new Date($('ev_f').value).toISOString(),to=new Date($('ev_to').value).toISOString();
  EVR=await fetchAll(()=>{let q=sb.from('events').select('*').gte('recorded_at',f).lte('recorded_at',to).order('recorded_at',{ascending:false});if(v.length)q=q.in('vehicle_id',v);if(d.length)q=q.in('driver_id',d);if(t.length)q=q.in('type',t);return q});EVF={};renderEvt()}
-function evReset(){EVF={};renderEvt()}
+// The three toolbar dropdowns keep their tick marks between visits, so a type ticked
+// weeks ago can hide every event with nothing on the page to say why. Name an active
+// one here, in the same row as the tile filters, and let one click clear both.
+const EVTB={ev_v:'Vehicles',ev_d:'Drivers',ev_t:'Events'};
+function evTb(){return Object.keys(EVTB).map(id=>{const el=$(id);if(!el)return '';
+ const it=[...el.querySelectorAll('input.it')],on=mselVal(id);
+ if(!on.length||(it.length>1&&on.length===it.length))return '';
+ return `<span class="chip chipB">${EVTB[id]}: ${esc(el.querySelector('.msb span').textContent)}</span>`}).join('')}
+function evReset(){EVF={};Object.keys(EVTB).forEach(id=>{const el=$(id);if(!el)return;
+ el.querySelectorAll('input.it').forEach(i=>i.checked=false);msLbl(id)});loadEvt()}
 function evSet(k,val){EVF[k]=EVF[k]===val?undefined:val;renderEvt()}
 const dayOf=r=>new Date(r.recorded_at).toLocaleDateString('en-CA');
 function renderEvt(){
  const fx=r=>(!EVF.driver||(r.driver_name||'-')===EVF.driver)&&(!EVF.day||dayOf(r)===EVF.day),base=EVR.filter(fx),rows=base.filter(r=>!EVF.type||r.type===EVF.type),ty=cnt(rows,r=>r.type),K=Object.keys(EV);
- $('evFl').innerHTML=Object.entries(EVF).filter(x=>x[1]).map(x=>`<span class="chip chipB">${x[0]}: ${esc(x[0]==='type'?EVX(x[1])[0]:x[1])}</span>`).join(' ')+(Object.values(EVF).some(Boolean)?' <button class="btn gh sm" onclick="evReset()"><i class="fa-solid fa-rotate-left"></i>Reset filter</button>':'');
+ const tb=evTb(),ch=Object.entries(EVF).filter(x=>x[1]).map(x=>`<span class="chip chipB">${x[0]}: ${esc(x[0]==='type'?EVX(x[1])[0]:x[1])}</span>`).join(' ');
+ $('evFl').innerHTML=[tb,ch].filter(Boolean).join(' ')+((tb||ch)?' <button class="btn gh sm" onclick="evReset()"><i class="fa-solid fa-rotate-left"></i>Reset filter</button>':'');
  // the tiles count without the type filter, so every type stays clickable
  const bt=cnt(base,r=>r.type),ct=(c,i,v,l,js,on)=>tile(c,i,v,l).replace('class="card kpi ',`onclick="${js}" title="Click to show only these" class="card kpi click${on?' on':''} `);
  $('evK').innerHTML=ct('gy','fa-bell',base.length,'Total events',"EVF.type=undefined;renderEvt()",!EVF.type)+K.map(k=>ct(EV[k][3],EV[k][1],bt[k]||0,EV[k][0],`evSet('type','${k}')`,EVF.type===k)).join('');
