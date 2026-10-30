@@ -35,6 +35,11 @@ section{display:none;height:100%;flex-direction:column;gap:10px;min-width:0}sect
 #zHint{position:fixed;left:50%;transform:translateX(-50%);bottom:64px;z-index:3000;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px;box-shadow:0 10px 28px #0003;display:flex;gap:10px;align-items:center;flex-wrap:wrap;max-width:92vw}
 .mdl{position:fixed;inset:0;z-index:3001;background:#0006;display:none;place-items:center;padding:14px}
 .mdl.on{display:grid}.mdl>div{background:var(--card);border-radius:16px;padding:16px 18px;width:min(560px,100%);box-shadow:0 18px 50px #0005;max-height:92vh;overflow:auto}
+/* live camera viewer: whatever the panel has to say about the picture is painted over
+   the picture itself, so a waiting or an error state can never sit below a black frame */
+#camW{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:3/4;max-height:56vh}
+#camW img{width:100%;height:100%;object-fit:contain;display:block}
+#camW .msg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:16px;color:#fff;background:#000c;font-size:13px;line-height:1.55}
 .fg{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
 .ck{display:flex;gap:6px;align-items:center;font-weight:700;font-size:12px;cursor:pointer}
 .ck input{width:20px;height:20px;margin:0}
@@ -688,6 +693,7 @@ async function bbAsk(){if(!ADMIN)return;const v=$('bb_v').value,nm=(vehicles.fin
  if(hrs>6&&!confirm('This window is '+hrs+' hours of one-fix-per-second data (up to '+Math.round(hrs*3600).toLocaleString()+' rows). The phone needs to be on and in coverage to answer it.\n\nContinue?'))return;
  const {error}=await sb.from('bb_requests').insert({vehicle_id:v,vehicle_name:nm,from_ts:f.toISOString(),to_ts:t.toISOString(),requested_by:UID});
  if(error)return toast(error.message);
+ fSave('bb');
  await bbTable();logAct('Blackbox download asked',nm+' '+f.toLocaleString()+' to '+t.toLocaleString());
  toast('Request sent to '+nm+'. The phone pushes that window as soon as it is online.',1)}
 async function bbCancel(id){if(!ADMIN)return;
@@ -793,7 +799,10 @@ async function boot(fresh){
  // signing in with it opens the change box, and the box has no Cancel button
  if(p?.must_change){pwForm(1);toast('That password was set for you. Choose your own before anything else.',0)}
  logAct(fresh?'Signed in':'Opened dashboard','Role: '+(ADMIN?'admin':'user'));sessStart();
- mapL=mkMap('mapLive',fitAll,[['fa-thumbtack','Pin: keep the selected vehicle in the centre of the map while it moves',pinV,'pin'],['fa-volume-high','Mute the alert buzzer',muteTog,'mute']]);mapH=mkMap('mapHist',hFit);muteUi();
+ mapL=mkMap('mapLive',fitAll,[['fa-thumbtack','Pin: keep the selected vehicle in the centre of the map while it moves',pinV,'pin'],['fa-volume-high','Mute the alert buzzer',muteTog,'mute']]
+  // only a supervisor gets the camera button, and it is put with the other controls
+  // that act on this map rather than on a page elsewhere
+  .concat(ADMIN?[['fa-video','Live camera: open the forward camera of the selected vehicle for '+LV_MIN+' minutes',camAsk,'cam']]:[]));mapH=mkMap('mapHist',hFit);muteUi();
  initDates();
  await refs();await getSet();await zRefs();await loadLive();loadRules();evInit();
  sb.channel('pos').on('postgres_changes',{event:'INSERT',schema:'public',table:'positions'},e=>{if(e.new)upsert(e.new)}).subscribe(s=>{const ok=s==='SUBSCRIBED';$('conn').className='pill'+(ok?'':' bad');$('connT').textContent=ok?'Live':'Reconnecting'});
@@ -817,7 +826,10 @@ async function refs(){
  $('hv').innerHTML=vehicles.map(v=>`<option value="${v.id}">${esc(v.name)}</option>`).join('');
  msel('lv_v',vehicles,'All vehicles',mselVal('lv_v'));if(!LVW){LVW=1;$('lv_v').addEventListener('change',lvChg)}
  msel('ev_v',vehicles,'All vehicles',mselVal('ev_v'));msel('ev_d',drivers,'All drivers',mselVal('ev_d'));msel('ev_t',Object.keys(EV).map(k=>({id:k,name:EV[k][0]})),'All events',mselVal('ev_t'));
- $('tr_v').innerHTML=$('hv').innerHTML;$('bb_v').innerHTML=$('hv').innerHTML;$('vehT').innerHTML=tbl(vehicles,['name','type','make_model','year','speed_limit','fuel_moving','fuel_idle'],'vehicles');$('drvT').innerHTML=tbl(drivers,['name','phone','license_no','license_expiry'],'drivers');tools($('vehT'));tools($('drvT'))}
+ $('tr_v').innerHTML=$('hv').innerHTML;$('bb_v').innerHTML=$('hv').innerHTML;$('vehT').innerHTML=tbl(vehicles,['name','type','make_model','year','speed_limit','fuel_moving','fuel_idle'],'vehicles');$('drvT').innerHTML=tbl(drivers,['name','phone','license_no','license_expiry'],'drivers');tools($('vehT'));tools($('drvT'));
+ // rebuilding the pickers above wipes whatever was chosen, so the last criteria go
+ // back in straight after it
+ fApply()}
 const tbl=(rows,cols,t)=>`<table><tr>${cols.map(c=>`<th>${c.replace(/_/g,' ')}</th>`).join('')}<th></th></tr>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(r[c])}</td>`).join('')}<td class="act"><button class="btn b sm" onclick="edit('${t}','${r.id}')"><i class="fa-solid fa-pen"></i>Edit</button> <button class="btn r sm" onclick="del('${t}','${r.id}')"><i class="fa-solid fa-trash"></i>Delete</button></td></tr>`).join('')||'<tr><td colspan="9" class="empty">Nothing here yet. Add one above.</td></tr>'}</table>`;
 async function add(e,t,cols){e.preventDefault();if(!ADMIN)return;const f=e.target,id=f.dataset.id,o={};cols.forEach(c=>o[c]=f[c].value||null);
  const {error}=id?await sb.from(t).update(o).eq('id',id):await sb.from(t).insert(o);if(error)return toast(error.message);
@@ -908,10 +920,12 @@ async function link(id){const role=$('r_'+id).value;if(id===UID&&role!=='admin')
 // entry even when the current period happens to contain none of it.
 const ACTS=['Signed in','Signed out','Session time','Opened dashboard','Opened app','Opened dashboard from app','Allowed permissions','Switched vehicle','Changed own password','Reset password','Unlocked user','Added vehicle','Edited vehicle','Deleted vehicle','Added driver','Edited driver','Deleted driver','Created user','Saved user access','Saved configuration','Reset vehicles to fleet defaults','Exported report','Printed trip','Started trip','Ended trip'];
 let ACT=[],ACTU=null,ACF='';
-async function loadAct(){if(!ADMIN)return;
+async function loadAct(){if(!ADMIN)return;fSave('act');
  if(!ACTU){const {data}=await sb.from('profiles').select('id,email').order('email');
   ACTU=data||[];$('ac_u').innerHTML='<option value="">All users</option>'+ACTU.map(p=>`<option value="${p.id}">${esc((p.email||'').replace('@fleet.local',''))}</option>`).join('')}
  $('ac_t').innerHTML='<option value="">All activities</option>'+ACTS.map(a=>`<option value="${a}">${a}</option>`).join('');
+ // both pickers were just rebuilt, which drops the choice made last time
+ fApply('act');
  const u=$('ac_u').value,t=$('ac_t').value,f=new Date($('ac_f').value).toISOString(),to=new Date($('ac_to').value).toISOString();
  ACT=await fetchAll(()=>{let q=sb.from('user_activity').select('*').gte('recorded_at',f).lte('recorded_at',to).order('recorded_at',{ascending:false});if(u)q=q.eq('user_id',u);if(t)q=q.eq('action',t);return q});
  // a tile filter already picked stays across a reload, so changing the user or
@@ -972,6 +986,80 @@ function renderList(){
  const q=$('q').value.toLowerCase();
  $('liveList').innerHTML=all.filter(p=>shown(p)&&((p.vehicle_name||'')+(p.driver_name||'')).toLowerCase().includes(q)).sort((a,b)=>(a.vehicle_name||'').localeCompare(b.vehicle_name||'')).map(p=>{const s=st(p);
  return `<div class="veh" data-u="${p.user_id}" onclick="mapL.setView([${p.lat},${p.lng}],16);selLive('${p.user_id}');markers['${p.user_id}'].openPopup()"><div class="av" style="background:${COL[s]}"><i class="fa-solid ${vt(p)}"></i></div><div class="t"><b>${esc(p.vehicle_name||'Unassigned')}</b><br><small>${esc(p.driver_name||'-')} · ${new Date(p.recorded_at).toLocaleTimeString()}</small></div><div class="taR"><b>${spd(p)}</b> <small>km/h</small><br><span class="chip" style="background:${COL[s]}22;color:${COL[s]}">${LBL[s]}</span></div></div>`}).join('')||'<p style="color:var(--mut);padding:8px">No vehicles to show.</p>'}
+// ---- live camera. The video button on this map asks the selected vehicle's phone to
+// open its forward camera and push pictures here for LV_MIN minutes. A handset only
+// answers while the driver's app is the screen in front of him - the camera lives in
+// that page, not in the background service - so the panel says so out loud instead of
+// showing a black square and calling it a broken lens. The driver sees who is watching,
+// on his own screen, for as long as the view lasts.
+const LV_MIN=3;
+let LVQ=null,LVC=null,LVP=0,LVT=0,LVF=0,LVL='',LVS=0;
+async function camAsk(){if(!ADMIN)return;
+ const p=SELV&&last[SELV];
+ if(!p||!p.vehicle_id)return toast('Select a vehicle on the map or in the list first, then press the camera button');
+ if(LVQ&&String(LVQ.vehicle_id)===String(p.vehicle_id)){$('modal').classList.add('on');return}
+ const nm=p.vehicle_name||'that vehicle';
+ if(LVQ)await camEnd('switched');
+ if(!confirm('Open the forward camera of '+nm+' for '+LV_MIN+' minutes?\n\nThe driver is told your name on his own screen while it runs, and the phone only answers when his app is open in front of him.'))return;
+ const {data,error}=await sb.from('dms_live').insert({vehicle_id:p.vehicle_id,vehicle_name:nm,requested_by:UID,requested_name:UNAME,
+  stop_at:new Date(Date.now()+LV_MIN*60000).toISOString()}).select().single();
+ if(error)return toast('The database has no live camera table yet. Run the new schema.sql in the Supabase SQL editor, then press Refresh. ('+error.message+')',1);
+ LVQ=data;LVF=0;LVL='';LVS=0;logAct('Live camera opened',nm);camPanel();camHooks()}
+function camHooks(){if(LVC){sb.removeChannel(LVC);LVC=null}
+ LVC=sb.channel('cam'+LVQ.id)
+  .on('postgres_changes',{event:'INSERT',schema:'public',table:'dms_frame',filter:'live_id=eq.'+LVQ.id},e=>camShow(e.new))
+  .on('postgres_changes',{event:'UPDATE',schema:'public',table:'dms_live',filter:'id=eq.'+LVQ.id},e=>camStat(e.new))
+  .subscribe();
+ clearInterval(LVP);clearInterval(LVT);
+ // realtime can miss an insert without saying anything; this poll is what keeps the
+ // panel honest when the socket drops, and the watch ends at stop_at either way
+ LVP=setInterval(camPoll,3000);LVT=setInterval(camTick,1000);
+ mapL&&mapL._btn&&mapL._btn.cam&&mapL._btn.cam.classList.add('on');camTick()}
+async function camPoll(){if(!LVQ)return;const id=LVQ.id;
+ const {data:row}=await sb.from('dms_live').select('*').eq('id',id).single();
+ if(!row)return camEnd('gone');
+ camStat(row);
+ if(row.status==='live'){const {data:f}=await sb.from('dms_frame').select('img,taken_at').eq('live_id',id).order('taken_at',{ascending:false}).limit(1);
+  if(f&&f.length&&f[0].taken_at!==LVL)camShow(f[0])}}
+function camShow(f){if(!LVQ||!f||!f.img)return;LVL=f.taken_at||'';LVS=Date.now();LVF++;
+ const i=$('camIm'),m=$('camMsg');if(i)i.src=f.img;if(m)m.style.display='none'}
+function camStat(row){if(!LVQ)return;const was=LVQ.status;LVQ=row;
+ if(row.status==='live'&&was!=='live')camMsg('The phone answered. Waiting for its first picture.');
+ else if(row.status==='pending')camMsg('Waiting for the phone of '+esc(row.vehicle_name||'this vehicle')+'. It answers only while the driver has his app open in front of him - the camera is never left running behind his back.');
+ else if(row.status==='ended')camMsg('The driver closed this view on his phone.',1);
+ else if(row.status==='failed')camMsg('That phone could not open the camera: '+esc(row.error||'no reason given')+'.',1)}
+function camMsg(t,bad){const m=$('camMsg');if(!m)return;m.innerHTML=t?'<div><i class="fa-solid '+(bad?'fa-circle-exclamation':'fa-video-slash')+'" style="font-size:26px;display:block;margin:0 auto 10px"></i>'+t+'</div>':'';
+ m.style.display=t?'grid':'none';m.style.background=bad?'#3b0d0dd0':'#000c'}
+function camTick(){if(!LVQ)return;const left=Math.max(0,Math.round((Date.parse(LVQ.stop_at)-Date.now())/1000));
+ const el=$('camT');if(el)el.textContent=(LVQ.status==='live'?'Live':LVQ.status==='pending'?'Waiting':LVQ.status)+' · '+p2(Math.floor(left/60))+':'+p2(left%60)+' left · '+LVF+' picture'+(LVF===1?'':'s');
+ if(left<=0)return camEnd('expired');
+ if(LVQ.status==='live'){const age=Date.now()-LVS;
+  if(LVS&&age>8000)camMsg('No picture in the last '+Math.round(age/1000)+' seconds: the driver has probably left his app or the signal went.',1);
+  else if(LVS&&age<=8000)camMsg('')}}
+function camPanel(){const q=LVQ,m=$('modal');
+ m.innerHTML=`<div class="card" style="max-width:400px">
+ <div class="dlgT"><i class="fa-solid fa-video"></i> Live camera - <b>${esc(q.vehicle_name||'')}</b></div>
+ <div id="camW"><img id="camIm" alt="Picture from the driver camera"><div class="msg" id="camMsg"></div></div>
+ <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:9px;flex-wrap:wrap">
+ <small id="camT" style="color:var(--mut)"></small>
+ <button class="btn r sm" onclick="camEnd('closed')"><i class="fa-solid fa-stop"></i>Stop watching</button></div>
+ <small style="color:var(--mut);display:block;margin-top:7px">Asked at ${new Date(q.requested_at).toLocaleString()}. The view closes by itself when the time runs out or when the driver leaves his app, and the pictures are deleted from the database afterwards.</small></div>`;
+ m.classList.add('on');camStat(q);camTick()}
+async function camEnd(reason){if(!LVQ)return;const q=LVQ,nm=q.vehicle_name||'the vehicle',n=LVF;LVQ=null;
+ clearInterval(LVP);clearInterval(LVT);LVP=LVT=0;
+ if(LVC){sb.removeChannel(LVC);LVC=null}
+ mapL&&mapL._btn&&mapL._btn.cam&&mapL._btn.cam.classList.remove('on');
+ $('modal').classList.remove('on');
+ if(q.status==='pending'||q.status==='live'){
+  // closing the panel always ends the row in the database, even when the phone never
+  // answered: it polls for pending requests, and one left standing would open his
+  // camera after the supervisor had already gone
+  try{await sb.from('dms_live').update({status:'ended',ended_at:new Date().toISOString(),n_frames:n,
+   error:reason==='expired'?null:'The supervisor stopped the view'}).eq('id',q.id)}catch(e){}
+  try{await sb.from('dms_frame').delete().eq('live_id',q.id)}catch(e){}}
+ logAct('Live camera closed',nm+' - '+reason+' - '+n+' picture(s)');
+ if(reason==='expired')toast('The '+LV_MIN+' minute watch of '+nm+' ended',1);
+ else if(reason==='closed')toast('Stopped watching '+nm)}
 // ---- history: the period is split into trips (a gap of 10 minutes or an ended
 // trip starts a new one), each with its own colour, layer, details and playback
 const km=(a,b)=>{const r=x=>x*Math.PI/180,h=Math.sin(r(b.lat-a.lat)/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(r(b.lng-a.lng)/2)**2;return 12742*Math.asin(Math.sqrt(h))};
@@ -1024,7 +1112,10 @@ function drawTrip(T,Vh){const P=T.pts,g=T.ly,fm=+Vh.fuel_moving||0,fi=+Vh.fuel_i
  L.marker([a.lat,a.lng],{icon:shp('s'),zIndexOffset:1500}).addTo(g).bindPopup(()=>tPop(T,'s')).on('popupopen',e=>geoFill(e.popup,a));
  if(P.length>1)L.marker([z.lat,z.lng],{icon:shp('e'),zIndexOffset:1400}).addTo(g).bindPopup(()=>tPop(T,'e')).on('popupopen',e=>geoFill(e.popup,z));
  T.evs.forEach(x=>evMk(x).addTo(g))}
-async function loadHist(){pbStop();
+// `keep` is set when Historical Tracking is opened by clicking an event: that
+// fifteen-minute window is a jump to a moment, not a criteria anybody chose, so it
+// must not become what the page opens with tomorrow.
+async function loadHist(keep){if(!keep)fSave('hist');pbStop();
  const vid=$('hv').value,hf=new Date($('hf').value).toISOString(),ht=new Date($('ht').value).toISOString();
  const data=ded((await fetchAll(()=>sb.from('positions').select('*').eq('vehicle_id',vid).gte('recorded_at',hf).lte('recorded_at',ht).order('recorded_at'))).filter(okFix));
  if(hLayer)hLayer.remove();TRIPS.forEach(t=>t.ly.remove());TRIPS=[];TSEL=-1;HEVS=[];hData=data;
@@ -1150,7 +1241,7 @@ function chart(id,type,labels,sets,o={}){const cs=getComputedStyle(document.docu
   const t=hit.length?hit:el;if(t.length)setTimeout(()=>o.click(e,t),0)});
  charts[id]=new Chart($(id),{type,data:{labels,datasets:sets},options:{maintainAspectRatio:false,onClick:click,indexAxis:o.h?'y':'x',interaction:dn?{mode:'nearest',intersect:true}:{mode:'index',intersect:false,axis:o.h?'y':'x'},plugins:{title:{display:true,text:o.t},legend:{display:sets.length>1||dn}},scales:dn?{}:{x:{stacked:!!o.s},y:{stacked:!!o.s,beginAtZero:true}}},plugins:pl})}
 const cnt=(rows,f)=>rows.reduce((o,r)=>{const k=f(r)||'-';o[k]=(o[k]||0)+1;return o},{});
-async function loadEvt(){
+async function loadEvt(){fSave('evt');
  const v=mselVal('ev_v'),d=mselVal('ev_d'),t=mselVal('ev_t'),f=new Date($('ev_f').value).toISOString(),to=new Date($('ev_to').value).toISOString();
  EVR=await fetchAll(()=>{let q=sb.from('events').select('*').gte('recorded_at',f).lte('recorded_at',to).order('recorded_at',{ascending:false});if(v.length)q=q.in('vehicle_id',v);if(d.length)q=q.in('driver_id',d);if(t.length)q=q.in('type',t);return q});EVF={};renderEvt()}
 function evReset(){EVF={};renderEvt()}
@@ -1171,8 +1262,8 @@ function renderEvt(){
  // the speed it breached in the Speed column, so this column has to stay empty
  const acc=r=>(r.type==='harsh_braking'||r.type==='harsh_acceleration')?(+r.value).toFixed(1):'-';
  $('evT').innerHTML=`<table><tr><th>Event Start</th><th>Event End</th><th>Duration</th><th>Vehicle</th><th>Driver</th><th>Event</th><th>Speed (km/h)</th><th>Acceleration / Deceleration (km/h/s)</th><th>Details</th><th>Location</th></tr>${rows.slice(0,1000).map(r=>{const E=EVX(r.type),d=evDur(r);return `<tr><td>${new Date(r.recorded_at).toLocaleString()}</td><td>${r.ended_at?new Date(r.ended_at).toLocaleString():'-'}</td><td class="nw">${d==null?'-':hms(d)}</td><td>${esc(r.vehicle_name)}</td><td>${esc(r.driver_name)}</td><td><span class="chip" style="background:${E[2]}22;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</span></td><td>${Math.round(r.speed||0)}</td><td>${acc(r)}</td><td>${esc(r.details||'-')}</td><td><a href="#" onclick="goHist('${r.vehicle_id}','${r.recorded_at}',${r.lat},${r.lng});return false"><i class="fa-solid fa-map-location-dot"></i> ${(+r.lat).toFixed(5)}, ${(+r.lng).toFixed(5)}</a></td></tr>`}).join('')||'<tr><td colspan="10" class="empty">No events in this period.</td></tr>'}</table>`;tools($('evT'))}
-async function goHist(vid,iso,lat,lng){document.querySelector('.nb[data-t=hist]').click();$('hv').value=vid;const t=new Date(iso).getTime();$('hf')._flatpickr.setDate(new Date(t-9e5),true);$('ht')._flatpickr.setDate(new Date(t+9e5),true);await loadHist();mapH.setView([lat,lng],17)}
-async function loadRep(){
+async function goHist(vid,iso,lat,lng){document.querySelector('.nb[data-t=hist]').click();$('hv').value=vid;const t=new Date(iso).getTime();$('hf')._flatpickr.setDate(new Date(t-9e5),true);$('ht')._flatpickr.setDate(new Date(t+9e5),true);await loadHist(1);mapH.setView([lat,lng],17)}
+async function loadRep(){fSave('rep');
  const F=new Date($('rp_f').value),T=new Date($('rp_t').value);
  if(isNaN(F)||isNaN(T))return toast('Set a valid From and To period first');
  const f=F.toISOString(),t=T.toISOString();
@@ -1390,7 +1481,7 @@ document.addEventListener('mousedown',e=>{if(MSO&&!e.target.closest('.ms'))msClo
 // scroll or resize moves the box but not the fixed panel, so follow it
 addEventListener('scroll',e=>{if(MSO&&(e.target.closest?e.target.closest('.msp'):null))return;msPos()},true);
 addEventListener('resize',msPos);
-async function loadTrip(){
+async function loadTrip(){fSave('trip');
  const v=$('tr_v').value,f=new Date($('tr_f').value).toISOString(),t=new Date($('tr_t').value).toISOString();
  tr=ded((await fetchAll(()=>sb.from('positions').select('*').eq('vehicle_id',v).gte('recorded_at',f).lte('recorded_at',t).order('recorded_at'))).filter(okFix));tp=0;
  if(!tr.length)return toast('No data in this period');
@@ -1528,10 +1619,41 @@ function range(k){const n=new Date(),y=n.getFullYear(),m=n.getMonth(),d=n.getDat
 function setR(a,b,k){if(k==='custom')return;const r=range(k);$(a)._flatpickr.setDate(r[0],true);$(b)._flatpickr.setDate(r[1],true)}
 function initDates(){[['hf','ht','today'],['ev_f','ev_to','today'],['tr_f','tr_t','today'],['rp_f','rp_t','today'],['ac_f','ac_to','today'],['bb_f','bb_t','today',BBPRE]].forEach(([a,b,k,lst])=>{
  const o={enableTime:true,enableSeconds:true,time_24hr:true,dateFormat:'Y-m-d\\TH:i:S',altInput:true,altFormat:'d/m/Y H:i:S',disableMobile:true};flatpickr('#'+a,o);flatpickr('#'+b,o);
- $(a).closest('.field').insertAdjacentHTML('beforebegin',`<div class="field"><label>Period</label><select onchange="setR('${a}','${b}',this.value)">${(lst||PRE).map(p=>`<option value="${p[0]}" ${p[0]===k?'selected':''}>${p[1]}</option>`).join('')}</select></div>`);
+ $(a).closest('.field').insertAdjacentHTML('beforebegin',`<div class="field"><label>Period</label><select id="pr_${a}" onchange="setR('${a}','${b}',this.value)">${(lst||PRE).map(p=>`<option value="${p[0]}" ${p[0]===k?'selected':''}>${p[1]}</option>`).join('')}</select></div>`);
  setR(a,b,k)});
  const l=document.querySelector('[name=license_expiry]');if(l)flatpickr(l,{dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',disableMobile:true});
- ['evt','trip','rep'].forEach(panels)}
+ ['evt','trip','rep'].forEach(panels);fApply()}
+// ---- the criteria each report was last built with. Every page used to open on
+// Today, so a supervisor who spends the morning on last week's tacho is handed an
+// empty table and a "no data in this period" message every time he returns to it.
+// What is saved is what was on the toolbar when the report ran.
+const RPAGES={hist:{d:['hf','ht'],v:['hv']},evt:{d:['ev_f','ev_to'],m:['ev_v','ev_d','ev_t']},trip:{d:['tr_f','tr_t'],v:['tr_v']},rep:{d:['rp_f','rp_t']},act:{d:['ac_f','ac_to'],v:['ac_u','ac_t']},bb:{d:['bb_f','bb_t'],v:['bb_v']}};
+const fSnap=s=>{const p=RPAGES[s],o={},d=id=>{const f=$(id)&&$(id)._flatpickr,x=f&&f.selectedDates[0];return x?x.toISOString():''};
+ if(p.d){const[a,b]=p.d;o.p=($('pr_'+a)||{}).value||'';o.f=d(a);o.t=d(b)}
+ (p.v||[]).forEach(id=>o[id]=($(id)||{}).value||'');
+ (p.m||[]).forEach(id=>o[id]=mselVal(id));
+ return o};
+function fSave(s){try{localStorage['flt_'+s]=JSON.stringify(fSnap(s))}catch(e){}}
+function fApply(only){for(const s in RPAGES){if(only&&s!==only)continue;const p=RPAGES[s];let o=null;
+ try{o=JSON.parse(localStorage['flt_'+s]||'null')}catch(e){}
+ if(!o)continue;
+ if(p.d){const[a,b]=p.d,pr=$('pr_'+a);
+  // a named window is taken again from its preset, so "Last 24 hrs" still means the
+  // last 24 hours today; only a range typed by hand goes back exactly as it was
+  if(o.p&&o.p!=='custom'){if(pr)pr.value=o.p;setR(a,b,o.p)}
+  else{if(o.f&&$(a)._flatpickr)$(a)._flatpickr.setDate(new Date(o.f),true);
+   if(o.t&&$(b)._flatpickr)$(b)._flatpickr.setDate(new Date(o.t),true);
+   if(pr)pr.value='custom'}}
+ // a vehicle or driver deleted since then is simply left out rather than opening a
+ // report that can only answer "no data"
+ (p.v||[]).forEach(id=>{const el=$(id);if(el&&o[id]&&[...el.options].some(x=>x.value===o[id]))el.value=o[id]});
+ (p.m||[]).forEach(id=>{const el=$(id);if(!el||!Array.isArray(o[id])||!o[id].length)return;
+  // the multi-selects are built by refs(), which runs after this on a cold page: a
+  // control that is not there yet is left for refs() to fill in at the end
+  if(!el.querySelector('.msb'))return;
+  const want=o[id].filter(x=>el.querySelector(`input.it[value="${x}"]`));
+  el.querySelectorAll('input.it').forEach(i=>i.checked=want.includes(i.value));msLbl(id)})
+}}
 const SCF=()=>'<b>Score = (harsh acceleration events + harsh braking events + overspeed seconds) &times; (100 &divide; distance driven in km)</b><br>Lower is safer. Distances under 1 km count as 1 km. Colour bands are set on the Configuration page: green at or below <b>'+(SET.score_green??1)+'</b>, amber up to <b>'+(SET.score_red??3)+'</b>, red at or above that.';
 function msg(t,h){const m=$('modal');m.innerHTML=`<div class="card" style="max-width:420px"><div class="dlgT">${t}</div><p>${h}</p><div class="dlgB"><button class="btn b sm" onclick="$('modal').classList.remove('on')">OK</button></div></div>`;m.classList.add('on')}
 // one shared popup for every .hp "?" mark: fixed positioning keeps it readable
