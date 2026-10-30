@@ -36,9 +36,31 @@
 -- New in v18 (account lockout and password reset) -- adds:
 --   profiles.fails, locked_at and must_change, plus login_gate / login_fail /
 --   login_ok / clear_pw_flag: five wrong passwords lock that account out of both
---   apps until an administrator presses Unlock on the Users page, and a password
---   the administrator sets for someone else has to be replaced by the user on
---   their next sign-in.
+--   apps, and a password the administrator sets for someone else has to be replaced
+--   by the user on their next sign-in.
+--
+-- New in v21 (the lockout stops lasting for ever) -- adds:
+--   profiles.fails_at and locked_until, app_settings login_window_m / login_lock_m,
+--   and login_cfg / login_sweep behind the three sign-in functions above. Wrong
+--   passwords now only count while they keep coming: a quiet stretch puts the count
+--   back to nothing, and a five-strike lockout expires by itself after the wait you
+--   set on the Configuration page. A lock an administrator pressed on the Users page
+--   has no expiry and still waits for his Unlock.
+--
+-- New in v22 (the camera stays on the phone) -- removes:
+--   dms_live and dms_frame, the two tables v20 built so a supervisor could open a
+--   driver's camera from the dashboard. Pushing those pictures to a browser never
+--   worked dependably, so the button is gone from the dashboard and the driver starts
+--   the same forward-camera watch himself from his own map. The events, rules and
+--   settings the camera writes are all untouched; only the remote view retires.
+--
+-- New in v23 (a parked vehicle says much less, and the blackbox follows the wheels) -- adds:
+--   stopped_interval 3600. A phone whose trip is running but whose vehicle is standing
+--   still now sends one position an hour instead of one a minute, which is the box
+--   already on the Configuration page, so any other wait you type there wins. Only a
+--   database still holding the original 60 is moved; a number you chose is left alone.
+--   app_settings bb_min_kmh (1) -- the blackbox stores a fix only from this speed up, so
+--   a stationary shift stops filling the handset with positions nobody will ever ask for.
 --
 -- The "admin seed" block makes ameer@fleettrack.com role=admin, so the separate
 -- Admin.sql saved query in Supabase is no longer needed — delete it once this
@@ -379,8 +401,15 @@ $$ select exists(select 1 from profiles where id = auth.uid() and role = 'admin'
 
 -- fleet report computed in the database (no 1000-row limit, fast)
 -- over_s: seconds spent above the vehicle's own speed_limit (100 km/h when the
--- vehicle has none). Sample gaps over 3 minutes are ignored, as everywhere else
--- in this function, so a parked overnight gap cannot become hours of overspeed.
+-- vehicle has none). Sample gaps over 3 minutes are ignored - except for standing time,
+-- see below - so a parked overnight gap cannot become hours of overspeed.
+-- The one figure that cannot use that bound is standing time: a vehicle that reports
+-- once an hour while parked (v23) is not missing data between two heartbeats, it is
+-- sitting there, so stop_min accepts a gap up to that vehicle's own parked interval
+-- plus room for the fix that did not arrive on time. Drive minutes, distance and
+-- overspeed seconds keep the 3-minute bound, because a silence between two moving
+-- samples is a phone that said nothing, and joining them would invent a straight line
+-- across roads the vehicle never took in a straight line.
 -- vehicle_report gained a column, and Postgres refuses to change the return type
 -- of an existing function ("cannot change return type of existing function"), so
 -- the old one has to be dropped before it is recreated. Safe: nothing depends on
@@ -389,10 +418,13 @@ drop function if exists vehicle_report(timestamptz, timestamptz, text);
 create or replace function vehicle_report(p_from timestamptz, p_to timestamptz, p_tz text default 'UTC')
 returns table(vehicle_id uuid, vehicle_name text, day date, km numeric, max_speed numeric, drive_min numeric, stop_min numeric, over_s numeric)
 language sql stable security invoker as $$
- with p as (select po.vehicle_id, po.vehicle_name, po.recorded_at, po.speed, po.lat, po.lng,
+ with st as (select coalesce(max(case when key = 'stopped_interval'
+   then nullif(regexp_replace(value, '[^0-9]', '', 'g'), '')::int end), 3600) si from app_settings),
+ p as (select po.vehicle_id, po.vehicle_name, po.recorded_at, po.speed, po.lat, po.lng,
    coalesce(v.speed_limit, 100) lim,
+   least(86400, greatest(180, coalesce(v.stopped_interval, st.si, 3600) * 2 + 120)) si_gap,
    lag(po.lat) over w plat, lag(po.lng) over w plng, lag(po.recorded_at) over w pt
-   from positions po left join vehicles v on v.id = po.vehicle_id
+   from positions po left join vehicles v on v.id = po.vehicle_id cross join st
    where po.recorded_at between p_from and p_to and po.vehicle_id is not null
    window w as (partition by po.vehicle_id order by po.recorded_at)),
  g as (select *, extract(epoch from recorded_at - pt) dt,
@@ -401,7 +433,7 @@ language sql stable security invoker as $$
   round(coalesce(sum(case when dt<=180 then d end),0)::numeric,2),
   round(coalesce(max(speed),0)::numeric),
   round((coalesce(sum(case when dt<=180 and speed>0 then dt end),0)/60)::numeric,1),
-  round((coalesce(sum(case when dt<=180 and speed=0 then dt end),0)/60)::numeric,1),
+  round((coalesce(sum(case when dt<=si_gap and speed=0 then dt end),0)/60)::numeric,1),
   round(coalesce(sum(case when dt<=180 and speed>lim then dt end),0)::numeric,1)
  from g group by g.vehicle_id, 3 order by 3 $$;
 
@@ -597,14 +629,15 @@ create policy "activity insert own" on user_activity for insert to authenticated
   with check (user_id = auth.uid() and action is not null and length(action) <= 80);
 
 -- --------------------------------------------------------- v18 lockout ----
--- Five wrong passwords in a row lock that account until an administrator unlocks
--- it on the Users page. An administrator can also set and clear the same stamp by
--- hand from that page, which is why login_gate can answer "locked" for an account
--- that has never typed a wrong password at all. The counter has to be reachable from the sign-in screen,
--- where nobody is logged in yet, so these functions are security definer: each
--- touches one row of profiles by its own address and nothing else. They answer
--- identically for an address that has never signed in here, so the sign-in screen
--- cannot be walked through to find out which users exist.
+-- Five wrong passwords in a row lock that account. An administrator can also set and
+-- clear the same stamp by hand from the Users page, which is why login_gate can answer
+-- "locked" for an account that has never typed a wrong password at all. The counter has
+-- to be reachable from the sign-in screen, where nobody is logged in yet, so these
+-- functions are security definer: each touches one row of profiles by its own address
+-- and nothing else. They answer identically for an address that has never signed in
+-- here, so the sign-in screen cannot be walked through to find out which users exist.
+-- v21 below changed the two words "for ever" in this description: the count now decays
+-- and a lockout now expires. The three functions are re-created there.
 alter table profiles add column if not exists fails int not null default 0,
   add column if not exists locked_at timestamptz,
   add column if not exists must_change boolean not null default false;
@@ -650,6 +683,140 @@ $$;
 
 revoke all on function login_gate(text), login_fail(text), login_ok(text), clear_pw_flag() from public;
 grant execute on function login_gate(text), login_fail(text), login_ok(text), clear_pw_flag() to anon, authenticated, service_role;
+
+-- ------------------------------------------------------ v21 lockout expiry ----
+-- v18 counted wrong passwords for ever: five of them spread over a week of forgetful
+-- mornings locked a driver out as surely as five in a row, and the lock then waited for
+-- somebody to notice. Both halves now expire by themselves. A quiet stretch puts the
+-- count back to nothing, and a five-strike lockout buys its way out after a fixed wait.
+-- An administrator's own Lock on the Users page keeps no expiry: that is a decision, not
+-- a timeout, and only his Unlock ends it. Two columns carry the difference —
+-- locked_until says how much of a lock is left, and a NULL in it says nobody but the
+-- person who locked the account is going to open it.
+alter table profiles add column if not exists fails_at timestamptz;
+alter table profiles add column if not exists locked_until timestamptz;
+
+-- Minutes of quiet before the wrong-password count starts again from nothing, and
+-- minutes a five-strike lockout lasts. login_lock_m 0 means "until an administrator
+-- unlocks it", which is the v18 behaviour for a fleet that wants it back.
+insert into app_settings (key, value) values ('login_window_m','15'), ('login_lock_m','15')
+  on conflict (key) do nothing;
+
+-- The two durations, with this file's own numbers standing behind an empty or mistyped
+-- box. The screen that asks for them is the sign-in screen, where a failed cast would be
+-- a driver unable to reach his vehicle.
+create or replace function login_cfg() returns table(win_m int, lock_m int)
+language sql stable security definer set search_path = public as $$
+  select greatest(1, coalesce(nullif(regexp_replace((select value from app_settings where key = 'login_window_m'), '[^0-9]', '', 'g'), '')::int, 15)),
+         greatest(0, coalesce(nullif(regexp_replace((select value from app_settings where key = 'login_lock_m'),   '[^0-9]', '', 'g'), '')::int, 15))
+$$;
+
+-- Bring every account up to date before anything is asked about it. Two statements on
+-- purpose: an expired lock clears itself and takes its count with it, while an aged
+-- count clears only itself and leaves any lock alone. A row an administrator locked has
+-- no expiry and a lock still running has one, so neither can be aged out of here by a
+-- stale stamp.
+create or replace function login_sweep() returns void
+language plpgsql security definer set search_path = public as $$
+declare w int;
+begin
+  update profiles set locked_at = null, locked_until = null, fails = 0, fails_at = null
+   where locked_until is not null and locked_until <= now();
+  select win_m into w from login_cfg();
+  update profiles set fails = 0, fails_at = null
+   where locked_at is null and fails > 0
+     and (fails_at is null or fails_at < now() - make_interval(mins => w));
+end $$;
+
+-- Asked before a sign-in is attempted: is this account locked, how many tries has it
+-- left, how many minutes are left on the lock, and how many minutes of quiet it would
+-- take to put the count back to nothing. wait_min comes back NULL for an address that is
+-- not locked and for one only an administrator can open, which is what lets both screens
+-- say "contact the administrator" instead of promising a minute that will never arrive.
+-- Both functions answer for a lock that has already run out as well: the sweep above
+-- ends it first, so a driver who waited it out signs in on the very attempt that asks.
+drop function if exists login_gate(text);
+create or replace function login_gate(p_email text)
+returns table(locked boolean, tries_left int, wait_min int, reset_min int)
+language plpgsql security definer set search_path = public as $$
+declare lk boolean; tr int; wm int; rm int; w int;
+begin
+  select win_m into w from login_cfg();
+  perform login_sweep();
+  -- the aggregates hold one row even when no address matches, which is what makes an
+  -- address that has never signed in here answer exactly like an unlocked one
+  select coalesce(bool_or(locked_at is not null), false),
+         greatest(5 - coalesce(sum(fails), 0), 0),
+         ceil(max(case when locked_until is null then null
+                       else greatest(0, extract(epoch from locked_until - now()) / 60) end)::numeric)::int,
+         case when max(fails_at) is null then null
+              else greatest(0, ceil(w - extract(epoch from now() - max(fails_at)) / 60)::int) end
+    into lk, tr, wm, rm
+  from profiles where lower(email) = lower(p_email);
+  return query select lk, tr, case when lk then wm end, rm;
+end $$;
+
+-- One wrong password. The count and its stamp move together, because fails_at is the
+-- whole reason an old attempt stops counting. The fifth also starts the clock on the
+-- lock, and the count is then left standing at five so that the Users page can still
+-- tell a lockout apart from a lock somebody pressed by hand.
+drop function if exists login_fail(text);
+create or replace function login_fail(p_email text)
+returns table(locked boolean, tries_left int, wait_min int, reset_min int)
+language plpgsql security definer set search_path = public as $$
+declare n int; l int; w int; lu timestamptz;
+begin
+  select win_m, lock_m into w, l from login_cfg();
+  perform login_sweep();
+  update profiles set fails = fails + 1, fails_at = now()
+   where lower(email) = lower(p_email) returning fails into n;
+  if n is null then return query select false, 5, null::int, null::int; return; end if;
+  if n >= 5 then
+    -- "and locked_at is null" leaves the row to whichever stamp came first: a driver
+    -- cannot type over a lock, and cannot restart an administrator's one either
+    update profiles set locked_at = now(),
+      locked_until = case when l = 0 then null else now() + make_interval(mins => l) end
+     where lower(email) = lower(p_email) and locked_at is null;
+    select locked_until into lu from profiles where lower(email) = lower(p_email);
+    return query select true, 0,
+      case when lu is null then null
+           else greatest(0, ceil(extract(epoch from lu - now()) / 60)::int) end, null;
+  end if;
+  return query select false, greatest(5 - n, 0), null, w;
+end $$;
+
+-- A sign-in that worked still clears the count, and still never clears a lock: only the
+-- administrator's Unlock does, so a lock cannot be typed away. Since v21 it puts down the
+-- stamp beside the count, because a try that no longer counts must not hold a countdown
+-- on the screen either.
+create or replace function login_ok(p_email text) returns void
+language sql security definer set search_path = public as $$
+  update profiles set fails = 0, fails_at = null where lower(email) = lower(p_email)
+$$;
+
+-- Choosing one's own password after an administrator set a temporary one puts down the
+-- flag and the whole count with it, exactly as login_ok does.
+create or replace function clear_pw_flag() returns void
+language sql security definer set search_path = public as $$
+  update profiles set must_change = false, fails = 0, fails_at = null where id = auth.uid()
+$$;
+
+-- Accounts already locked when this version arrives: a five-wrong-password lock gets
+-- the expiry it would have had, so nobody has to be unlocked by hand just because the
+-- schema caught up late. A lock with fewer than five tries behind it is one somebody
+-- pressed on the Users page, and that one keeps waiting for him.
+update profiles p set locked_until = greatest(now(), p.locked_at + make_interval(mins => c.lock_m))
+  from login_cfg() c
+  where c.lock_m > 0 and p.locked_at is not null and p.locked_until is null and p.fails >= 5;
+
+revoke all on function login_cfg(), login_sweep(), login_gate(text), login_fail(text) from public;
+-- login_sweep is handed to a signed-in account for one reason: the Users page shows
+-- these numbers, and a count that aged out overnight should not still read as a warning
+-- when an administrator opens that table. It only ever ends things whose time is up, so
+-- nobody can use it to open a lock or clear one that still stands.
+grant execute on function login_sweep() to authenticated;
+grant execute on function login_gate(text), login_fail(text), login_ok(text), clear_pw_flag()
+  to anon, authenticated, service_role;
 
 -- --------------------------------------------------- v19 driver monitoring ----
 -- The handset's forward camera watches the driver's face and four rules decide when
@@ -711,73 +878,15 @@ insert into app_settings (key, value) values
   ('dms_fps','5'), ('dms_keep_d','7'), ('dms_preview','1')
   on conflict (key) do nothing;
 
--- ----------------------------------------------------- v20 live camera view ----
--- v20: the "look at the driver now" button on Live Tracking. A blackbox pull asks
--- the phone for rows it already stored and can wait hours for a signal; a live face
--- check cannot — it is only worth having while that handset is answering. So every
--- request carries an expiry: the dashboard watches until stop_at, then says plainly
--- that the driver's app did not open the camera, instead of spinning for ever.
---
--- The pictures themselves are the frames the preview already hands to the page,
--- pushed into dms_frame about once a second and deleted when the session ends. That
--- is deliberate: this phase stays entirely inside the two web layers with no new
--- native code, and the table holds a handful of rows rather than a video archive.
--- Answering while the phone is locked or in another app is the next phase and needs
--- the camera to move into the service instead of the page.
-create table if not exists dms_live (
-  id uuid primary key default gen_random_uuid(),
-  vehicle_id uuid not null, vehicle_name text,
-  status text not null default 'pending',          -- pending | live | ended | failed
-  requested_by uuid, requested_name text,          -- who to name on the driver's banner
-  requested_at timestamptz default now(), answered_at timestamptz, ended_at timestamptz,
-  stop_at timestamptz not null,                    -- nobody may watch past this moment
-  n_frames int, error text);
-create index if not exists dms_live_vehicle on dms_live (vehicle_id, requested_at desc);
--- the phone's own poll: only an unanswered request whose window is still open matters
-create index if not exists dms_live_open on dms_live (status, stop_at);
-
-create table if not exists dms_frame (
-  id uuid primary key default gen_random_uuid(),
-  live_id uuid not null references dms_live(id) on delete cascade,
-  vehicle_id uuid, img text, taken_at timestamptz default now());
-create index if not exists dms_frame_live on dms_frame (live_id, taken_at);
-
-alter table dms_live  enable row level security;
-alter table dms_frame enable row level security;
-
--- A supervisor may open, read and close any session. A driver sees only requests
--- about a vehicle assigned to him and may answer those — which is what lets the
--- phone mark its own row live, stamp who answered and end it, without inventing a
--- session or rewriting anybody else's. Same shape as the three blackbox rules.
--- Every driver-side rule also accepts is_admin(), because the person who tests this
--- feature from a handset is signed in with his own supervisor login, and a login
--- that holds no vehicle would otherwise be refused without a word on either screen.
-drop policy if exists "dms live admin" on dms_live;
-create policy "dms live admin" on dms_live for all using (is_admin()) with check (is_admin());
-drop policy if exists "dms live open own" on dms_live;
-create policy "dms live open own" on dms_live for insert to authenticated
-  with check (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()) or is_admin());
-drop policy if exists "dms live read own" on dms_live;
-create policy "dms live read own" on dms_live for select to authenticated
-  using (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()) or is_admin());
-drop policy if exists "dms live answer own" on dms_live;
-create policy "dms live answer own" on dms_live for update to authenticated
-  using (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()) or is_admin())
-  with check (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()) or is_admin());
-
--- Frames travel one way: the handset of that vehicle writes them, an administrator
--- reads them. A handset may also delete its own pictures, which is how an abandoned
--- or crashed viewer stops filling the table instead of leaving base64 behind. The
--- admin rule is a full one so that removing a session row also clears its frames —
--- Postgres applies the frame rules even to its own cascade delete.
-drop policy if exists "dms frame write own" on dms_frame;
-create policy "dms frame write own" on dms_frame for insert to authenticated
-  with check (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()) or is_admin());
-drop policy if exists "dms frame admin" on dms_frame;
-create policy "dms frame admin" on dms_frame for all using (is_admin()) with check (is_admin());
-drop policy if exists "dms frame clear own" on dms_frame;
-create policy "dms frame clear own" on dms_frame for delete to authenticated
-  using (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()) or is_admin());
+-- v20 built a remote live camera on two tables, dms_live and dms_frame, and v22 retires
+-- both of them again: pushing a handset's picture to a browser was only ever answerable
+-- while the driver's app sat on his screen with a strong signal, and in practice it never
+-- worked. The camera now belongs to the phone alone - the driver presses his own video
+-- button and the same on-device watch the trip starts begins. Nothing here is read or
+-- written by either app any more, so the statements that created them are gone and the
+-- v22 block near the end of this file drops whatever a v20 database still holds.
+-- The events the camera produces are untouched: they are ordinary rows in the events
+-- table, which is what the dashboard's four driver rules and every report read.
 
 -- ------------------------------------------------------------- realtime ----
 -- the dashboard listens for position and event inserts; both must be in the
@@ -795,16 +904,47 @@ do $$ begin
   if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='bb_requests') then
     alter publication supabase_realtime add table bb_requests;
   end if;
-  -- v20: the dashboard waits for frames as they land, and the phone waits for the
-  -- request that tells it to start. Both are picture-rate events, so neither app
-  -- polls harder than it already does for blackbox pulls.
-  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='dms_live') then
-    alter publication supabase_realtime add table dms_live;
-  end if;
-  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='dms_frame') then
-    alter publication supabase_realtime add table dms_frame;
+  -- v20 put dms_live and dms_frame in here for the remote live camera. v22 retired
+  -- both tables, and dropping a table takes it out of the publication by itself, so
+  -- there is nothing to undo here and nothing to add.
+end $$;
+
+-- ------------------------------------------------------- v22 retire remote camera ----
+-- The remote live view is deleted from the dashboard and the phone keeps the camera for
+-- itself, so the two tables v20 built for that view are dropped. Nothing else in this
+-- file creates them and neither app reads or writes them any more; a database that never
+-- had v20 simply finds nothing to drop.
+--
+-- One drop per table is the whole of the clean-up: Postgres takes the table's policies,
+-- indexes, grants and publication membership down with it, and dms_frame's rows belonged
+-- to a session through "on delete cascade", so no pictures are left behind either. The
+-- clip column v19 added to events and the four driver rule rows are deliberately untouched.
+drop table if exists dms_frame;
+drop table if exists dms_live;
+
+-- ------------------------------------------- v23 the parked vehicle, and the blackbox ----
+-- A vehicle standing still does not need a position every minute. One point an hour
+-- keeps Live Tracking and every report honest, and it is a twentieth of the rows the same
+-- stop used to write. This is the stopped_interval the Configuration page already edits,
+-- so nothing new has to be learned to change it - only its starting value moves, and only
+-- in a database that is still sitting on the original 60. A fleet that typed its own
+-- number keeps it, and any number it types after this run survives every future run,
+-- because the marker below is written once and never taken back.
+do $$ begin
+  if not exists (select 1 from app_settings where key='parked_3600') then
+    update app_settings set value='3600' where key='stopped_interval' and value='60';
+    insert into app_settings (key, value) values ('parked_3600','1') on conflict (key) do nothing;
   end if;
 end $$;
+
+-- The blackbox took every fix the phone was handed, so a vehicle parked for a whole shift
+-- stored some twenty-eight thousand readings of the same stationary position, filled its
+-- cap of stored seconds and pushed the oldest driving seconds out with them. It now keeps
+-- only the fixes at or above bb_min_kmh, which is what the handset's own speed reading of
+-- a moving vehicle looks like; 0 in that box puts the old behaviour back for a fleet that
+-- wants every second of a stop as well.
+insert into app_settings (key, value) values ('bb_min_kmh','1')
+  on conflict (key) do nothing;
 
 -- ------------------------------------------------------------- admin seed ----
 -- Promote the owner account. Runs after the tables/policies exist, and is safe
@@ -1038,4 +1178,85 @@ end $$;
 --   streams only while its app is on screen — the camera lives in the page, not yet in the background service.
 --        Run this file BEFORE publishing the dashboard build with the video button: an insert into a table the
 --   database has not been told about is refused, and the panel would report a missing service instead of a picture.
+--   RETIRED IN v22: neither table is created by the statements above any more, and the two drops at the end of this
+--   file take them out of a database that already has them. See the v22 entry below.
+--
+-- v21, on top of the above (a lockout that expires instead of waiting for a person):
+--   profiles.fails_at                                                  -> the moment the wrong-password count last
+--        moved. login_window_m quiet minutes after it, the count is back to nothing, so five forgetful mornings in
+--        one week no longer add up to a lockout the way five in a row do.
+--   profiles.locked_until                                              -> how much of a lock is left. Set only by a
+--        five-strike lockout; NULL means an administrator pressed Lock on the Users page and only his Unlock ends
+--        it. login_lock_m says how long a lockout lasts, and login_lock_m 0 restores the v18 behaviour of a lock
+--        that waits forever.
+--   app_settings keys 'login_window_m' (15) and 'login_lock_m' (15)      -> those two waits, edited on the
+--        Configuration page. They are read by login_cfg(), which stands its own default behind an empty or mistyped
+--        box because the screen that calls it is the sign-in screen.
+--   login_sweep()                                                      -> ends expired locks and aged counts. Every
+--        sign-in call runs it first, so nobody needs a scheduled job: a lock that ran out is simply gone by the next
+--        attempt, and the person who waited it out signs in on the attempt that asks. It is granted to a signed-in
+--        account so the Users page can show the truth rather than a stale warning.
+--   login_gate / login_fail                                            -> re-created with two more answers:
+--        wait_min, the minutes a lock has left, and reset_min, the minutes of quiet after which the count starts
+--        again from nothing. wait_min is NULL when there is no lock or only an administrator can end it. Both are
+--        what lets the two sign-in screens tell a driver how long to wait instead of only sending him to the
+--        office. The v18 two-column versions are dropped before these are created: Postgres
+--        cannot change a function's return type in place, and a file that is run twice has to
+--        find the same signature both times.
+--   login_ok / clear_pw_flag                                           -> also put down fails_at, so a good sign-in
+--        and a new password both start the clock from nothing. Neither clears a lock: a lockout is ended by its own
+--        clock or by Unlock, never by typing.
+--   one-off backfill                                                    -> accounts sitting locked when this version
+--        arrives get the expiry they would have had, so nobody has to be unlocked by hand just because the schema
+--        caught up late. A lock with fewer than five tries behind it is one an administrator pressed, and it is left
+--        alone.
+--   Run this file before publishing the build that shows the two waits on the Configuration page; until then both
+--   apps keep working with the v18 answers and simply never mention an expiry.
+--
+-- v22, on top of the above (the camera stops being somebody else's remote control):
+--   drop dms_frame, then drop dms_live                                    -> v20's remote live view is deleted.
+--        Pushing a handset's pictures into a browser only ever answered while the driver's app was the screen in
+--        front of him and the signal was good enough to carry a frame a second; on the roads this fleet runs that
+--        never held, and a button that promises a picture and shows a black square is worse than no button. The
+--        video button is gone from Live Tracking, and the driver opens the same forward camera from his own map:
+--        the phone's DMS service, the four driver rules, the buzzer, the voice and the rows in the events table
+--        are exactly the ones the fleet's own "Watch the driver" switch produces, because the driver's button
+--        hands the camera the same setup a trip hands it.
+--   events, event_rules, app_settings dms_* , events.clip_path            -> untouched. Every record the camera
+--        makes still arrives in the events table and still shows in Live Tracking, Events, the reports and the
+--        Configuration page. Only the two tables that carried pictures to a browser retire.
+--   Nothing to run in a particular order: the two drops are if-exists, so a fresh project and a v20 project both
+--   end in the same state. Publish the dashboard and the phone builds that stop using the tables first if you
+--   want the button gone before the data does - the reverse order only means a press that finds no table, which
+--   the panel already reports as a missing service.
+--
+-- v23, on top of the above (a parked vehicle speaks once an hour, and the blackbox keeps only the road):
+--   app_settings 'stopped_interval' 60 -> 3600                             -> one position an hour while the
+--        vehicle stands still, instead of one a minute. It is the same box on the Configuration page that has
+--        always held it, and the same per-vehicle column that has always overridden it, so a fleet that wants a
+--        different wait - 300 for a taxi, 3600 for a lorry at a depot - changes one number and nothing else.
+--        The update runs only where the value is still the original 60, and 'parked_3600' marks that it ran: a
+--        number you set yourself, before or after, is never moved again.
+--      Live Tracking                                                        -> a stopped vehicle is a point up to an
+--        hour old, so between two heartbeats it reads Parking rather than Idling. Nothing else about it changes:
+--        it is not Offline, because that waits for offline_after_h, and it starts reporting every moving interval
+--        again the moment it rolls.
+--      Historical Tracking, the Tacho report and every distance figure      -> the trip splitter and the idling
+--        maths used to treat a silence of ten minutes and a silence of three minutes as breaks in the drive. Both
+--        now read the recording intervals you configured, so an hour parked between two heartbeats stays one trip
+--        and counts as idling rather than as missing data. A phone that was switched off still shows a gap.
+--   vehicle_report()                                                     -> its stop_min term takes the same
+--        parked-interval bound, so the Fleet Summary keeps reporting a parked shift as standing time when the phone
+--        says nothing about it for an hour. km, drive_min and over_s keep the three-minute bound on purpose: a
+--        silence between two moving samples is a phone that said nothing, and bridging it would draw a straight
+--        line over roads no vehicle took straight.
+--   app_settings 'bb_min_kmh' (1)                                        -> the speed, in km/h, at which the
+--        handset begins storing a second in its blackbox. Below it a fix is dropped, so a shift spent parked costs
+--        the phone nothing and cannot push the driving seconds out of its cap. 0 means every fix again. This
+--        changes only what is kept on the handset: the download the Vehicles page asks for, its windows, its
+--        de-duplication and the Blackbox rows in the tacho report are all exactly as before.
+--   Publish the dashboard and the phone that read these two before running this file. The order hardly matters -
+--   an older app simply never sees the new keys and keeps its own built-in defaults (60 s stopped, every fix
+--   stored) - but a newer phone holding a stopped_interval of 3600 while the dashboard still offers a 60 s box is
+--   a page that lies about what the fleet does.
 -- ============================================================================
