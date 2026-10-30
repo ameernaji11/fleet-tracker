@@ -19,7 +19,8 @@
 // WHAT IT ACCEPTS, and only from a caller whose own profile says role = admin
 //   POST {action:'set_password', user_id, password}  - give that account a new
 //        password and make it change the password on its next sign-in
-//   POST {action:'unlock', user_id}                  - clear the lock and the count
+//   POST {action:'unlock', user_id}                  - clear the lock, its expiry and
+//        the whole count of wrong tries (v21 added the two stamped columns to that)
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const json = (body, status) =>
@@ -27,6 +28,23 @@ const json = (body, status) =>
     status: status || 200,
     headers: { 'Content-Type': 'application/json' },
   });
+
+// v21 gave the lock two more columns: locked_until, the moment a lockout ends by
+// itself, and fails_at, the stamp that decides when the count of wrong tries ages
+// out. An administrator's action puts both down with the lock and the count. A
+// database that has not run the newest schema.sql has neither column, and one failed
+// update would leave the row half reset, so the older shape is retried once.
+async function resetLock(admin, id, extra) {
+  const full = { fails: 0, fails_at: null, locked_at: null, locked_until: null, ...(extra || {}) };
+  let { error } = await admin.from('profiles').update(full).eq('id', id);
+  if (error && /column .* does not exist/i.test(error.message || '')) {
+    ({ error } = await admin
+      .from('profiles')
+      .update({ fails: 0, locked_at: null, ...(extra || {}) })
+      .eq('id', id));
+  }
+  return error;
+}
 
 Deno.serve(async (req) => {
   try {
@@ -64,14 +82,18 @@ Deno.serve(async (req) => {
       if (pw.length < 6) return json({ error: 'The new password must be at least 6 characters.' }, 400);
       const { error } = await admin.auth.admin.updateUserById(id, { password: pw, email_confirm: true });
       if (error) return json({ error: error.message }, 500);
-      await admin.from('profiles').update({ fails: 0, locked_at: null, must_change: true }).eq('id', id);
+      // the flag matters: without it the account keeps using a password somebody else
+      // typed, so a profile that could not be written is reported rather than ignored
+      const err = await resetLock(admin, id, { must_change: true });
+      if (err) return json({ error: 'The password is set, but this account could not be told to replace it: ' + err.message }, 500);
       return json({ ok: true });
     }
 
     if (action === 'unlock') {
       const { error } = await admin.auth.admin.updateUserById(id, { ban_duration: '0s' });
       if (error) return json({ error: error.message }, 500);
-      await admin.from('profiles').update({ fails: 0, locked_at: null }).eq('id', id);
+      const err2 = await resetLock(admin, id);
+      if (err2) return json({ error: err2.message }, 500);
       return json({ ok: true });
     }
 
