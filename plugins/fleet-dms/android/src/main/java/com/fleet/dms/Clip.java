@@ -135,7 +135,13 @@ class Clip {
                 }
             }
         }
-        if (done != null) enc.execute(() -> write(done));
+        if (done != null) {
+            // a lambda may only take a variable it can rely on not changing, and `done`
+            // has just been assigned inside the lock, so it is handed over under a name
+            // that will not be touched again
+            final Capture finished = done;
+            enc.execute(() -> write(finished));
+        }
     }
 
     /**
