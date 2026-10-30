@@ -22,8 +22,24 @@ jobs:
         env:
           FLEET_KEYSTORE_B64: ${{ secrets.FLEET_KEYSTORE_B64 }}
         run: |
+          # This step used to have no guard at all, so a secret that was not clean
+          # base64 - a carriage return from a Windows editor, or the BEGIN/END lines
+          # of certutil's PEM output - killed the run with nothing but "exit code 1"
+          # two minutes in, which reads exactly like a code problem. It now says so.
+          trap 'echo "::error::The signing key could not be read from the FLEET_KEYSTORE_B64 secret (failing line $LINENO). Save the secret as one base64 string with no headers, no spaces and no carriage returns." | head -c 600; exit 1' ERR
           if [ -n "$FLEET_KEYSTORE_B64" ]; then
-            printf '%s' "$FLEET_KEYSTORE_B64" | base64 -d > fleet.keystore
+            # Secrets get pasted in whatever shape the tool that made them produced:
+            # one long line, wrapped at 76, with Windows line endings, or with certutil's
+            # BEGIN/END lines around it. All four decode to the same key here. A strict
+            # `base64 -d` on any of the others is what ended this run with nothing but
+            # "exit code 1" - and `-i` alone is not enough, because the letters of
+            # "BEGIN CERTIFICATE" are themselves valid base64 and shift the whole file.
+            printf '%s' "$FLEET_KEYSTORE_B64" \
+              | tr -d '\r\n \t' \
+              | sed -E 's/-----[A-Za-z ]+-----//g' \
+              | base64 -di > fleet.keystore
+            SZ=$(stat -c %s fleet.keystore)
+            [ "$SZ" -gt 500 ] || { echo "::error::FLEET_KEYSTORE_B64 decoded to only $SZ bytes - the secret is truncated or is not this keystore."; exit 1; }
             echo "source=secret" >> "$GITHUB_OUTPUT"
           else
             echo "source=none" >> "$GITHUB_OUTPUT"
@@ -157,19 +173,47 @@ jobs:
           npm i --no-save sharp@0.33.5
           node tools/make-icons.js --direct
           ls -l android/app/src/main/res/mipmap-xxxhdpi/
-      - name: Build signed release APK
+      # Gradle was in the same step as zipalign and apksigner, and the whole thing had
+      # no guard: a Java or Gradle failure printed "Process completed with exit code 1"
+      # and nothing else, which is the one thing this file has been fixed for twice
+      # already. Each of the three now says what it was doing, and the Gradle one
+      # repeats the lines that actually failed into the annotation.
+      - name: Build the release APK with Gradle
+        run: |
+          chmod +x android/gradlew
+          # pipefail is on for the whole job, so a failing gradlew would end the step
+          # before the report below could run; it is lifted just for this pipeline.
+          set +o pipefail
+          (cd android && ./gradlew assembleRelease --console=plain --warning-mode=none 2>&1) | tee gradle.log
+          RC=${PIPESTATUS[0]}
+          set -o pipefail
+          if [ "$RC" -ne 0 ]; then
+            echo "::group::why the build failed"
+            grep -nE "FAILURE:|^\* What went wrong|^> Task .* FAILED|error:|Execution failed for task|Could not (find|resolve)" gradle.log | tail -40
+            echo "--- last 60 lines ---"
+            tail -60 gradle.log
+            echo "::endgroup::"
+            echo "::error::Gradle could not build the release APK (exit $RC). The failing lines are in the group above."
+            exit 1
+          fi
+          grep -q "BUILD SUCCESSFUL" gradle.log || { echo "::error::Gradle said it succeeded but left no BUILD SUCCESSFUL line."; exit 1; }
+          ls -l android/app/build/outputs/apk/release/
+      - name: Align and sign the APK
         env:
           KS_PASS: ${{ secrets.FLEET_KEYSTORE_PASSWORD }}
         run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleRelease
-          cd ..
+          trap 'echo "::error::the APK could not be aligned or signed (failing line $LINENO)"; exit 1' ERR
           BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
           [ -x "$BT/zipalign" ] || { echo "::error::No build-tools with zipalign under $ANDROID_HOME"; exit 1; }
-          $BT/zipalign -p 4 android/app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
+          UNSIGNED=android/app/build/outputs/apk/release/app-release-unsigned.apk
+          [ -s "$UNSIGNED" ] || { echo "::error::Gradle produced no $UNSIGNED."; exit 1; }
+          $BT/zipalign -p 4 "$UNSIGNED" aligned.apk
           $BT/apksigner sign --ks fleet.keystore --ks-pass pass:$KS_PASS --key-pass pass:$KS_PASS --ks-key-alias fleet --out fleet-tracker.apk aligned.apk
-          $BT/apksigner verify fleet-tracker.apk
+      - name: Check the signed APK
+        run: |
+          BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+          $BT/apksigner verify --print-certs fleet-tracker.apk || { echo "::error::fleet-tracker.apk is not a valid signed APK."; exit 1; }
+          ls -l fleet-tracker.apk
       - uses: actions/upload-artifact@v4
         with:
           name: fleet-tracker-apk
