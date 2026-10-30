@@ -64,12 +64,16 @@ jobs:
         run: |
           trap 'echo "::error::npm could not install the Capacitor packages (failing line $LINENO)"; exit 1' ERR
           npm init -y
-          npm i @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7 @capacitor/device@7 @capacitor/local-notifications@7 @capacitor/browser@7 @capacitor-community/background-geolocation@1.2.26 @capacitor-community/text-to-speech@6.1.0 esbuild
+          # fleet-dms is our own module, in this repository rather than on npm: the
+          # file: path is how Capacitor's CLI finds it, its package.json is what tells
+          # the CLI it is a plugin, and plugins/fleet-dms/android is what gets added to
+          # the Gradle build as :fleet-dms.
+          npm i @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7 @capacitor/device@7 @capacitor/local-notifications@7 @capacitor/browser@7 @capacitor-community/background-geolocation@1.2.26 @capacitor-community/text-to-speech@6.1.0 file:./plugins/fleet-dms esbuild
       - name: Bundle the plugin bridge
         run: |
           trap 'echo "::error::www/bridge.js could not be built (failing line $LINENO)"; exit 1' ERR
           echo "import { registerPlugin } from '@capacitor/core';" > bridge.js
-          echo "window.CapPlugins = { BG: registerPlugin('BackgroundGeolocation'), Device: registerPlugin('Device'), LN: registerPlugin('LocalNotifications'), Browser: registerPlugin('Browser'), TTS: registerPlugin('TextToSpeech') };" >> bridge.js
+          echo "window.CapPlugins = { BG: registerPlugin('BackgroundGeolocation'), Device: registerPlugin('Device'), LN: registerPlugin('LocalNotifications'), Browser: registerPlugin('Browser'), TTS: registerPlugin('TextToSpeech'), Dms: registerPlugin('FleetDms') };" >> bridge.js
           npx esbuild bridge.js --bundle --minify --outfile=www/bridge.js
       - name: Copy the map libraries into the app
         run: |
@@ -96,10 +100,34 @@ jobs:
           done
           [ "$(ls www/vendor/fa/webfonts/*.woff2 2>/dev/null | wc -l)" -ge 3 ] || { echo "::error::no icon fonts in www/vendor/fa/webfonts - the buttons would render as empty boxes."; exit 1; }
           ls -l www/vendor www/vendor/fa/css www/vendor/fa/webfonts
+      # The driver's face is read on the handset, so the model that reads it travels
+      # inside the APK: a driver in a dead spot cannot download one, and nothing about
+      # his eyes ever leaves the phone. It is fetched at build time rather than kept in
+      # git because it is a few megabytes of binary nobody can review, and the URL below
+      # is a version-pinned copy of it (float16/1).
+      - name: Fetch the driver-camera model
+        run: |
+          trap 'echo "::error::the face model for the driver camera was not fetched (failing line $LINENO)"; exit 1' ERR
+          A=plugins/fleet-dms/android/src/main/assets
+          mkdir -p "$A"
+          curl -fsSL --retry 3 -o "$A/face_landmarker.task" \
+            https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
+          # A half-downloaded file builds into an APK that quietly has no eyes for the
+          # whole trip, which is a long way to find out about a bad mirror.
+          SZ=$(stat -c %s "$A/face_landmarker.task")
+          [ "$SZ" -gt 3000000 ] || { echo "::error::face_landmarker.task is only $SZ bytes - the download did not finish."; exit 1; }
+          echo "Driver-camera model ready: $SZ bytes."
       - name: Create the Android project
         run: |
           trap 'echo "::error::the Android project could not be created (failing line $LINENO)"; exit 1' ERR
           npx cap add android
+          # The driver-camera library is built for Android 7 and up, and a library may
+          # not ask less of the app it is merged into, so the app's own floor moves with
+          # it. The grep afterwards is the check that the template still says what it
+          # said when this line was written - if it ever changes, the build should stop
+          # here rather than fail three minutes later in the Gradle merge.
+          sed -i 's/minSdkVersion = 2[0-9]/minSdkVersion = 24/' android/variables.gradle
+          grep -q 'minSdkVersion = 24' android/variables.gradle || { echo "::error::android/variables.gradle no longer holds a minSdkVersion this step can raise to 24."; exit 1; }
           sed -i 's#</manifest>#<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/><uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/><uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/><uses-permission android:name="android.permission.POST_NOTIFICATIONS"/><uses-permission android:name="android.permission.VIBRATE"/></manifest>#' android/app/src/main/AndroidManifest.xml
           sed -i 's/android:allowBackup="true"/android:allowBackup="false"/; s/<application/<application android:usesCleartextTraffic="false"/' android/app/src/main/AndroidManifest.xml
           # The buzzer tones double as notification-channel sounds, which is how an
@@ -110,6 +138,14 @@ jobs:
           cp www/tones/*.wav android/app/src/main/res/raw/
           ls -l android/app/src/main/res/raw/ | grep -c '\.wav'
           npx cap sync android
+          # cap sync is what writes the list of plugin classes the app loads when it
+          # starts. If our own module is missing from it the phone still builds, still
+          # installs and still drives - only the camera never opens, which is a hard
+          # thing to notice from a dashboard. So the build checks it instead.
+          PL=android/app/src/main/assets/capacitor.plugins.json
+          [ -s "$PL" ] || { echo "::error::$PL was not written by cap sync."; exit 1; }
+          grep -q 'com.fleet.dms.FleetDmsPlugin' "$PL" || { echo "::error::cap sync did not register the driver camera. It reads plugins/fleet-dms/package.json for the module path and the Java under plugins/fleet-dms/android/src/main for the class name, so check the capacitor manifest and the @CapacitorPlugin annotation."; exit 1; }
+          cat "$PL"
       # One artwork for the browser tab and the phone: both come from www/icon.svg.
       # @capacitor/assets is not used here - its v3 CLI has no icon-only flag and it
       # insists on a splash.png we don't ship, so the mipmaps are written straight
