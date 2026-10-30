@@ -189,11 +189,18 @@ jobs:
           set -o pipefail
           if [ "$RC" -ne 0 ]; then
             echo "::group::why the build failed"
-            grep -nE "FAILURE:|^\* What went wrong|^> Task .* FAILED|error:|Execution failed for task|Could not (find|resolve)" gradle.log | tail -40
+            grep -nE "FAILURE:|^\* What went wrong|^\* Where|^> Task .* FAILED|error:|Execution failed for task|Could not (find|resolve|determine|create)" gradle.log | tail -40
             echo "--- last 60 lines ---"
             tail -60 gradle.log
             echo "::endgroup::"
-            echo "::error::Gradle could not build the release APK (exit $RC). The failing lines are in the group above."
+            # The log itself can only be read signed in, so the lines that name the
+            # cause are repeated inside the annotation: %0A is how a workflow command
+            # carries a newline, and %25 has to go first or the escapes break.
+            KEY=$(grep -A6 "^\* What went wrong:" gradle.log | head -30)
+            [ -n "$KEY" ] || KEY=$(grep -E "FAILURE:|error:|^> Task .* FAILED|Could not (find|resolve|determine|create)" gradle.log | head -12)
+            [ -n "$KEY" ] || KEY=$(tail -6 gradle.log)
+            MSG=$(printf '%s\n' "$KEY" | tr -d '\r' | sed -e 's/%/%25/g' -e 's/[[:space:]]\{1,\}/ /g' -e ':a' -e 'N' -e '$!ba' -e 's/\n/%0A/g')
+            echo "::error::Gradle could not build the release APK (exit $RC): ${MSG:0:1500}"
             exit 1
           fi
           grep -q "BUILD SUCCESSFUL" gradle.log || { echo "::error::Gradle said it succeeded but left no BUILD SUCCESSFUL line."; exit 1; }
