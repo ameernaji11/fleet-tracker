@@ -447,8 +447,14 @@ public class DmsService extends Service implements LifecycleOwner {
             if (turn != null) turn.recycle();
             turn = Bitmap.createBitmap(tw, th, Bitmap.Config.ARGB_8888);
         }
+        // Rotate about the picture's own centre, then drop its new centre where the
+        // canvas centre is. Turning about the origin instead would throw the whole
+        // rotated frame off the canvas, and a clipped draw onto a bitmap this object
+        // reuses paints the driver's box - and the face reading - solid black.
         Matrix m = new Matrix();
+        m.postTranslate(-w / 2f, -h / 2f);
         m.postRotate(deg);
+        m.postTranslate(tw / 2f, th / 2f);
         new Canvas(turn).drawBitmap(flat, m, null);
         return turn;
     }
