@@ -43,6 +43,13 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.grid3 div{background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px 8px;min-width:0}.grid3 small{display:block;color:var(--mut);font-size:10px}.grid3 b{font-size:12px;white-space:nowrap}.grid3 .w2{grid-column:span 2}
 .btns{display:flex;gap:8px}.btns .btn{margin:0;height:48px}
 .mcl{position:absolute;z-index:999;right:8px;top:8px;display:flex;flex-direction:column;gap:6px}.mcl button{width:38px;height:38px;border:0;border-radius:10px;background:#fff;box-shadow:0 1px 6px #0004;color:var(--ink)}
+/* the driver's own picture of himself. It sits inside the map on purpose: the map is
+   the one part of this screen where covering a corner costs nothing, it moves with the
+   map into full screen, and a box drawn over the page by Android would float on top of
+   the Start and End buttons he has to press */
+#camV{position:absolute;left:8px;bottom:8px;z-index:999;width:76px;height:100px;max-width:38%;max-height:76%;background:#0009;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+#camV img{width:100%;height:100%;object-fit:cover;display:block;transform:scaleX(-1)}
+#camV i{position:absolute;left:5px;top:5px;color:#fff9;font-size:13px}
 /* the style name has to be readable the moment the driver taps the layer button,
    because a touch device never shows a button title - so it sits level with that
    button (the second in the cluster) and just to the left of it */
@@ -54,7 +61,10 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 #err{position:fixed;bottom:66px;left:12px;right:12px;font-size:12px;pointer-events:none;margin:0;z-index:1001}
 /* Short screens (a phone held sideways, a small window): every screen has to fit
    without scrolling, so the login artwork and the step spacing give way first. */
-@media(max-height:660px){.hero{max-height:112px;width:auto;margin:2px auto}#lg{padding:8px 16px!important}.lgname{font-size:19px}#pm{padding:8px 16px}#pm h2{margin:0 0 4px}#pm p{margin:0 0 6px}#pm .card.step{padding:6px 8px}#pm .btn{height:42px;margin:4px 0}.spd b{font-size:28px}}
+@media(max-height:660px){.hero{max-height:112px;width:auto;margin:2px auto}#lg{padding:8px 16px!important}.lgname{font-size:19px}#pm{padding:8px 16px}#pm h2{margin:0 0 4px}#pm p{margin:0 0 6px}#pm .card.step{padding:6px 8px}#pm .btn{height:42px;margin:4px 0}.spd b{font-size:28px}
+/* five map buttons have to stay inside a short map, or the last one hangs over the
+   tiles below it */
+.mcl{gap:4px}.mcl button{width:31px;height:31px;border-radius:8px;font-size:12px}}
 </style></head><body>
 <div id="lg" class="screen" style="text-align:center;padding-top:40px">
 <div class="lgname">Fleet Tracker</div>
@@ -85,13 +95,15 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 <button class="btn o" onclick="CapPlugins.BG.openSettings()"><i class="fa-solid fa-gear"></i>Open location settings</button>
 <div class="card step"><i class="fa-solid fa-battery-full"></i><div>Battery: "Unrestricted"<br><small>Opens settings. Tap Battery → Unrestricted, so Android never stops tracking.</small></div></div>
 <button class="btn o" onclick="CapPlugins.BG.openSettings()"><i class="fa-solid fa-gear"></i>Open battery settings</button>
+<div class="card step" id="camcard"><i class="fa-solid fa-video"></i><div>Driver camera<br><small>Only used if your fleet turns driver alerts on. While a trip is running the phone looks at your face for tiredness, distraction or a phone in your hand and warns you. A short video is kept around a warning; nothing is sent without a signal.</small></div></div>
+<button class="btn o" id="camask" onclick="camAsk()"><i class="fa-solid fa-camera"></i>Allow the camera</button>
 <div class="card step"><i class="fa-solid fa-bell"></i><div>Alerts with the screen off<br><small>Keep Battery "Unrestricted" and notifications allowed: the buzzer and the voice are then produced by Android itself, so both work with the screen locked or another app open. Test them with the bell button once the trip has started. The speaker button at the top of the map silences every sound without losing the on-screen warning.</small></div></div>
 <button class="btn g" onclick="localStorage.perm='1';show('lg');init()"><i class="fa-solid fa-arrow-right"></i>Continue</button></div>
 <div id="app" class="screen hide">
 <div class="top"><div><small>Welcome,</small> <b id="wn"></b><b>!</b></div><div><button class="ib hide" id="dash" onclick="openDash()" title="Open dashboard"><i class="fa-solid fa-chart-line"></i></button><button class="ib" onclick="testAlert()" title="Test the buzzer and the voice alert"><i class="fa-solid fa-bell"></i></button><button class="ib" onclick="pwUi()" title="Change password"><i class="fa-solid fa-key"></i></button><button class="ib" onclick="signOut()" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i></button></div></div>
 <div class="card id"><div class="av" style="width:38px;height:38px;font-size:17px"><i id="vi" class="fa-solid fa-car"></i></div><div><b id="vn"></b><br><small><i class="fa-solid fa-id-card"></i> <span id="dn"></span></small><br><select id="pk" class="hide" onchange="pickV()" style="margin-top:6px;max-width:190px"></select></div><span class="chip" id="stc">Parking</span></div>
 <div class="card spd"><div><b id="sp">0</b><span>km/h</span></div><div class="pr"><small>Position</small><b id="v_pos">-</b><br><small id="lt">No record yet</small></div></div>
-<div id="map"><div id="fr"></div><div class="mn hide" id="mn"><i class="fa-solid fa-wifi"></i> No signal: this area was not cached, the route and zones are still drawn</div><div class="layN hide" id="layN"></div><div class="mcl"><button id="muteB" onclick="muteTog()" title="Mute the alerts"><i class="fa-solid fa-volume-high"></i></button><button id="layB" onclick="togMap()" title="Map style"><i class="fa-solid fa-layer-group"></i></button><button id="fsB" onclick="fsMap()" title="Full screen"><i class="fa-solid fa-expand"></i></button><button id="pinB" class="on" onclick="togPin()" title="Pin: keep the vehicle in the centre"><i class="fa-solid fa-thumbtack"></i></button></div></div>
+<div id="map"><div id="fr"></div><div class="mn hide" id="mn"><i class="fa-solid fa-wifi"></i> No signal: this area was not cached, the route and zones are still drawn</div><div class="layN hide" id="layN"></div><div id="camV" class="hide"><img id="camI" alt="Driver camera view"><i id="camVi" class="fa-solid fa-video"></i></div><div class="mcl"><button id="muteB" onclick="muteTog()" title="Mute the alerts"><i class="fa-solid fa-volume-high"></i></button><button id="layB" onclick="togMap()" title="Map style"><i class="fa-solid fa-layer-group"></i></button><button id="fsB" onclick="fsMap()" title="Full screen"><i class="fa-solid fa-expand"></i></button><button id="pinB" class="on" onclick="togPin()" title="Pin: keep the vehicle in the centre"><i class="fa-solid fa-thumbtack"></i></button><button id="camB" class="hide" onclick="camTog()" title="Show the driver camera view"><i class="fa-solid fa-video"></i></button></div></div>
 <div class="grid3" id="vals"></div>
 <div class="btns"><button id="go" class="btn g" onclick="start()"><i class="fa-solid fa-play"></i>Start trip</button><button id="stp" class="btn r hide" onclick="stop()"><i class="fa-solid fa-stop"></i>End trip</button></div>
 <div class="foot">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</div>
@@ -135,11 +147,15 @@ function outOpen(){return new Promise(res=>{if(!window.indexedDB||!indexedDB.ope
 function outAdd(v){const s=outSt('readwrite');if(s){try{s.add({v,at:Date.now()});return}catch(e){}}
  MEMQ.push({k:++MMX,v,mem:true})}
 let MMX=0;
-function outDel(r){if(r.mem)return;const s=outSt('readwrite');if(s)try{s.delete(r.k)}catch(e){}}
+function outDel(r){if(r.mem){const i=MEMQ.findIndex(x=>x.k===r.k);if(i>=0)MEMQ.splice(i,1);return}
+ const s=outSt('readwrite');if(s)try{s.delete(r.k)}catch(e){}}
 // oldest-first page of the queue; the server accepts 200 rows per insert, so that
-// is the natural batch size
+// is the natural batch size. Reading a page never removes it: a record is only thrown
+// away once the server has taken it, and this holds for the memory queue the phone
+// falls back to when IndexedDB is not available - an unreadable store must not turn an
+// offline drive into lost records.
 function outTake(n,after){return new Promise(res=>{const s=outSt('readonly');
- if(!s)return res(MEMQ.splice(0,n));
+ if(!s)return res(MEMQ.filter(x=>x.k>(after||0)).slice(0,n));
  try{s.getAll(IDBKeyRange.lowerBound(after||0,true),n).onsuccess=e=>
   res((e.target.result||[]).map(x=>({k:x.k,v:x.v})))}catch(e){res([])}})}
 const outCount=()=>new Promise(res=>{const s=outSt('readonly');
@@ -233,6 +249,9 @@ async function signIn(){
  catch(e){$('err').textContent=(e.soft?'':'Error: ')+(e.message||e)}
  b.disabled=false;b.innerHTML='<i class="fa-solid fa-right-to-bracket"></i>Sign in'}
 async function signOut(){sessStop();await logAct('Signed out','Phone');
+ // the watch ends with his session, and the warnings and pictures this phone kept of
+ // him are deleted rather than left for the next driver of the same handset
+ try{if(dmsHas()){await CapPlugins.Dms.stop();await dmsDrain();await CapPlugins.Dms.clear()}}catch(e){}
  localStorage.removeItem('offl');try{await sb.auth.signOut()}catch(e){}location.reload()}
 let PWFORCE=0;
 // force=1 opens the panel and takes the Cancel button away: a password the
@@ -269,11 +288,12 @@ function logAct(action,details,duration_s){if(!me)return;(async()=>{
 let SST=0;
 function sessStop(){if(!SST||!me)return;const s=Math.round((Date.now()-SST)/1000);SST=0;if(s>=10)logAct('Session time','App',s)}
 function sessStart(){if(me)SST=Date.now()}
-document.addEventListener('visibilitychange',()=>{if(document.hidden){sessStop();return}
- sessStart();if(Date.now()<ALRM)$('fr').classList.add('on');
+document.addEventListener('visibilitychange',()=>{if(document.hidden){sessStop();dmsUi();return}
+ sessStart();dmsUi();if(Date.now()<ALRM)$('fr').classList.add('on');
  // coming back to the front: stop a tone whose deadline passed while we were away,
- // and push whatever the phone saved in the meantime
- toneEnd();outUi();if(PEND)flush();maybeResume()});
+ // and push whatever the phone saved in the meantime - including the warnings the
+ // driver camera raised while this page was frozen
+ toneEnd();outUi();if(PEND)flush();maybeResume();dmsDrain()});
 addEventListener('pagehide',sessStop);
 // A driver with no signal still has to be able to open the app, start a trip and be
 // warned. The session may be unreadable offline, so the last identity the phone proved
@@ -301,6 +321,9 @@ async function init(fresh,who){
   if(a&&a.must_change)pwUi(1)}catch(e){}
  await outInit();
  await loadRules();
+ // a phone Android restarted while a trip was running has already raised warnings of
+ // its own: hear about them from the first moment, not only after Start is pressed
+ dmsListen();
  const nm=(me.email||'').replace('@fleet.local','');$('wn').textContent=nm;
  const v=asg?.vehicles;$('vn').textContent=v?.name||'No vehicle linked';$('dn').textContent=asg?.drivers?.name||'No driver linked';$('vi').className='fa-solid '+(TI[v?.type]||'fa-car');
  logAct(fresh?'Signed in':'Opened app',$('vn').textContent);sessStart();
@@ -405,7 +428,7 @@ function alertRing(){ALRM=Date.now()+8000;$('fr').classList.add('on');if(mrk)mrk
 async function pAsk(){try{const id=await CapPlugins.BG.addWatcher({requestPermissions:true,backgroundTitle:'Fleet Tracker',backgroundMessage:'Checking permissions'},()=>{});setTimeout(()=>CapPlugins.BG.removeWatcher({id}),3000)}catch(e){$('err').textContent='Location: '+(e.message||e)}
  await askNotif()}
 // ---- alerts on the phone
-let RUL={};const EVN={harsh_braking:'Harsh braking',harsh_acceleration:'Harsh acceleration',overspeed:'Overspeed',zone_enter:'Entered zone',zone_exit:'Left zone',zone_overspeed:'Zone overspeed'};
+let RUL={};const EVN={harsh_braking:'Harsh braking',harsh_acceleration:'Harsh acceleration',overspeed:'Overspeed',zone_enter:'Entered zone',zone_exit:'Left zone',zone_overspeed:'Zone overspeed',dms_fatigue:'Driver fatigued',dms_distraction:'Driver distracted',dms_phone_use:'Phone in hand',dms_cam_blocked:'Camera blocked'};
 // Alerts must be audible even when the driver never opened the Permissions screen, so every
 // trip start re-asks for notification permission and registers the loud channel it posts to.
 let CHAN=false;
@@ -445,10 +468,10 @@ async function askNotif(){await logAct('Allowed permissions');
 // the on/off switches come from the dashboard Configuration page.
 const VLANG={en:['English','en-US'],ar:['Arabic','ar-SA'],hi:['Hindi','hi-IN'],ur:['Urdu','ur-PK']};
 const VMSG={
- en:{overspeed:'You are over the speed limit. Please slow down.',harsh_braking:'Harsh braking detected. Keep a safe distance and brake gently.',harsh_acceleration:'Harsh acceleration detected. Please accelerate smoothly.',zone_enter:'You have entered a restricted zone.',zone_exit:'You have left the zone.',zone_overspeed:'You are over the speed limit for this zone. Please slow down.'},
- ar:{overspeed:'لقد تجاوزت حد السرعة. يرجى تخفيف السرعة.',harsh_braking:'تم رصد فرملة قوية. حافظ على مسافة آمنة واضغط على الفرامل بهدوء.',harsh_acceleration:'تم رصد تسارع قوي. يرجى التسارع بسلاسة.',zone_enter:'لقد دخلت المنطقة المحددة.',zone_exit:'لقد غادرت المنطقة المحددة.',zone_overspeed:'لقد تجاوزت السرعة المحددة داخل هذه المنطقة. يرجى تخفيف السرعة.'},
- hi:{overspeed:'आप गति सीमा से ऊपर हैं। कृपया गति कम करें।',harsh_braking:'तेज़ ब्रेक लगाया गया। सुरक्षित दूरी रखें और धीरे ब्रेक लगाएँ।',harsh_acceleration:'तेज़ रफ़्तार पकड़ी गई। कृपया धीरे-धीरे गति बढ़ाएँ।',zone_enter:'आप निर्धारित क्षेत्र में प्रवेश कर गए हैं।',zone_exit:'आप निर्धारित क्षेत्र से बाहर निकल गए हैं।',zone_overspeed:'इस क्षेत्र की गति सीमा से ऊपर चल रहे हैं। कृपया गति कम करें।'},
- ur:{overspeed:'آپ رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',harsh_braking:'سخت بریک لگائی گئی۔ محفوظ فاصلہ رکھیں اور آہستہ بریک لگائیں۔',harsh_acceleration:'تیز رفتاری پکڑی گئی۔ براہ کرم آہستہ آہستہ رفتار بڑھائیں۔',zone_enter:'آپ مقررہ علاقے میں داخل ہو گئے ہیں۔',zone_exit:'آپ مقررہ علاقے سے باہر نکل گئے ہیں۔',zone_overspeed:'اس علاقے کی رفتار کی حد سے اوپر جا رہے ہیں۔ براہ کرم رفتار کم کریں۔'}};
+ en:{overspeed:'You are over the speed limit. Please slow down.',harsh_braking:'Harsh braking detected. Keep a safe distance and brake gently.',harsh_acceleration:'Harsh acceleration detected. Please accelerate smoothly.',zone_enter:'You have entered a restricted zone.',zone_exit:'You have left the zone.',zone_overspeed:'You are over the speed limit for this zone. Please slow down.',dms_fatigue:'You look tired. Please take a break.',dms_distraction:'Please keep your eyes on the road.',dms_phone_use:'Please do not use a phone while driving.',dms_cam_blocked:'The driver camera is covered. Keep the view clear.'},
+ ar:{overspeed:'لقد تجاوزت حد السرعة. يرجى تخفيف السرعة.',harsh_braking:'تم رصد فرملة قوية. حافظ على مسافة آمنة واضغط على الفرامل بهدوء.',harsh_acceleration:'تم رصد تسارع قوي. يرجى التسارع بسلاسة.',zone_enter:'لقد دخلت المنطقة المحددة.',zone_exit:'لقد غادرت المنطقة المحددة.',zone_overspeed:'لقد تجاوزت السرعة المحددة داخل هذه المنطقة. يرجى تخفيف السرعة.',dms_fatigue:'يبدو أنك متعب. يرجى أخذ استراحة.',dms_distraction:'رجاءً أبقِ ناظريك على الطريق.',dms_phone_use:'رجاءً لا تستخدم الهاتف أثناء القيادة.',dms_cam_blocked:'كاميرا السائق مغطاة. أبقِ الرؤية واضحة.'},
+ hi:{overspeed:'आप गति सीमा से ऊपर हैं। कृपया गति कम करें।',harsh_braking:'तेज़ ब्रेक लगाया गया। सुरक्षित दूरी रखें और धीरे ब्रेक लगाएँ।',harsh_acceleration:'तेज़ रफ़्तार पकड़ी गई। कृपया धीरे-धीरे गति बढ़ाएँ।',zone_enter:'आप निर्धारित क्षेत्र में प्रवेश कर गए हैं।',zone_exit:'आप निर्धारित क्षेत्र से बाहर निकल गए हैं।',zone_overspeed:'इस क्षेत्र की गति सीमा से ऊपर चल रहे हैं। कृपया गति कम करें।',dms_fatigue:'आप थके हुए लगते हैं। कृपया विश्राम करें।',dms_distraction:'कृपया नज़र सड़क पर रखें।',dms_phone_use:'कृपया ड्राइव करते समय फ़ोन का उपयोग न करें।',dms_cam_blocked:'ड्राइवर कैमरा ढका है। दृश्य साफ़ रखें।'},
+ ur:{overspeed:'آپ رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',harsh_braking:'سخت بریک لگائی گئی۔ محفوظ فاصلہ رکھیں اور آہستہ بریک لگائیں۔',harsh_acceleration:'تیز رفتاری پکڑی گئی۔ براہ کرم آہستہ آہستہ رفتار بڑھائیں۔',zone_enter:'آپ مقررہ علاقے میں داخل ہو گئے ہیں۔',zone_exit:'آپ مقررہ علاقے سے باہر نکل گئے ہیں۔',zone_overspeed:'اس علاقے کی رفتار کی حد سے اوپر جا رہے ہیں۔ براہ کرم رفتار کم کریں۔',dms_fatigue:'آپ تھکے ہوئے لگتے ہیں۔ براہ کرم آرام کریں۔',dms_distraction:'براہ کرم نظر سڑک پر رکھیں۔',dms_phone_use:'براہ کرم ڈرائیو کرتے وقت فون استعمال نہ کریں۔',dms_cam_blocked:'ڈرائیور کیمیر ڈھکا ہوا ہے۔ دید صاف رکھیں۔'}};
 const vrMsg=(t,l)=>(VMSG[l]||VMSG.en)[t]||VMSG.en[t]||'';
 // the WebView's own speechSynthesis is unreliable on Android, so the native
 // text-to-speech plugin is tried first and the browser voice is the fallback.
@@ -467,6 +490,8 @@ function muteUi(){const b=$('muteB');if(!b)return;const i=b.querySelector('i');
  b.classList.toggle('mute',MUTE);if(i)i.className='fa-solid '+(MUTE?'fa-volume-xmark':'fa-volume-high');
  b.title=MUTE?'Alerts are muted - tap to make them audible again':'Tap to mute the buzzer and the spoken warning'}
 function muteTog(){MUTE=!MUTE;localStorage.mute=MUTE?'1':'0';if(MUTE)stopTone();muteUi();
+ // the camera makes its own sound with the screen off, so it has to be told too
+ dmsSync();
  banner(MUTE?'<i class="fa-solid fa-volume-xmark"></i> Alerts muted: warnings still show on screen':'<i class="fa-solid fa-volume-high"></i> Alerts are audible again',4000);
  logAct('Alert sounds',MUTE?'muted':'audible')}
 function beep(type){const R=RUL[type]||{};if(MUTE||R.beep===false||R.beep_type==='off')return;const dur=Math.max(1,+R.beep_duration||5);
@@ -514,7 +539,7 @@ function testAlert(){const R=RUL.overspeed||{};
 // ---- driving events and telemetry
 const MIN_MOVING_KMH=2;
 const sepm=(a,b)=>{const r=x=>x*Math.PI/180,dLa=r(b.latitude-a.latitude),dLo=r(b.longitude-a.longitude),x=Math.sin(dLa/2)**2+Math.cos(r(a.latitude))*Math.cos(r(b.latitude))*Math.sin(dLo/2)**2;return 12742000*Math.asin(Math.sqrt(x))};
-let V={voice_on:1,lang:'en',zones_on:1,bb_on:1,bb_days:3};const LIM={speed:100,brake:-3,accel:2.5,buf:0,warn:0,dist:0,zbuf:0},HOLD={harsh_braking:0,harsh_acceleration:0,overspeed:0,zone_overspeed:0},ON={},lastEv={},lastNotify={},VS={},ANN={};let prev=null,lastA=0,lastLoc=null,ODOM=0,pp=null,bat={},fl=false,batT,cfgT,MOV=10,STP=60;
+let V={voice_on:1,lang:'en',zones_on:1,bb_on:1,bb_days:3,dms_on:0,dms_fps:5,dms_pre_s:3,dms_post_s:1,dms_keep_d:7,dms_preview:1};const LIM={speed:100,brake:-3,accel:2.5,buf:0,warn:0,dist:0,zbuf:0},HOLD={harsh_braking:0,harsh_acceleration:0,overspeed:0,zone_overspeed:0},ON={},lastEv={},lastNotify={},VS={},ANN={};let prev=null,lastA=0,lastLoc=null,ODOM=0,pp=null,bat={},fl=false,batT,cfgT,MOV=10,STP=60;
 // ---- geofences. An admin draws these on the dashboard's Live Tracking map and
 // gives each one a speed limit; the phone reads the shapes, tests every fix against
 // them and reports driving in, driving out or passing the zone's own limit.
@@ -622,6 +647,121 @@ function endEv(type,t){const b=VS[type];if(!b)return;VS[type]=null;
 
 // called when a trip ends: every open breach gets its end time and closing readings
 function closeAll(t){Object.keys(VS).forEach(k=>endEv(k,t))}
+// ---- the driver camera: tiredness, distraction, a phone in hand and a covered lens.
+// The judgement belongs to Android rather than to this page on purpose: a driver who
+// answers a call or locks the screen freezes this JavaScript, and the watch has to
+// carry on through that. So the page hands the camera its copy of the Configuration
+// page, keeps telling it where the vehicle is, warns the driver while he is looking at
+// this screen, and takes back the events the service decided on without him. Those
+// events go through the same outbox as every other record and this page files them -
+// which is what keeps the driver's own rights and the guards on the events table the
+// thing that decides what a record becomes. Nothing here can stop a trip: a phone with
+// no camera, no model or a refused permission drives and is recorded exactly as before.
+const DMS=['dms_fatigue','dms_distraction','dms_phone_use','dms_cam_blocked'];
+let DMSL=false,CAMD=false,CAMON=false,CAMSEEN=false;
+// a settings number that keeps a real zero: a clip of nothing before the alert is a
+// choice the page can make, and a truth test would turn it back into 3 seconds
+function num(v,d){const n=+v;return Number.isFinite(n)&&n>=0?n:d}
+const dmsHas=()=>!!(window.CapPlugins&&CapPlugins.Dms);
+const dmsOn=()=>dmsHas()&&V.dms_on===1;
+// the whole setup, in the shape the plugin reads: the four rules by their own column
+// names, the words to speak by language, and who to file a record against
+function dmsCfg(){const v=asg?.vehicles||{},d=asg?.drivers||{};
+ return{dms_on:true,dms_fps:V.dms_fps,dms_pre_s:V.dms_pre_s,dms_post_s:V.dms_post_s,dms_keep_d:V.dms_keep_d,
+  dms_preview:V.dms_preview===1,mute:!!MUTE,voice_on:V.voice_on!==0,voice_lang:V.lang,lens:'front',
+  ids:{user_id:me?me.id:'',vehicle_id:asg?.vehicle_id||'',driver_id:asg?.driver_id||'',
+   vehicle_name:v.name||'',driver_name:d.name||''},
+  msgs:VMSG,rules:DMS.map(t=>RUL[t]).filter(Boolean)}}
+async function dmsSync(){if(!dmsOn())return;try{await CapPlugins.Dms.configure({cfg:dmsCfg()})}catch(e){}}
+// why the lens is not watching, in the driver's own words
+function dmsSay(s){if(!s)return;
+ if(s.granted===false){$('err').textContent='Driver camera: allow the camera on the Permissions page, then start the trip again.';return}
+ if(s.running&&s.model===false){$('err').textContent='Driver camera is not watching: this build has no face model.'+(s.error?' ('+s.error+')':'');return}
+ if(s.running&&s.camera===false&&s.reason){$('err').textContent='Driver camera: '+s.reason;return}
+ if(s.running&&s.notices===true)$('err').textContent='Notifications are off on this phone: camera warnings show on the screen only.'}
+async function dmsStatus(){if(!dmsOn())return;try{dmsSay(await CapPlugins.Dms.status())}catch(e){}}
+// trip start: the lens opens with the trip, because Android only lets a camera service
+// begin while this app is the screen in front - which is exactly when Start is pressed
+async function dmsStart(){camPaint(false);if(!dmsOn())return;
+ CAMSEEN=false;let r=null;
+ try{r=await CapPlugins.Dms.start()}catch(e){$('err').textContent='Driver camera could not start: '+(e.message||e);return}
+ dmsSay(r);if(!r||r.granted===false)return;
+ // the phone opened the box the way the dashboard has it set, and says so; the
+ // driver's own button then changes it for the rest of this trip
+ camPaint(r.preview!==false);CAMON=true;
+ // a lens that has not handed over a picture after a few seconds is a lens that is not
+ // working, and the reason is worth saying out loud before the trip is over
+ setTimeout(()=>{if(!CAMSEEN)dmsStatus()},5000)}
+async function dmsStop(){CAMON=false;camPaint(false);if(!dmsHas())return;try{await CapPlugins.Dms.stop()}catch(e){}}
+// every fix the vehicle's own watcher already produces, so an event can say where the
+// driver was and how fast the vehicle was going at the moment his face was judged
+function dmsFeed(loc,kmh){if(!dmsOn())return;
+ try{const p=CapPlugins.Dms.feed({lat:loc.latitude,lng:loc.longitude,acc:loc.accuracy,alt:loc.altitude,
+  heading:loc.bearing,kmh,at:Date.now()});if(p&&p.catch)p.catch(()=>{})}catch(e){}}
+function dmsUi(){if(!dmsHas())return;
+ try{const p=CapPlugins.Dms.ui({visible:!document.hidden});if(p&&p.catch)p.catch(()=>{})}catch(e){}}
+// the warning, when the driver is looking at this screen: the service stays quiet so
+// the same breach never sounds twice. Behind his back, Android posts and speaks it.
+function dmsAlert(type,detail){if(!type||DMS.indexOf(type)<0||!RUL[type])return;const R=RUL[type];
+ if(R.alert!==false){banner('<i class="fa-solid fa-triangle-exclamation"></i> '+(EVN[type]||'Driver camera')+' · '+(detail||''),6000);alertRing()}
+ beep(type);
+ if(MUTE||V.voice_on===0||R.voice===false)return;
+ const vl=R.voice_lang&&VLANG[R.voice_lang]?R.voice_lang:V.lang;
+ speak(vrMsg(type,vl),vl)}
+// the events the camera raised while this page was frozen. They arrive as the rows the
+// service would have written, but the people named on them are taken from the session
+// this page holds, not from what the camera was told earlier.
+async function dmsDrain(){if(!dmsHas())return;let items=null;
+ try{const r=await CapPlugins.Dms.drain();items=r&&r.items}catch(e){return}
+ if(!items||!items.length)return;
+ const v=asg?.vehicles||{},d=asg?.drivers||{};
+ for(const it of items){if(!it||!it.p)continue;const p=it.p;
+  // a closing update carries only what changed: guard_events pins the identity
+  // columns, so sending them at all is a write the database refuses
+  if(it.op==='upd'&&it.id){outAdd({t:'upd',id:it.id,p});continue}
+  if(!p.cid||!p.type||!p.recorded_at)continue;
+  // the service wrote this row knowing only the ids the page handed over when the trip
+  // began; whoever is signed in now is what the events table must be filed against
+  if(me)p.user_id=me.id;
+  if(asg){p.vehicle_id=asg.vehicle_id;p.driver_id=asg.driver_id;p.vehicle_name=v.name||null;p.driver_name=d.name||null}
+  // a clip is a file on this phone, and the phase that uploads it is not built yet, so
+  // the name is dropped here rather than written into a column nothing can serve
+  outAdd({t:'ev',p})}
+ flush()}
+function dmsListen(){if(DMSL||!dmsHas())return;DMSL=true;
+ const on=(n,f)=>{try{const p=CapPlugins.Dms.addListener(n,f);if(p&&p.catch)p.catch(()=>{})}catch(e){}};
+ on('dmsBreach',x=>dmsAlert(x&&x.type,x&&x.detail));
+ on('dmsPing',()=>dmsDrain());
+ on('dmsFrame',x=>{if(!CAMD||!x||!x.img)return;CAMSEEN=true;const i=$('camI');if(i)i.src=x.img;
+  const v=$('camVi');if(v)v.classList.add('hide')})}
+// the driver's own picture of himself, in the corner of the map he can put away
+function camPaint(show){CAMD=!!show&&dmsOn();
+ const b=$('camB'),v=$('camV');
+ if(b){b.classList.toggle('hide',!dmsOn());b.classList.toggle('on',CAMD);
+  b.title=CAMD?'Hide the view of your face':'Show the view of your face'}
+ if(v){v.classList.toggle('hide',!CAMD);
+  if(!CAMD){const i=$('camI');if(i)i.removeAttribute('src');const x=$('camVi');if(x)x.classList.remove('hide')}}}
+async function camBox(show){camPaint(show);if(!dmsHas())return;
+ try{await CapPlugins.Dms.preview({show:CAMD})}catch(e){}}
+function camTog(){camBox(!CAMD)}
+// the setup row for the lens: a build that cannot watch, or a phone that already
+// allowed it, has nothing left to say here. It never asks on its own: the driver
+// should decide when the camera starts being part of his app
+async function camPermUi(){const c=$('camcard'),b=$('camask');
+ if(!dmsHas()){if(c)c.classList.add('hide');if(b)b.classList.add('hide');return}
+ let st='';try{st=((await CapPlugins.Dms.checkPermissions())||{}).camera||''}catch(e){}
+ if(st==='granted'){if(c)c.classList.add('hide');if(b)b.classList.add('hide')}}
+// the Permissions page asks for the lens in its own right, because a driver who is
+// about to be watched should know it before he sets off, not from a prompt mid-trip
+async function camAsk(){const b=$('camask'),c=$('camcard');if(!dmsHas()){if(b)b.classList.add('hide');if(c)c.classList.add('hide');return}
+ let st='';
+ try{const p=await CapPlugins.Dms.checkPermissions();st=p&&p.camera||''}catch(e){}
+ if(st==='granted'){camGranted();return}
+ try{const r=await CapPlugins.Dms.requestPermissions();if(r&&r.camera==='granted')camGranted();
+  else $('err').textContent='The camera was not allowed. Driver alerts cannot work until it is.'}catch(e){
+  $('err').textContent='This build has no driver camera: rebuild the APK with the latest build-apk.yml.'}}
+function camGranted(){const b=$('camask');if(b){b.classList.add('hide')}
+ const c=$('camcard');if(c)c.classList.add('hide');logAct('Camera allowed','Driver monitoring')}
 function pickUi(){const s=$('pk');if(!s)return;
  $('vn').textContent=asg?.vehicles?.name||'No vehicle linked';$('dn').textContent=asg?.drivers?.name||'No driver linked';
  if(ASGS.length<2){s.classList.add('hide');s.replaceChildren();return}
@@ -640,7 +780,11 @@ function applyCfg(a,r,t,g){
  // voice_on is only 0 when the dashboard switches it off; voice_lang stays text
  // because app_settings stores every value as a string
  V={voice_on:VC.voice_on==='0'?0:1,lang:VLANG[VC.voice_lang]?VC.voice_lang:'en',
-  zones_on:VC.zones_on==='0'?0:1,bb_on:VC.bb_on==='0'?0:1,bb_days:Math.min(14,Math.max(1,+VC.bb_days||3))};
+  zones_on:VC.zones_on==='0'?0:1,bb_on:VC.bb_on==='0'?0:1,bb_days:Math.min(14,Math.max(1,+VC.bb_days||3)),
+  // the driver camera: off unless the fleet has switched it on, which is also what a
+  // database that has not run v19 yet means, because it has no dms_ keys at all
+  dms_on:VC.dms_on==='1'?1:0,dms_fps:num(VC.dms_fps,5),dms_pre_s:num(VC.dms_pre_s,3),
+  dms_post_s:num(VC.dms_post_s,1),dms_keep_d:num(VC.dms_keep_d,7),dms_preview:VC.dms_preview==='0'?0:1};
  // the zones drawn on the dashboard map, ready for the point-in-polygon test
  ZONES=(g||[]).map(x=>({id:x.id,name:x.name,color:x.color,speed_limit:x.speed_limit,
   enter:x.enter!==false,exit:x.exit!==false,overspeed:x.overspeed!==false,
@@ -654,6 +798,12 @@ function applyCfg(a,r,t,g){
    if(x.type==='zone_overspeed'){LIM.zbuf=Math.max(0,+x.threshold||0);HOLD.zone_overspeed=h}});
  LIM.warn=Math.max(0,+v.max_accel_warning||0);LIM.dist=Math.max(0,+v.min_moving_distance||0);
  MOV=Math.max(1,v.moving_interval||S.moving_interval||10);STP=Math.max(1,v.stopped_interval||S.stopped_interval||60);
+ // the camera runs Android's own copy of this setup, because the page may be frozen
+ // by the time the next frame is judged: hand every read of it over
+ dmsSync();camPaint(CAMD);
+ // an administrator who switches the camera off mid-trip takes the lens away now,
+ // not at the end of the trip
+ if(CAMON&&!dmsOn())dmsStop();
  // the setup is what a resumed trip was waiting for: an app that restarted with no
  // signal, or with the settings query still running, can only start again from here
  if(map&&!watcher)maybeResume()}
@@ -884,6 +1034,9 @@ async function start(quiet){
   if(n-TS_TRIP>60000){TS_TRIP=n;tripSave()}
   // the blackbox takes every fix, before the upload throttle below drops most
   bbPut(bbPack(loc,kmh));
+  // and the driver camera is told where the vehicle is, so a warning raised with the
+  // screen locked still lands on a position and a speed
+  dmsFeed(loc,kmh);
   // detect first: the Accel. tile then shows the value that just triggered the alert
   detect(loc,kmh);upd(loc,kmh,moving);
   // a corner is worth a point of its own: two fixes spaced by the recording
@@ -898,10 +1051,16 @@ async function start(quiet){
  tripSave();
  logAct(quiet?'Resumed trip':'Started trip',(asg?.vehicles?.name||'')+' · records every '+(MOV)+' s moving, '+(STP)+' s stopped');
  await askNotif();
+ // the driver camera opens with the trip, after the settings it is told to watch for
+ // have been read and handed over by loadRules above
+ dmsListen();await dmsStart();
  if(!navigator.onLine)banner('<i class="fa-solid fa-wifi"></i> No internet: records are kept on the phone and sent later',7000);
  }catch(e){$('err').textContent='Error: '+(e.message||e)}
  SRT=false}
 async function stop(){SGEN++;stopTone();clearInterval(batT);clearInterval(cfgT);prev=null;pp=null;closeAll(Date.now()/1000);
+ // the camera ends with the trip: a breach still open on the phone gets its end time
+ // there and comes back here before anything is pushed
+ await dmsStop();await dmsDrain();
  Object.keys(VS).forEach(k=>VS[k]=0);tripClear();
  if(lastLoc)outAdd({t:'pos',p:row(lastLoc,0,false)});flush();
  logAct('Ended trip',(asg?.vehicles?.name||'')+(lastLoc?' at '+lastLoc.latitude.toFixed(5)+', '+lastLoc.longitude.toFixed(5):''));
@@ -921,6 +1080,6 @@ if('serviceWorker'in navigator&&/^https?:$/.test(location.protocol))addEventList
  try{navigator.serviceWorker.register('sw.js',{scope:'./'}).catch(()=>{})}catch(e){}});
 lgHint();
 if(localStorage.user){$('em').value=localStorage.user;$('rem').checked=true}
-if(localStorage.perm!=='1')show('pm');
+if(localStorage.perm!=='1'){show('pm');camPermUi()}
 init();
 </script></body></html>
