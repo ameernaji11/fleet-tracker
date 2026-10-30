@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Merged into the app by Capacitor's own manifest merger, so the CI build does not
+     have to inject these. camera is required="false": a handset with no front camera
+     is still a working tracker, it simply cannot watch the driver, and the app says
+     so instead of failing to install. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- API 34 only grants a camera-type foreground service if this is declared. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <!-- The screen may be off while the vehicle is moving, and the analysis still has
+         to run, so the service holds a partial wake lock for as long as it is watching. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.front" android:required="false" />
+
+    <application>
+        <service
+            android:name="com.fleet.dms.DmsService"
+            android:exported="false"
+            android:foregroundServiceType="camera" />
+    </application>
+</manifest>

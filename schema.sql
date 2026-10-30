@@ -651,6 +651,66 @@ $$;
 revoke all on function login_gate(text), login_fail(text), login_ok(text), clear_pw_flag() from public;
 grant execute on function login_gate(text), login_fail(text), login_ok(text), clear_pw_flag() to anon, authenticated, service_role;
 
+-- --------------------------------------------------- v19 driver monitoring ----
+-- The handset's forward camera watches the driver's face and four rules decide when
+-- what it sees is a problem. Nothing is decided here: the picture is read on the
+-- phone, so the database only ever receives a finished event. That is why these are
+-- ordinary event_rules rows and get the same Recorded / Visual alert / Buzzer alert /
+-- Voice alert switches and the same tolerance column as overspeed does — the
+-- Configuration page shows them in one table with no special casing.
+--
+-- threshold and hold_s carry a different meaning for each rule, and the page says so
+-- next to the row:
+--   dms_fatigue      threshold = the percentage of the last second the eyes were shut
+--                    (PERCLOS). hold_s = how long that may go on before the event.
+--   dms_distraction  threshold = how far the head may turn away from the road, degrees.
+--                    hold_s = how many seconds it may stay turned.
+--   dms_phone_use    threshold = how much of the lower face a hand or object covers,
+--                    percent. hold_s = seconds it must last. This one is a shape
+--                    guess, not a certainty, so it is the rule most likely to need
+--                    tuning against your own cabs and light.
+--   dms_cam_blocked  threshold is unused (the page prints "no limit"): no face in
+--                    view, or the picture has stopped changing, and hold_s is how
+--                    many seconds of that before the alert.
+-- speed_min is the new column. An alert about a driver's face means nothing when the
+-- vehicle is standing still, and a phone left on a seat with nobody in it would
+-- otherwise raise a camera-blocked every few minutes in a depot. Only these four
+-- rules read it; every other rule stays armed at any speed.
+alter table event_rules add column if not exists speed_min numeric not null default 0;
+
+-- do nothing on conflict, so thresholds you have tuned are never rolled back by
+-- re-running this file — the same rule the older seeds follow.
+insert into event_rules (type, label, enabled, threshold, alert, hold_s, speed_min) values
+  ('dms_fatigue',     'Driver fatigued',   true, 40, true, 2,  10),
+  ('dms_distraction', 'Driver distracted', true, 35, true, 3,  15),
+  ('dms_phone_use',   'Phone in hand',     true, 50, true, 3,  15),
+  ('dms_cam_blocked', 'Camera blocked',    true,  0, true, 15, 10)
+  on conflict (type) do nothing;
+
+-- ten types now, the six the vehicle already produced plus the four the camera does.
+drop policy if exists "events insert own" on events;
+create policy "events insert own" on events for insert with check (
+  user_id = auth.uid() and owns_vehicle(vehicle_id) and owns_pair(vehicle_id, driver_id)
+  and type in ('harsh_braking','harsh_acceleration','overspeed',
+               'zone_enter','zone_exit','zone_overspeed',
+               'dms_fatigue','dms_distraction','dms_phone_use','dms_cam_blocked'));
+
+-- Where the short video an event leaves behind is kept. The camera holds a rolling
+-- buffer all trip and writes the seconds before and after the alert into it, so the
+-- row points at a file instead of holding one. It is nullable and nothing writes it
+-- until the monitoring build is on the phone; older rows and older builds are
+-- unaffected. The clip bucket, and the rights that let a handset write into it and an
+-- administrator read it back, arrive with the clip phase rather than here.
+alter table events add column if not exists clip_path text;
+
+-- One camera-wide decision each, so they live in app_settings rather than on every
+-- rule row. dms_on is off by default: a build that has just learned to watch the
+-- driver should not start doing it before you turn it on for the fleet.
+insert into app_settings (key, value) values
+  ('dms_on','0'),  ('dms_pre_s','3'),  ('dms_post_s','1'),
+  ('dms_fps','5'), ('dms_keep_d','7'), ('dms_preview','1')
+  on conflict (key) do nothing;
+
 -- ------------------------------------------------------------- realtime ----
 -- the dashboard listens for position and event inserts; both must be in the
 -- publication. Guarded so re-running this file does not error.
@@ -861,4 +921,25 @@ end $$;
 --   page calls the fleet-admin Edge function (functions/fleet-admin/index.ts), which checks that the caller really
 --   is an administrator before it uses the server-only key Supabase gives it. Deploy that function or the button
 --   reports that the service is missing; everything else in the lock works without it.
+--
+-- v19, on top of the above (driver monitoring by the phone's forward camera):
+--   event_rules.speed_min (0)                                             -> the km/h above which a rule is armed.
+--        Only the four camera rules read it: a drowsy or covered-face alert is noise when the vehicle is parked,
+--        and a phone left on a seat with nobody in it would otherwise raise Camera blocked all day in a depot.
+--   four new event_rules rows: dms_fatigue, dms_distraction, dms_phone_use, dms_cam_blocked
+--        -> ordinary rules, so they inherit the Configuration page's tolerance, Recorded, Visual alert, Buzzer
+--        alert and Voice alert columns unchanged. Seeded with do nothing, so your tuning survives a re-run.
+--   events insert policy                                                  -> ten accepted types now, not six.
+--   events.clip_path (null)                                               -> where the short clip an event leaves
+--        behind is stored. Nothing writes it until the monitoring build reaches the phones, and a row without a
+--        clip reads and exports exactly as every older row does.
+--   app_settings dms_on (0), dms_pre_s (3), dms_post_s (1), dms_fps (5), dms_keep_d (7),
+--        dms_preview (1)                                                  -> camera-wide switches: the master
+--        arm, how many seconds of the rolling buffer an event keeps either side of
+--        itself, how often a frame is looked at, how long clips survive, and whether
+--        the driver sees the small picture on his screen.
+--   Run this file BEFORE installing a build that monitors the driver: the new event types are refused by a
+--   database that has not been told about them, and the Configuration page warns you when speed_min is missing.
+--   The clip bucket itself is created in the next phase, together with the rights that let a handset write into
+--   it and an administrator read it back.
 -- ============================================================================

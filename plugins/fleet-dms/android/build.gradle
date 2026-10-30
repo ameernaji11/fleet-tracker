@@ -1,0 +1,71 @@
+// A library module of its own, in the same shape as the capacitor-android module the
+// app already builds against: its own buildscript block, AGP from google(), Java only.
+// No Kotlin here on purpose - the generated app project does not put the Kotlin
+// plugin on its classpath unless a Cordova plugin asks for it, and a module that
+// needs Kotlin would fail the build for a reason that has nothing to do with this
+// feature.
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.7.2'
+    }
+}
+
+apply plugin: 'com.android.library'
+
+android {
+    namespace "com.fleet.dms"
+    compileSdk project.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 35
+
+    defaultConfig {
+        // MediaPipe's Android tasks are built for 24 and up; the app's own minSdk is
+        // raised to match by the CI build, because a library may not require more
+        // than the app it is merged into.
+        minSdkVersion 24
+        targetSdkVersion project.hasProperty('targetSdkVersion') ? rootProject.ext.targetSdkVersion : 35
+        versionCode 1
+        versionName "1.0"
+        consumerProguardFiles 'proguard-rules.pro'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+dependencies {
+    implementation project(':capacitor-android')
+    // The service is not an activity, so it drives its own lifecycle for CameraX, and
+    // LifecycleRegistry and LifecycleOwner are what that needs.
+    implementation "androidx.lifecycle:lifecycle-common:2.8.7"
+    implementation "androidx.lifecycle:lifecycle-runtime:2.8.7"
+    // CameraX: one open camera feeds the analyser, the rolling clip buffer and, while
+    // the app is on screen, the small preview box the driver can hide.
+    // No camera-view here on purpose: the preview is painted from the same frames the
+    // analyser gets, so a second use-case never has to be bound when the app comes back
+    // to the front - and a lens handed to two targets is how a background watch dies.
+    implementation "androidx.camera:camera-core:1.3.4"
+    implementation "androidx.camera:camera-camera2:1.3.4"
+    implementation "androidx.camera:camera-lifecycle:1.3.4"
+    implementation "androidx.core:core:1.13.1"
+    // The face model itself runs on the handset. tasks-vision brings tasks-core with
+    // its native libraries, and both are pinned: the Java API names used in
+    // FaceReader.java were read out of these exact artifacts.
+    implementation "com.google.mediapipe:tasks-vision:1.2.0"
+}
