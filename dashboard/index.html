@@ -35,14 +35,6 @@ section{display:none;height:100%;flex-direction:column;gap:10px;min-width:0}sect
 #zHint{position:fixed;left:50%;transform:translateX(-50%);bottom:64px;z-index:3000;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 12px;box-shadow:0 10px 28px #0003;display:flex;gap:10px;align-items:center;flex-wrap:wrap;max-width:92vw}
 .mdl{position:fixed;inset:0;z-index:3001;background:#0006;display:none;place-items:center;padding:14px}
 .mdl.on{display:grid}.mdl>div{background:var(--card);border-radius:16px;padding:16px 18px;width:min(560px,100%);box-shadow:0 18px 50px #0005;max-height:92vh;overflow:auto}
-/* live camera viewer: whatever the panel has to say about the picture is painted over
-   the picture itself, so a waiting or an error state can never sit below a black frame */
-#camW{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:3/4;max-height:56vh}
-#camW img{width:100%;height:100%;object-fit:contain;display:block}
-#camW .msg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:16px;color:#fff;background:#000c;font-size:13px;line-height:1.55}
-/* a driver who opened his own camera lights the button until somebody looks at it */
-.mt .ic.new{background:var(--or);color:#fff;animation:camp 1.3s ease-in-out infinite}
-@keyframes camp{50%{box-shadow:0 0 0 7px #f28c2833}}
 .fg{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
 .ck{display:flex;gap:6px;align-items:center;font-weight:700;font-size:12px;cursor:pointer}
 .ck input{width:20px;height:20px;margin:0}
@@ -87,6 +79,14 @@ section{display:none;height:100%;flex-direction:column;gap:10px;min-width:0}sect
 .field{display:flex;flex-direction:column;gap:4px;min-width:0}.field label{font-weight:700;font-size:12px;color:var(--mut)}
 .pick{max-height:132px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:6px 9px;min-width:180px;text-align:left;background:var(--card)}.pick label{display:flex;gap:8px;align-items:center;font-size:13px;font-weight:600;padding:3px 0;cursor:pointer}.pick input[type=checkbox]{width:17px;height:17px;flex:0 0 auto;margin:0;accent-color:var(--bl)}.pick small{color:var(--mut)}
 input,select{font:inherit;height:40px;padding:0 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);width:100%;min-width:0}
+/* A number box has to show the whole number typed into it. Twelve pixels of padding on
+   each side, plus the stepper arrows the browser slides in the moment the box has focus,
+   left room for two digits inside the narrow table boxes - so 150 read as 15 and the rest
+   sat hidden at the right-hand end. The arrows go, the padding halves, and every width in
+   this file stays exactly as wide as it was, because a table that gains width gains the
+   page a sideways scrollbar. Values are typed or pasted here; the wheel does the stepping. */
+input[type=number]{padding:0 6px;-moz-appearance:textfield;appearance:textfield}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 input:focus,select:focus{outline:2px solid var(--bl);border-color:transparent}
 .fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px;align-items:end}.frow{display:flex;flex-wrap:wrap;gap:9px;align-items:end}
 .tbar .btn.sm,.pbar .btn.sm{height:28px;padding:0 10px;font-size:12px;gap:5px}.tbar .chip{font-size:11px;padding:2px 8px}.frow .field{flex:1 1 150px}.frow>.btn{flex:0 0 auto}
@@ -115,7 +115,7 @@ td select{height:36px}#evt,#rep,#trip,#cfg,#hist{height:auto;min-height:100%}.cg
 /* Configuration holds two wide editing tables. Below this width their fixed-size
    inputs and selects shrink rather than pushing the page sideways, because a
    dashboard page must never need a horizontal scrollbar. */
-@media(max-width:1240px){#cfgV input[type=number]{width:54px!important}#ruleT select{width:104px!important}#ruleT input[type=number]{width:50px!important}#ruleT .play,#cfgV .play{margin-left:2px}.tw th{padding:6px 6px}.tw td{padding:5px 6px}}
+@media(max-width:1240px){#cfgV input[type=number]{width:54px!important;padding:0 4px;font-size:13px}#ruleT select{width:104px!important}#ruleT input[type=number]{width:50px!important;padding:0 4px;font-size:13px}#ruleT .play,#cfgV .play{margin-left:2px}.tw th{padding:6px 6px}.tw td{padding:5px 6px}}
 :root[data-theme=dark]{color-scheme:dark;--bg:#12181d;--card:#1b242a;--th:#202b32;--ink:#e6edf1;--mut:#9db0bb;--line:#2b363e;--orl:#3b2a16;--ord:#ffb36b;--grl:#16352a;--bll:#162c47;--rdl:#3d1f1d;--gyl:#222c33}
 input,select{color:var(--ink)}input[type=checkbox]{width:20px;height:20px}
 body.usr .adm{display:none!important}
@@ -257,16 +257,19 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <div id="evFl" class="fbar"></div><div class="kpis" id="evK"></div><div class="cgrid"><div class="card"><canvas id="c1"></canvas></div><div class="card"><canvas id="c2"></canvas></div><div class="card"><canvas id="c3"></canvas></div></div><div class="tw" id="evT"></div></section>
 <section id="cfg"><div class="ctitle"><b><i class="fa-solid fa-gear"></i> Configuration</b><small>An empty box in a vehicle row means "use the default". Press Save at the bottom of this page to keep every change on it.</small></div>
 <div class="card"><div class="csh"><i class="fa-solid fa-sliders"></i><div><b>Fleet defaults</b><small>Values every vehicle follows unless it carries its own further down this page.</small></div></div><div class="tw mt10"><table><tr><th>Setting</th><th>Value</th><th>What it does</th></tr>
-<tr><td>Recording interval — while moving</td><td><input id="s_mov" type="number" min="1" class="w110"></td><td><small>Seconds between positions while the vehicle is moving.</small></td></tr>
-<tr><td>Recording interval — while stopped</td><td><input id="s_stp" type="number" min="1" class="w110"></td><td><small>Seconds between positions while the vehicle is standing still.</small></td></tr>
+<tr><td>Position while moving</td><td><input id="s_mov" type="number" min="1" max="3600" class="w110"> <small>sec</small></td><td><small>Seconds between positions while the vehicle is rolling.</small></td></tr>
+<tr><td>Position while parked <span class="hp" data-tip="A vehicle that is standing still has nowhere new to report, so it stays quiet between these heartbeats - 3600 is one point an hour. Three things to know: the phone goes back to the moving interval the second it rolls, so a trip never starts late; Live Tracking shows a stopped vehicle as &lt;b&gt;Parking&lt;/b&gt; rather than Idling between two heartbeats, because the point it holds is that old - it is not Offline, that still waits for the Offline tile; and Historical Tracking keeps the whole stop inside one trip and counts it as idling, because the trip splitter now reads this number instead of a fixed ten minutes. A vehicle that needs its own wait - a taxi crawling through a city, a lorry idling at a depot - can be given one in the per-vehicle table further down this page.">?</span></td><td><input id="s_stp" type="number" min="5" max="43200" class="w110"> <small>sec</small></td><td><small>Seconds between positions while the vehicle stands still. 3600 is once an hour.</small></td></tr>
 <tr><td>Safety score — green at or below <span class="hp" data-tip="Fleet Summary scores every vehicle with &lt;b&gt;(harsh acceleration events + harsh braking events + overspeed seconds) &times; (100 &divide; distance in km)&lt;/b&gt;, so a lower number is safer. Set where green stops and red starts; everything between the two is amber.">?</span></td><td><input id="sc_g" type="number" step="0.1" min="0" class="w110"></td><td><small>A vehicle at or under this score is shown green.</small></td></tr>
 <tr><td>Safety score — red at or above</td><td><input id="sc_r" type="number" step="0.1" min="0" class="w110"></td><td><small>A vehicle at or over this score is shown red; in between is amber.</small></td></tr>
-<tr><td>Blackbox recording on the phone <span class="hp" data-tip="The phone keeps &lt;b&gt;every&lt;/b&gt; fix it receives - about one per second - in its own storage and never uploads them, so the server stays small. When an incident has to be investigated, choose the vehicle and the period on the Vehicles page and press Download: the phone then pushes exactly the fixes in that window, each stamped with the moment it was taken.">?</span></td><td><label class="ck"><input id="s_bb" type="checkbox"> Keep every fix on the handset</label></td><td><small>Off stops the recording; anything already stored stays until it ages out.</small></td></tr>
-<tr><td>Blackbox kept for</td><td><input id="s_bbd" type="number" min="1" max="14" class="w110"></td><td><small>Days the phone holds before it overwrites the oldest fixes.</small></td></tr>
-<tr><td>Zone detection <span class="hp" data-tip="Turns zone checking off for the whole fleet without deleting any shape. Draw, name and limit your zones in the Zones table below.">?</span></td><td><label class="ck"><input id="s_z" type="checkbox"> Report entry, exit and overspeed</label></td><td><small>Each zone's own limit and alerts are set in the Zones table below.</small></td></tr></table></div></div>
+<tr><td>Blackbox recording on the phone <span class="hp" data-tip="The phone keeps the fixes it takes while the vehicle runs in its own storage and never uploads them, so the server stays small. When an incident has to be investigated, choose the vehicle and the period on the Vehicles page and press Download: the phone then pushes exactly the fixes in that window, each stamped with the moment it was taken.">?</span></td><td><label class="ck"><input id="s_bb" type="checkbox"> Keep the fixes on the handset</label></td><td><small>Off stops the recording; anything already stored stays until it ages out.</small></td></tr>
+<tr><td>Blackbox records from <span class="hp" data-tip="A handset stores about one second of driving per second, and the box it fills holds roughly two days of it. Recording while the vehicle is parked spent that room on the same stationary position - a shift at a loading bay could push two days of real driving out of the store before anybody asked for it. Below the speed here a fix is dropped, so the blackbox holds the road and nothing else. Put &lt;b&gt;0&lt;/b&gt; for every fix again, parked included, if a stop is worth having second by second. A download that asks for a parked period then simply returns the seconds it was given: the panel says Nothing stored for that period rather than failing.">?</span></td><td><input id="s_bbmin" type="number" min="0" max="50" step="0.5" class="w110"> <small>km/h</small></td><td><small>The speed at which the phone starts storing. GPS jitter sits under 1 km/h, so 1 means moving.</small></td></tr>
+<tr><td>Blackbox kept for</td><td><input id="s_bbd" type="number" min="1" max="14" class="w110"> <small>days</small></td><td><small>Days the phone holds before it overwrites the oldest fixes.</small></td></tr>
+<tr><td>Zone detection <span class="hp" data-tip="Turns zone checking off for the whole fleet without deleting any shape. Draw, name and limit your zones in the Zones table below.">?</span></td><td><label class="ck"><input id="s_z" type="checkbox"> Report entry, exit and overspeed</label></td><td><small>Each zone's own limit and alerts are set in the Zones table below.</small></td></tr>
+<tr><td>Wrong passwords forgotten after <span class="hp" data-tip="A driver typing his password wrong does not have to reach &lt;b&gt;five in a row&lt;/b&gt; to be locked out any more. This is how long the account has to go without another wrong try before the count starts again from nothing. Three wrong attempts on Monday and two on Tuesday used to add up to a lockout; with 15 here they are two separate slips and nothing happens. The count is only ever put back by the database, on the sign-in screen itself, so it works the same on the dashboard and on every phone.">?</span></td><td><input id="s_lw" type="number" min="1" max="1440" class="w110"> <small>min</small></td><td><small>Quiet for this long and the wrong-try count is back to nothing.</small></td></tr>
+<tr><td>Lockout opens itself after <span class="hp" data-tip="When the count does reach five, the account is shut out of both apps for this many minutes and then let back in on its own - nobody has to be unlocked by hand in the middle of a shift. Put &lt;b&gt;0&lt;/b&gt; here for the older behaviour: a lockout then stays on until you press Unlock on the Users page. A lock &lt;b&gt;you&lt;/b&gt; press there has no expiry either way, whatever this says.">?</span></td><td><input id="s_ll" type="number" min="0" max="1440" class="w110"> <small>min</small></td><td><small>0 keeps the account shut until you press Unlock on the Users page.</small></td></tr></table></div></div>
 <div class="card"><div class="csh"><i class="fa-solid fa-triangle-exclamation"></i><div><b>Events (defaults for all vehicles) <span class="hp" data-tip="&lt;b&gt;Tolerance&lt;/b&gt; is how long the driver must keep breaking the rule before it is written to the database. The buzzer and the on-screen alert fire immediately; the event is only recorded once the violation lasts longer than the tolerance. Use 2 s for harsh braking/acceleration and 10 s for overspeed. &lt;b&gt;Trigger limit&lt;/b&gt; is the fleet default that a vehicle uses unless it has its own value below. Zone entered and Zone exited have no trigger limit: crossing the line is itself the event.">?</span></b><small>The limit, the buzzer and the spoken message the whole fleet starts from.</small></div></div><div class="tw mt10" id="ruleT"></div></div>
 <div class="card"><div class="csh"><i class="fa-solid fa-video"></i><div><b>Driver camera <span class="hp" data-tip="The forward camera reads the driver's face and the four &lt;b&gt;Driver fatigued / Driver distracted / Phone in hand / Camera blocked&lt;/b&gt; rows above decide when what it sees is a problem. Nothing is uploaded while you drive: the picture is read where it is taken, and only a finished event reaches the database. &lt;b&gt;A camera can only be held by one app at a time&lt;/b&gt;, so opening it elsewhere stops the monitoring until that app lets go. Reading a face 5 times a second is the single biggest battery drain this tool has - expect the screen-off drain to roughly double on a long shift.">?</span></b><small>What the camera watches, how long it keeps the video an alert leaves behind, and how much of it it stores.</small></div></div><div class="tw mt10"><table><tr><th>Setting</th><th>Value</th><th>What it does</th></tr>
-<tr><td>Watch the driver <span class="hp" data-tip="Off, and the camera is never opened by itself: no face is read, no clip is kept, and the four driver rows above stay silent even if they are switched on. On, and every vehicle that runs a build holding the camera starts watching as soon as it begins a trip. The live camera button on Live Tracking is separate: it opens the lens for those few minutes on either setting, with the driver told who is watching. &lt;b&gt;Nothing happens on an older build&lt;/b&gt; - it has no camera in it at all, so switch this on only after the fleet has the new one. Cars and drivers apply the change within 5 minutes or at the next trip start.">?</span></td><td><label class="ck"><input id="d_on" type="checkbox"> Read the face while the vehicle moves</label></td><td><small>The four driver rules above only make events while this is on. The live camera button works either way.</small></td></tr>
+<tr><td>Watch the driver <span class="hp" data-tip="Off, and the camera is never opened by itself: no face is read, no clip is kept, and the four driver rows above stay silent even if they are switched on. On, and every vehicle that runs a build holding the camera starts watching as soon as it begins a trip. Off is not the end of the watching: the driver has the same camera on his own phone and can start it himself from the video button on his map, which warns him on the spot and files these same four rows. &lt;b&gt;Nothing happens on an older build&lt;/b&gt; - it has no camera in it at all, so switch this on only after the fleet has the new one. Cars and drivers apply the change within 5 minutes or at the next trip start.">?</span></td><td><label class="ck"><input id="d_on" type="checkbox"> Read the face while the vehicle moves</label></td><td><small>The four driver rules above only make events while this is on, or while the driver runs his own camera watch.</small></td></tr>
 <tr><td>Show the live picture <span class="hp" data-tip="Draws a small camera box over the map so the driver can see what the camera sees - and can prove the view is clear. Switched off, the box is hidden but the camera keeps working; the driver opens it again from the map button, and that choice is only theirs, it is not sent back here. Turning it off does not save any battery: the camera is running either way, so the box is for trust, not for power.">?</span></td><td><label class="ck"><input id="d_pv" type="checkbox"> Open with the box visible</label></td><td><small>The starting state; the driver can still hide or show it while driving.</small></td></tr>
 <tr><td>Seconds of video before the alert <span class="hp" data-tip="The camera holds a short rolling video of its own and, when an event happens, writes the seconds &lt;b&gt;leading up to&lt;/b&gt; the alert into the clip - the nod, the hand going to the phone, the moment the view was covered. 3 s covers it; 0 saves the storage but leaves you with only the aftermath. Each clip costs about a megabyte per second held.">?</span></td><td><input id="d_pre" type="number" min="0" max="10" class="w110"></td><td><small>How far back a clip reaches from the moment of the alert.</small></td></tr>
 <tr><td>Seconds of video after the alert</td><td><input id="d_post" type="number" min="0" max="10" class="w110"></td><td><small>How long it keeps recording afterwards, to show whether the driver corrected.</small></td></tr>
@@ -290,7 +293,7 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <div class="field"><label>Make / model</label><input name="make_model"></div><div class="field"><label>Year</label><input name="year" type="number" min="1980" max="2100"></div><div class="field"><label>VIN / chassis</label><input name="vin"></div>
 <div class="field"><label>Fuel</label><select name="fuel_type"><option value="">-</option><option>Petrol</option><option>Diesel</option><option>Hybrid</option><option>Electric</option></select></div>
 <div class="field"><label>Speed limit (km/h) <span class="hp" data-tip="Leave empty to use the fleet default speed limit from the Configuration page for overspeed alerts. A number here applies to this vehicle only.">?</span></label><input name="speed_limit" type="number" min="10" max="250"></div><div class="field"><label>Fuel moving (L/100 km)</label><input name="fuel_moving" type="number" step="0.1" min="0"></div><div class="field"><label>Fuel idling (L/hour)</label><input name="fuel_idle" type="number" step="0.1" min="0"></div><div class="field"><label>Notes</label><input name="notes"></div><button class="btn g"><i class="fa-solid fa-plus"></i>Add vehicle</button></form></div><div class="tw" id="vehT"></div>
-<div class="card"><div class="csh"><i class="fa-solid fa-box-archive"></i><div><b>Blackbox download <span class="hp" data-tip="Each phone keeps &lt;b&gt;every&lt;/b&gt; fix it receives - about one per second - in its own storage, and never uploads that stream. Pick the vehicle and the period around an incident and press Download: the request reaches the phone over realtime (or on its next minute-long poll), and the phone then pushes exactly the stored fixes in that window, each stamped with the moment it was taken. They appear in Historical Tracking and the Tacho report as Blackbox rows. A phone that is switched off or out of coverage answers as soon as it is back. Every second exists once on the phone and is uploaded once: a request for a period that was already downloaded, or one that overlaps an earlier request, pushes only the seconds the server does not have, and a pull that stops halfway resumes where it left off.">?</span></b><small>Ask one vehicle for its stored 1-per-second fixes for a period — for accident investigation.</small></div><button class="btn gh sm" onclick="bbTable()" title="Check whether the phone has answered yet"><i class="fa-solid fa-rotate"></i>Refresh</button></div>
+<div class="card"><div class="csh"><i class="fa-solid fa-box-archive"></i><div><b>Blackbox download <span class="hp" data-tip="Each phone keeps the fixes it takes while the vehicle is above the speed on the Configuration page - about one per second of driving - in its own storage, and never uploads that stream. Pick the vehicle and the period around an incident and press Download: the request reaches the phone over realtime (or on its next minute-long poll), and the phone then pushes exactly the stored fixes in that window, each stamped with the moment it was taken. They appear in Historical Tracking and the Tacho report as Blackbox rows. A phone that is switched off or out of coverage answers as soon as it is back. Every second exists once on the phone and is uploaded once: a request for a period that was already downloaded, or one that overlaps an earlier request, pushes only the seconds the server does not have, and a pull that stops halfway resumes where it left off.">?</span></b><small>Ask one vehicle for its stored 1-per-second fixes for a period — for accident investigation.</small></div><button class="btn gh sm" onclick="bbTable()" title="Check whether the phone has answered yet"><i class="fa-solid fa-rotate"></i>Refresh</button></div>
 <div class="frow mt10"><div class="field"><label>Vehicle</label><select id="bb_v"></select></div>
 <div class="field"><label>From</label><input id="bb_f" type="text"></div><div class="field"><label>To</label><input id="bb_t" type="text"></div>
 <button class="btn b" onclick="bbAsk()"><i class="fa-solid fa-cloud-arrow-down"></i>Download</button></div>
@@ -358,6 +361,24 @@ const toast=(m,ok)=>{const t=$('toast');t.textContent=m;t.className='show '+(ok?
 let EVR=[],EVF={},ADMIN=false,UID,UNAME,evN=0,charts={},rep=[],mapL,mapH,markers={},last={},hLayer,hData=[],vehicles=[],drivers=[];
 const COL={go:'#27a46a',idle:'#f28c28',park:'#2f7fe6',off:'#8b98a5'},LBL={go:'Moving',idle:'Idling',park:'Parking',off:'Offline'};
 const OFFH=()=>{const h=+SET.offline_after_h;return Number.isFinite(h)&&h>0?h:24};
+// the two login waits (v21). Both live in app_settings; a key the database has not
+// been given yet reads as the number schema.sql seeds, so the sign-in screens and the
+// Users page never show a blank or a zero.
+const LWIN=()=>{const m=+SET.login_window_m;return m>=1?Math.round(m):15};
+const LLOCK=()=>{const m=+SET.login_lock_m;return Number.isFinite(m)&&m>=0?Math.round(m):15};
+// the waits a phone is allowed to keep between positions. A parked vehicle says nothing
+// for one whole parked interval on purpose, so a silence that long is not missing data:
+// the trip splitter and the idling maths take it as the vehicle standing there, and only
+// a longer silence - or any long silence between two moving samples, which is a phone that
+// never spoke - becomes a gap. The vehicle's own override wins over the fleet default.
+const STP_S=v=>Math.min(43200,Math.max(1,+(v&&v.stopped_interval)||+SET.stopped_interval||3600));
+const MOV_S=v=>Math.min(3600,Math.max(1,+(v&&v.moving_interval)||+SET.moving_interval||10));
+// capped at one day for the same reason vehicle_report caps its own si_gap there: past a
+// day, however the fleet configured it, a silence is a vehicle that stopped reporting
+const GAP_S=v=>Math.min(86400,Math.max(600,STP_S(v)*2+120));
+// the speed from which a handset puts a second into its blackbox. 0 is an answer, not an
+// empty box: it means store every fix, parked or not, which is what the phone did before.
+const BBMIN=()=>{const k=+SET.bb_min_kmh;return Number.isFinite(k)&&k>=0?Math.min(50,k):1};
 const off=p=>Date.now()-new Date(p.recorded_at)>OFFH()*36e5;
 const st=p=>off(p)?'off':(p.ignition===false||Date.now()-new Date(p.recorded_at)>STALE_MIN*6e4)?'park':(p.speed>0?'go':'idle');
 // tile sources, shared by every map on the page and by the trip print-out window.
@@ -703,30 +724,46 @@ async function bbCancel(id){if(!ADMIN)return;
  if(!confirm('Cancel this request? A phone that already started sending keeps what it pushed.'))return;
  await sb.from('bb_requests').delete().eq('id',id);bbTable();logAct('Blackbox request cancelled','')}
 
-// ---- account lockout (v18). Five wrong passwords and that account is locked until
-// an administrator unlocks it on the Users page. The database holds the count, not
-// this page, so reloading, closing the tab or trying from the phone cannot get past
-// it. All three calls answer the same way for an address that has never signed in
-// here as for an unlocked one, so the sign-in screen cannot be walked through to
-// find out which users exist; a missing function (a database that has not run
-// schema.sql yet) is simply read as "no lock information" and signing in continues.
+// ---- account lockout (v18, and expiring by itself since v21). Five wrong passwords
+// and that account is locked. The count only matters while the tries keep coming: after
+// login_window_m quiet minutes the database puts it back to nothing, and a lockout a
+// driver actually reached lasts login_lock_m minutes and then opens itself. A lock an
+// administrator pressed on the Users page keeps no expiry - only his Unlock ends it. The
+// database holds all of it, not this page, so reloading, closing the tab or trying from
+// the phone cannot get past any of it. All three calls answer the same way for an address
+// that has never signed in here as for an unlocked one, so the sign-in screen cannot be
+// walked through to find out which users exist; a missing function (a database that has
+// not run schema.sql yet) is simply read as "no lock information" and signing in
+// continues.
 const LOCK_AT=5;let LOCKMISS=0;
 const lockCall=(f,e)=>sb.rpc(f,{p_email:e}).then(({data,error})=>{
  if(error&&/could not find the function|does not exist/i.test(error.message||''))LOCKMISS=1;
  return!error&&data&&data[0]||null});
+// the two waits, in the words a person reads while standing at the sign-in box. The
+// database answers in whole minutes, and a lock with no expiry answers as null.
+const mins=m=>m<=1?'1 minute':Math.round(m)+' minutes';
+const lockMsg=m=>m==null?'locked until the administrator unlocks it.'
+ :'locked, and it opens again by itself in '+mins(m)+'.';
+// a row read straight off profiles, which carries the stamps rather than the answers the
+// sign-in functions give. Since v21 a locked_at stamp alone does not shut an account: an
+// expiry on it means the lockout runs itself out, and no expiry means an administrator
+// pressed Lock and only he can release it.
+const lockOn=p=>!!p&&!!p.locked_at&&(!p.locked_until||new Date(p.locked_until)>new Date());
+const lockLeft=p=>p&&p.locked_until?Math.max(0,Math.ceil((new Date(p.locked_until)-Date.now())/6e4)):null;
 async function signIn(){
  const want=$('rem').checked;if(want!==REM){REM=want;localStorage.rem=want?'1':'0';sb=mk(REM)}
  const b=$('sib');b.disabled=true;b.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i>Signing in...';$('lerr').textContent='';
  const em=mail($('em').value),done=()=>{b.disabled=false;b.innerHTML='<i class="fa-solid fa-right-to-bracket"></i>Sign in'};
  const g=await lockCall('login_gate',em);
- if(g&&g.locked){$('lerr').textContent='Your account is locked. Please contact the administrator.';return done()}
+ if(g&&g.locked){$('lerr').textContent='Your account is '+lockMsg(g.wait_min);return done()}
  try{const {error}=await sb.auth.signInWithPassword({email:em,password:$('pw').value});if(error)throw error;
   await lockCall('login_ok',em);
   want?localStorage.user=$('em').value.trim():localStorage.removeItem('user');await boot(1);toast('Welcome, '+UNAME+'!',1)}
  catch(e){const m=e.message||String(e),bad=/invalid login credentials/i.test(m);
   const r=bad?await lockCall('login_fail',em):null;
-  if(r&&r.locked)$('lerr').textContent='That was the '+LOCK_AT+'th wrong password: your account is now locked. Please contact the administrator.';
-  else if(r)$('lerr').textContent='Wrong password. '+(r.tries_left>1?r.tries_left+' attempts left':'One attempt left')+' before this account is locked.';
+  if(r&&r.locked)$('lerr').textContent='That was the '+LOCK_AT+'th wrong password: your account is '+lockMsg(r.wait_min);
+  else if(r)$('lerr').textContent='Wrong password. '+(r.tries_left>1?r.tries_left+' attempts left':'One attempt left')+' before this account is locked.'
+   +(r.reset_min?' The count starts again from nothing after '+mins(r.reset_min)+' without a wrong one.':'');
   else if(/too many requests|rate limit/i.test(m))$('lerr').textContent='Too many attempts just now. Wait a minute, then try again.';
   else $('lerr').textContent='Error: '+m;
   if(LOCKMISS&&!WARNED.lock){WARNED.lock=1;toast('Account lockout needs the newest schema: run schema.sql in Supabase once.',0)}}
@@ -789,12 +826,17 @@ async function boot(fresh){
  // Supabase refreshes quietly while the tab is used; this keeps a dashboard left
  // open all day signed in, and notices the moment the session really has ended
  if(!KA)KA=setInterval(keepAlive,10*60*1000);
- const {data:p}=await sb.from('profiles').select('role,fails,locked_at,must_change').eq('id',session.user.id).single();
- // a lock set while this tab was already open steps straight back out: the lock is
-// the administrator's decision, not something a page left open all day rides through.
+ // v21 asks for locked_until as well, and a database that has not run the file yet has
+ // no such column - so the read that fails falls back to the older one rather than
+ // leaving an administrator looking like an ordinary user.
+ let {data:p}=await sb.from('profiles').select('role,fails,locked_at,locked_until,must_change').eq('id',session.user.id).single();
+ if(!p)p=(await sb.from('profiles').select('role,fails,locked_at,must_change').eq('id',session.user.id).single()).data;
+ // a lock set while this tab was already open steps straight back out: a lockout
+// expires on its own, but an administrator's Lock is his decision, not something a page
+// left open all day rides through.
 // It says nothing about the lock on the sign-in screen - that sentence belongs to the
 // moment the person actually tries to sign in, not to simply opening the page.
- if(p&&p.locked_at){await sb.auth.signOut();clearInterval(KA);KA=null;$('login').classList.remove('hide');
+ if(lockOn(p)){await sb.auth.signOut();clearInterval(KA);KA=null;$('login').classList.remove('hide');
   $('lerr').textContent='';return}
  ADMIN=p?.role==='admin';UID=session.user.id;document.body.classList.toggle('usr',!ADMIN);
  $('login').classList.add('hide');$('app').classList.remove('hide');UNAME=(session.user.email||'').replace('@fleet.local','');$('me').textContent=UNAME;$('accWho').textContent='Welcome, '+UNAME+'!';if(localStorage.pin==='1')document.querySelector('aside').classList.add('pin');pinBtn();themeBtn();
@@ -802,11 +844,8 @@ async function boot(fresh){
  // signing in with it opens the change box, and the box has no Cancel button
  if(p?.must_change){pwForm(1);toast('That password was set for you. Choose your own before anything else.',0)}
  logAct(fresh?'Signed in':'Opened dashboard','Role: '+(ADMIN?'admin':'user'));sessStart();
- mapL=mkMap('mapLive',fitAll,[['fa-thumbtack','Pin: keep the selected vehicle in the centre of the map while it moves',pinV,'pin'],['fa-volume-high','Mute the alert buzzer',muteTog,'mute']]
-  // only a supervisor gets the camera button, and it is put with the other controls
-  // that act on this map rather than on a page elsewhere
-  .concat(ADMIN?[['fa-video','Live camera: open the forward camera of the selected vehicle for '+LV_MIN+' minutes, or join one he opened himself',camAsk,'cam']]:[]));
- mapH=mkMap('mapHist',hFit);muteUi();camListen();
+ mapL=mkMap('mapLive',fitAll,[['fa-thumbtack','Pin: keep the selected vehicle in the centre of the map while it moves',pinV,'pin'],['fa-volume-high','Mute the alert buzzer',muteTog,'mute']]);
+ mapH=mkMap('mapHist',hFit);muteUi();
  initDates();
  await refs();await getSet();await zRefs();await loadLive();loadRules();evInit();
  sb.channel('pos').on('postgres_changes',{event:'INSERT',schema:'public',table:'positions'},e=>{if(e.new)upsert(e.new)}).subscribe(s=>{const ok=s==='SUBSCRIBED';$('conn').className='pill'+(ok?'':' bad');$('connT').textContent=ok?'Live':'Reconnecting'});
@@ -847,19 +886,26 @@ async function del(t,id){if(!ADMIN)return;if(confirm('Delete this item?')){const
 let USRS=[];
 const uname=id=>((USRS.find(x=>x.id===id)||{}).email||'').replace('@fleet.local','')||'this account';
 async function users(){
+ // ask the database to put its clocks forward first: a count that aged out overnight or
+ // a lockout that ran its time should not still read as a warning in this table
+ try{await sb.rpc('login_sweep')}catch(e){}
  const {data:ps}=await sb.from('profiles').select('*').order('email');const {data:as}=await sb.from('assignments').select('*');
  USRS=ps||[];
  const mine=(id,k)=>(as||[]).filter(x=>x.user_id===id&&x[k]).map(x=>x[k]);
  const HP=t=>`<span class="hp" data-tip="${t}">?</span>`;
- // the lock lives in the database, so this column only reports what it says: a lock
- // is either still on or on its way there, and a count of wrong tries that has not
- // reached five is only a warning. A lock with a count below five is one this page
- // set by hand, so the row says which of the two it is.
- const stat=p=>p.locked_at?`<span class="chip" style="background:var(--rdl);color:var(--rd)"><i class="fa-solid fa-lock"></i> Locked</span><br><small class="mut">${+p.fails>=LOCK_AT?'5 wrong passwords':'Locked by you'}<br>${new Date(p.locked_at).toLocaleString()}</small>`
-  :+p.fails>0?`<span class="chip chipO">${p.fails} wrong ${p.fails==1?'try':'tries'}</span><br><small class="mut">locks at ${LOCK_AT}</small>`
+ // the lock lives in the database, so this column only reports what it says. Since v21
+ // there are two different locks here: one the sign-in screen reached, which runs itself
+ // out, and one this page pressed, which waits for this page. The count of wrong tries
+ // beside it is only ever a warning until it reaches five, and it falls back to nothing
+ // by itself while the account stays quiet.
+ const stat=p=>lockOn(p)?`<span class="chip" style="background:var(--rdl);color:var(--rd)"><i class="fa-solid fa-lock"></i> Locked</span><br><small class="mut">${+p.fails>=LOCK_AT?'5 wrong passwords':'Locked by you'}<br>${p.locked_until?'opens again in '+mins(lockLeft(p)):new Date(p.locked_at).toLocaleString()}</small>`
+  :+p.fails>0?`<span class="chip chipO">${p.fails} wrong ${p.fails==1?'try':'tries'}</span><br><small class="mut">locks at ${LOCK_AT} · clears after ${LWIN()} min quiet</small>`
   :p.must_change?`<span class="chip chipO">Temp password</span><br><small class="mut">must set their own</small>`
   :`<span class="chip" style="background:var(--grl);color:var(--gr)">Active</span>`;
- $('usrT').innerHTML=`<table><tr><th>User</th><th>Vehicles ${HP('Open the list and tick every vehicle this login should see - use Select all or the search box when the fleet is large. A phone signed in here gets a vehicle picker on its own screen.')}</th><th>Drivers ${HP('Tick every driver profile this login should see. The first tick is paired with the first vehicle tick, the second with the second, and so on - that pairing is what the phone stamps on each position and event.')}</th><th>Role</th><th>Status ${HP('Five wrong passwords on the sign-in screen lock an account out of the dashboard and the phone until you press Unlock here. Press Lock to shut an account out straight away, without waiting for the five tries. A count below five is only a warning: the account still signs in normally.')}</th><th></th></tr>${USRS.map(p=>`<tr><td><i class="fa-solid fa-user"></i> ${esc((p.email||'').replace('@fleet.local',''))}${p.role==='admin'?' <span class="chip chipB">admin</span>':''}</td><td><div id="v_${p.id}"></div></td><td><div id="d_${p.id}"></div></td><td><select id="r_${p.id}" style="height:34px"><option value="user" ${p.role!=='admin'?'selected':''}>User</option><option value="admin" ${p.role==='admin'?'selected':''}>Admin</option></select></td><td class="nw">${stat(p)}</td><td class="act"><button class="btn g sm" onclick="link('${p.id}')"><i class="fa-solid fa-floppy-disk"></i>Save</button> <button class="btn ${p.locked_at?'b':'r'} sm" onclick="lockU('${p.id}')" title="${p.locked_at?'Clear the lock and the count of wrong passwords so this account can sign in again. It changes nothing else.':'Shut this account out straight away: the dashboard and the phone both refuse it until you press Unlock here.'}"><i class="fa-solid ${p.locked_at?'fa-lock-open':'fa-lock'}"></i>${p.locked_at?'Unlock':'Lock'}</button> <button class="btn gh sm" onclick="resetPw('${p.id}')" title="Give this account a new password. It has no mailbox, so hand the password to the person yourself; they must replace it with their own at their next sign-in."><i class="fa-solid fa-key"></i>Reset</button></td></tr>`).join('')}</table>`;
+ const LKM=LLOCK();
+ const LKT=HP(`Five wrong passwords on the sign-in screen lock an account out of the dashboard and the phone. The count only adds up while the tries keep coming: after <b>${LWIN()} minutes</b> of quiet it starts again from nothing, and a lockout that was actually reached ${LKM?'<b>opens itself again after '+LKM+' minutes</b>':'<b>stays on until you unlock it</b>'}. Both waits are set on the Configuration page. A lock <b>you</b> press here has no expiry at all — it waits for your Unlock.`);
+ $('usrT').innerHTML=`<table><tr><th>User</th><th>Vehicles ${HP('Open the list and tick every vehicle this login should see - use Select all or the search box when the fleet is large. A phone signed in here gets a vehicle picker on its own screen.')}</th><th>Drivers ${HP('Tick every driver profile this login should see. The first tick is paired with the first vehicle tick, the second with the second, and so on - that pairing is what the phone stamps on each position and event.')}</th><th>Role</th><th>Status ${LKT}</th><th></th></tr>${USRS.map(p=>{const lk=lockOn(p);
+ return `<tr><td><i class="fa-solid fa-user"></i> ${esc((p.email||'').replace('@fleet.local',''))}${p.role==='admin'?' <span class="chip chipB">admin</span>':''}</td><td><div id="v_${p.id}"></div></td><td><div id="d_${p.id}"></div></td><td><select id="r_${p.id}" style="height:34px"><option value="user" ${p.role!=='admin'?'selected':''}>User</option><option value="admin" ${p.role==='admin'?'selected':''}>Admin</option></select></td><td class="nw">${stat(p)}</td><td class="act"><button class="btn g sm" onclick="link('${p.id}')"><i class="fa-solid fa-floppy-disk"></i>Save</button> <button class="btn ${lk?'b':'r'} sm" onclick="lockU('${p.id}')" title="${lk?'Clear the lock and the count of wrong passwords so this account can sign in again. It changes nothing else.':'Shut this account out straight away, without waiting for the five tries: the dashboard and the phone both refuse it until you press Unlock here. Unlike a lockout, this one never expires by itself.'}"><i class="fa-solid ${lk?'fa-lock-open':'fa-lock'}"></i>${lk?'Unlock':'Lock'}</button> <button class="btn gh sm" onclick="resetPw('${p.id}')" title="Give this account a new password. It has no mailbox, so hand the password to the person yourself; they must replace it with their own at their next sign-in."><i class="fa-solid fa-key"></i>Reset</button></td></tr>`}).join('')}</table>`;
  USRS.forEach(p=>{msel('v_'+p.id,vehicles,'None selected',mine(p.id,'vehicle_id'));msel('d_'+p.id,drivers,'None selected',mine(p.id,'driver_id'))});tools($('usrT'))}
 // ---- the administrator actions on an account. Locking and unlocking are each one
 // ordinary profiles update, which the existing admin policy already allows, so they
@@ -871,12 +917,20 @@ async function users(){
 // else cannot be done with the key this page carries - only a server-only key can - so
 // it goes to the fleet-admin Edge function, which checks this session and that its
 // profile says admin before it acts.
-async function lockU(id){if(!ADMIN)return;const p=USRS.find(x=>x.id===id)||{},nm=uname(id),on=!p.locked_at;
+async function lockU(id){if(!ADMIN)return;const p=USRS.find(x=>x.id===id)||{},nm=uname(id),on=!lockOn(p);
  // locking the account you are signed in with would leave nobody holding the key to
  // unlock it again, so this page refuses its own row
  if(on&&id===UID)return toast('You cannot lock the account you are signed in with.');
- if(!confirm(on?'Lock '+nm+'? The dashboard and the phone both refuse this account until you press Unlock here.':'Unlock '+nm+'? They can sign in again straight away.'))return;
- const {error}=await sb.from('profiles').update(on?{locked_at:new Date().toISOString()}:{fails:0,locked_at:null}).eq('id',id);
+ if(!confirm(on?'Lock '+nm+'? The dashboard and the phone both refuse this account until you press Unlock here - and unlike a lockout, this lock never expires by itself.'
+  :'Unlock '+nm+'? They can sign in again straight away.'))return;
+ // v21 put an expiry and a stamp beside the two v18 columns. Sending all of them to a
+ // database that has not run the file yet would fail the whole update, so the older
+ // three-column shape is retried once and a lock still works either way.
+ const full=on?{locked_at:new Date().toISOString(),locked_until:null,fails_at:null}
+  :{fails:0,fails_at:null,locked_at:null,locked_until:null};
+ let {error}=await sb.from('profiles').update(full).eq('id',id);
+ if(error&&/column .* does not exist/i.test(error.message||''))
+  ({error}=await sb.from('profiles').update(on?{locked_at:new Date().toISOString()}:{fails:0,locked_at:null}).eq('id',id));
  if(error)return toast(error.message);
  logAct(on?'Locked user':'Unlocked user',nm);toast(nm+(on?' is locked out':' can sign in again'),on?0:1);users()}
 // a password someone has to read out over the phone or type in front of them: no
@@ -990,121 +1044,9 @@ function renderList(){
  const q=$('q').value.toLowerCase();
  $('liveList').innerHTML=all.filter(p=>shown(p)&&((p.vehicle_name||'')+(p.driver_name||'')).toLowerCase().includes(q)).sort((a,b)=>(a.vehicle_name||'').localeCompare(b.vehicle_name||'')).map(p=>{const s=st(p);
  return `<div class="veh" data-u="${p.user_id}" onclick="mapL.setView([${p.lat},${p.lng}],16);selLive('${p.user_id}');markers['${p.user_id}'].openPopup()"><div class="av" style="background:${COL[s]}"><i class="fa-solid ${vt(p)}"></i></div><div class="t"><b>${esc(p.vehicle_name||'Unassigned')}</b><br><small>${esc(p.driver_name||'-')} · ${new Date(p.recorded_at).toLocaleTimeString()}</small></div><div class="taR"><b>${spd(p)}</b> <small>km/h</small><br><span class="chip" style="background:${COL[s]}22;color:${COL[s]}">${LBL[s]}</span></div></div>`}).join('')||'<p style="color:var(--mut);padding:8px">No vehicles to show.</p>'}
-// ---- live camera. The video button on this map asks the selected vehicle's phone to
-// open its forward camera and push pictures here for LV_MIN minutes. A handset only
-// answers while the driver's app is the screen in front of him - the camera lives in
-// that page, not in the background service - so the panel says so out loud instead of
-// showing a black square and calling it a broken lens. The driver sees who is watching,
-// on his own screen, for as long as the view lasts.
-const LV_MIN=3;
-let LVQ=null,LVC=null,LVP=0,LVT=0,LVF=0,LVL='',LVS=0,LVA=0,LVM=0,CAMC=null,LVA2=0;
-async function camAsk(){if(!ADMIN)return;
- const p=SELV&&last[SELV];
- if(!p||!p.vehicle_id)return toast('Select a vehicle on the map or in the list first, then press the camera button');
- if(LVQ&&String(LVQ.vehicle_id)===String(p.vehicle_id)){$('modal').classList.add('on');return}
- const nm=p.vehicle_name||'that vehicle';
- if(LVQ)await camEnd('switched');
- // a driver may have opened his own view a moment ago, or a colleague may already be
- // watching one. Joining the session that exists beats starting a second camera on the
- // same handset, which is the one thing that phone would have to refuse.
- const {data:open}=(await sb.from('dms_live').select('*').eq('vehicle_id',p.vehicle_id)
-  .in('status',['pending','live']).gt('stop_at',new Date().toISOString())
-  .order('requested_at',{ascending:false}).limit(1))||{};
- if(open&&open.length)return camTake(open[0],'joined');
- if(!confirm('Open the forward camera of '+nm+' for '+LV_MIN+' minutes?\n\nThe driver is told your name on his own screen while it runs, and the phone only answers when his app is open in front of him.'))return;
- const {data,error}=await sb.from('dms_live').insert({vehicle_id:p.vehicle_id,vehicle_name:nm,requested_by:UID,requested_name:UNAME,
-  stop_at:new Date(Date.now()+LV_MIN*60000).toISOString()}).select().single();
- if(error)return toast('The database has no live camera table yet. Run the new schema.sql in the Supabase SQL editor, then press Refresh. ('+error.message+')',1);
- logAct('Live camera opened',nm);camTake(data)}
-// take a session row - one this page just made, one the phone made - and put it on screen
-function camTake(q,how){LVQ=q;LVF=0;LVL='';LVS=0;LVA=Date.now();LVM=0;
- const b=mapL&&mapL._btn&&mapL._btn.cam;if(b)b.classList.remove('new');
- if(how==='joined')logAct('Live camera joined',(String(q.requested_by||'')===String(UID)?'own request':'opened by the driver')+' - '+(q.vehicle_name||''));
- camPanel();camHooks()}
-function camHooks(){if(LVC){sb.removeChannel(LVC);LVC=null}
- LVC=sb.channel('cam'+LVQ.id)
-  .on('postgres_changes',{event:'INSERT',schema:'public',table:'dms_frame',filter:'live_id=eq.'+LVQ.id},e=>camShow(e.new))
-  .on('postgres_changes',{event:'UPDATE',schema:'public',table:'dms_live',filter:'id=eq.'+LVQ.id},e=>camStat(e.new))
-  .subscribe();
- clearInterval(LVP);clearInterval(LVT);
- // realtime can miss an insert without saying anything; this poll is what keeps the
- // panel honest when the socket drops, and the watch ends at stop_at either way
- LVP=setInterval(camPoll,3000);LVT=setInterval(camTick,1000);
- mapL&&mapL._btn&&mapL._btn.cam&&mapL._btn.cam.classList.add('on');camTick()}
-async function camPoll(){if(!LVQ)return;const id=LVQ.id;
- const {data:row}=await sb.from('dms_live').select('*').eq('id',id).single();
- if(!row)return camEnd('gone');
- camStat(row);
- if(row.status==='live'){const {data:f}=await sb.from('dms_frame').select('img,taken_at').eq('live_id',id).order('taken_at',{ascending:false}).limit(1);
-  if(f&&f.length&&f[0].taken_at!==LVL)camShow(f[0])}}
-function camShow(f){if(!LVQ||!f||!f.img)return;LVL=f.taken_at||'';LVS=Date.now();LVF++;
- const i=$('camIm'),m=$('camMsg');if(i)i.src=f.img;if(m)m.style.display='none'}
-function camStat(row){if(!LVQ)return;const was=LVQ.status;LVQ=row;
- if(row.status==='live'&&was!=='live')camMsg('The phone answered. Waiting for its first picture.');
- else if(row.status==='pending')camMsg('Waiting for the phone of '+esc(row.vehicle_name||'this vehicle')+'. It answers only while his app is the screen he is looking at and he has signal - the camera is never left running behind his back.');
- else if(row.status==='ended')camMsg('The driver closed this view on his phone.',1);
- else if(row.status==='failed')camMsg('That phone could not open the camera: '+esc(row.error||'no reason given')+'.',1)}
-function camMsg(t,bad){const m=$('camMsg');if(!m)return;m.innerHTML=t?'<div><i class="fa-solid '+(bad?'fa-circle-exclamation':'fa-video-slash')+'" style="font-size:26px;display:block;margin:0 auto 10px"></i>'+t+'</div>':'';
- m.style.display=t?'grid':'none';m.style.background=bad?'#3b0d0dd0':'#000c'}
-function camTick(){if(!LVQ)return;const left=Math.max(0,Math.round((Date.parse(LVQ.stop_at)-Date.now())/1000));
- const el=$('camT');if(el)el.textContent=(LVQ.status==='live'?'Live':LVQ.status==='pending'?'Waiting':LVQ.status)+' · '+p2(Math.floor(left/60))+':'+p2(left%60)+' left · '+LVF+' picture'+(LVF===1?'':'s');
- if(left<=0)return camEnd('expired');
- // a phone that never answers is the one failure this panel cannot see from here, so
- // after a quarter of a minute it stops saying "waiting" and says what to go and check
- if(LVQ.status==='pending'&&!LVM&&Date.now()-LVA>25000){LVM=1;
-  return camMsg('That phone has not answered. It has to run the new build with the live camera, be open on this screen and have signal - it works whether or not driver alerts are switched on for this fleet. He can also press the live view button on his own map, and this button then joins him.',1)}
- if(LVQ.status==='live'){const age=Date.now()-LVS;
-  if(LVS&&age>8000)camMsg('No picture in the last '+Math.round(age/1000)+' seconds: the driver has probably left his app or the signal went.',1);
-  else if(LVS&&age<=8000)camMsg('')}}
-function camPanel(){const q=LVQ,m=$('modal'),own=String(q.requested_by||'')===String(UID);
- m.innerHTML=`<div class="card" style="max-width:400px">
- <div class="dlgT"><i class="fa-solid fa-video"></i> Live camera - <b>${esc(q.vehicle_name||'')}</b>${own?'':' <small style="font-weight:400;color:var(--mut)">opened on the phone</small>'}</div>
- <div id="camW"><img id="camIm" alt="Picture from the driver camera"><div class="msg" id="camMsg"></div></div>
- <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:9px;flex-wrap:wrap">
- <small id="camT" style="color:var(--mut)"></small>
- <button class="btn r sm" onclick="camEnd('closed')"><i class="fa-solid fa-stop"></i>Stop watching</button></div>
- <small style="color:var(--mut);display:block;margin-top:7px">Opened by ${esc(q.requested_name||'the driver')} at ${new Date(q.requested_at).toLocaleString()}. The view closes by itself when the time runs out or when the driver leaves his app, and the pictures are deleted from the database afterwards.</small></div>`;
- m.classList.add('on');camStat(q);camTick()}
-async function camEnd(reason){if(!LVQ)return;const q=LVQ,nm=q.vehicle_name||'the vehicle',n=LVF;LVQ=null;
- clearInterval(LVP);clearInterval(LVT);LVP=LVT=0;
- if(LVC){sb.removeChannel(LVC);LVC=null}
- mapL&&mapL._btn&&mapL._btn.cam&&mapL._btn.cam.classList.remove('on');
- $('modal').classList.remove('on');
- if(q.status==='pending'||q.status==='live'){
-  // closing the panel always ends the row in the database, even when the phone never
-  // answered: it polls for pending requests, and one left standing would open his
-  // camera after the supervisor had already gone
-  try{await sb.from('dms_live').update({status:'ended',ended_at:new Date().toISOString(),n_frames:n,
-   error:reason==='expired'?null:'The supervisor stopped the view'}).eq('id',q.id)}catch(e){}
-  try{await sb.from('dms_frame').delete().eq('live_id',q.id)}catch(e){}}
- logAct('Live camera closed',nm+' - '+reason+' - '+n+' picture(s)');
- if(reason==='expired')toast('The '+LV_MIN+' minute watch of '+nm+' ended',1);
- else if(reason==='closed')toast('Stopped watching '+nm)}
-// ---- the other direction. A driver pressing the live view button on his own map makes
-// a session this supervisor never asked for, and there is nothing on this side to show
-// that it exists unless somebody listens. Realtime is what catches it the second it
-// happens; one look at boot catches a page that opened onto a view already running. The
-// camera button then joins that session instead of starting a second one.
-const LVSEEN={};
-function camListen(){if(!ADMIN)return;
- try{CAMC=sb.channel('cams').on('postgres_changes',{event:'INSERT',schema:'public',table:'dms_live'},e=>camHeard(e.new)).subscribe()}catch(e){}
- // the minute check is only there to put the light out again: a view that has run
- // itself out must not leave this button asking for attention for the rest of the shift
- LVA2=setInterval(camCheck,60000);setTimeout(camCheck,2000)}
-async function camCheck(){if(!ADMIN)return;
- const r=await sb.from('dms_live').select('*').in('status',['pending','live'])
-  .gt('stop_at',new Date().toISOString()).order('requested_at',{ascending:false}).limit(8);
- const rows=(r&&r.data)||[];rows.forEach(camHeard);
- if(!rows.some(x=>String(x.requested_by||'')!==String(UID))){const b=mapL&&mapL._btn&&mapL._btn.cam;
-  if(b)b.classList.remove('new')}}
-function camHeard(q){if(!q||String(q.requested_by||'')===String(UID))return;
- if(LVQ&&String(LVQ.id)===String(q.id))return;
- if(LVSEEN[q.id])return;LVSEEN[q.id]=1;
- const b=mapL&&mapL._btn&&mapL._btn.cam;if(b)b.classList.add('new');
- toast((q.requested_name||'A driver')+' opened a live camera on '+(q.vehicle_name||'a vehicle')+' - select it and press the camera button to watch',1);
- logAct('Live view opened on the phone',(q.requested_name||'')+' - '+(q.vehicle_name||''))}
-// ---- history: the period is split into trips (a gap of 10 minutes or an ended
-// trip starts a new one), each with its own colour, layer, details and playback
+// ---- history: the period is split into trips (a silence longer than this vehicle's own
+// parked heartbeat, or an ended trip, starts a new one), each with its own colour, layer,
+// details and playback
 const km=(a,b)=>{const r=x=>x*Math.PI/180,h=Math.sin(r(b.lat-a.lat)/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(r(b.lng-a.lng)/2)**2;return 12742*Math.asin(Math.sqrt(h))};
 const tile=(c,i,v,l)=>`<div class="card kpi ${c}"><div class="ic"><i class="fa-solid ${i}"></i></div><div><b>${v}</b><span>${l}</span></div></div>`;
 // a fix reporting accuracy 0 or less is a placeholder, not a real position
@@ -1119,14 +1061,18 @@ const ded=rows=>{const s=new Set();return rows.filter(r=>{const k=(r.vehicle_id|
 const hms=x=>{x=Math.max(0,Math.round(x||0));return p2(Math.floor(x/3600))+':'+p2(Math.floor(x%3600/60))+':'+p2(x%60)};
 const tms=p=>new Date(p.recorded_at).getTime();
 const brg=(a,b)=>{const r=x=>x*Math.PI/180,y=Math.sin(r(b.lng-a.lng))*Math.cos(r(b.lat)),x=Math.cos(r(a.lat))*Math.sin(r(b.lat))-Math.sin(r(a.lat))*Math.cos(r(b.lat))*Math.cos(r(b.lng-a.lng));return (Math.atan2(y,x)*180/Math.PI+360)%360};
-const TRIP_GAP=600,TCOL=['#2f7fe6','#e8590c','#27a46a','#9b51e0','#d6336c','#0b9fb3','#c99a00','#5c7cfa','#7a5c3e','#2b8a3e'];
+const TCOL=['#2f7fe6','#e8590c','#27a46a','#9b51e0','#d6336c','#0b9fb3','#c99a00','#5c7cfa','#7a5c3e','#2b8a3e'];
 let TRIPS=[],TSEL=-1,HEVS=[],PB=null;
-function splitTrips(d){const out=[];let cur=[];
- d.forEach(p=>{if(cur.length&&tms(p)-tms(cur.at(-1))>TRIP_GAP*1000){out.push(cur);cur=[]}cur.push(p);if(p.ignition===false&&cur.length>1){out.push(cur);cur=[]}});
+function splitTrips(d,Vh){const gap=GAP_S(Vh)*1000;const out=[];let cur=[];
+ d.forEach(p=>{if(cur.length&&tms(p)-tms(cur.at(-1))>gap){out.push(cur);cur=[]}cur.push(p);if(p.ignition===false&&cur.length>1){out.push(cur);cur=[]}});
  if(cur.length)out.push(cur);const f=out.filter(t=>t.length>1);return f.length?f:out.slice(0,1)}
-function tStats(t,Vh){let d=0,dr=0,id=0,fuel=0,max=0,ms=0,mn=0;const fm=+Vh.fuel_moving||0,fi=+Vh.fuel_idle||0;
+function tStats(t,Vh){let d=0,dr=0,id=0,fuel=0,max=0,ms=0,mn=0;const fm=+Vh.fuel_moving||0,fi=+Vh.fuel_idle||0,gap=GAP_S(Vh);
  t.forEach(p=>{const s=+p.speed||0;if(s>max)max=s;if(s>0){ms+=s;mn++}});
- for(let i=1;i<t.length;i++){const q=t[i-1],p=t[i],dt=(tms(p)-tms(q))/1000;if(dt>180)continue;const dk=km(q,p);d+=dk;if(p.speed>0){dr+=dt;fuel+=dk*fm/100}else{id+=dt;fuel+=dt/3600*fi}}
+ // two parked heartbeats an hour apart really were an hour of standing still, so a stopped
+ // pair may be as far apart as this vehicle's own wait. A pair with any movement in it is
+ // held to three minutes: past that the phone said nothing, and joining the two would draw
+ // a straight line over roads no vehicle took straight.
+ for(let i=1;i<t.length;i++){const q=t[i-1],p=t[i],dt=(tms(p)-tms(q))/1000;if(dt>(p.speed>0||q.speed>0?180:gap))continue;const dk=km(q,p);d+=dk;if(p.speed>0){dr+=dt;fuel+=dk*fm/100}else{id+=dt;fuel+=dt/3600*fi}}
  return {d,dr,id,fuel,max,avg:mn?ms/mn:0,s:tms(t[0]),e:tms(t.at(-1)),dur:(tms(t.at(-1))-tms(t[0]))/1000}}
 const arw=(b,c)=>L.divIcon({className:'arw',html:`<svg width="14" height="14" viewBox="0 0 14 14" style="transform:rotate(${Math.round(b)}deg)"><path d="M7 1L12.5 12.5L7 9.5L1.5 12.5Z" fill="${c}" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/></svg>`,iconSize:[14,14],iconAnchor:[7,7]});
 const shp=w=>L.divIcon({className:'',html:w==='s'?'<svg width="26" height="24" viewBox="0 0 26 24" style="display:block;filter:drop-shadow(0 1px 2px #0008)"><path d="M13 2L24.5 22H1.5Z" fill="#27a46a" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/></svg>':'<svg width="22" height="22" viewBox="0 0 22 22" style="display:block;filter:drop-shadow(0 1px 2px #0008)"><rect x="2" y="2" width="18" height="18" rx="2" fill="#d9534f" stroke="#fff" stroke-width="2.5"/></svg>',iconSize:w==='s'?[26,24]:[22,22],iconAnchor:w==='s'?[13,15]:[11,11],popupAnchor:[0,-10]});
@@ -1165,7 +1111,7 @@ async function loadHist(keep){if(!keep)fSave('hist');pbStop();
  if(!data.length){$('hstat').innerHTML='';hSide();return toast('No data in this period.')}
  HEVS=(await fetchAll(()=>sb.from('events').select('*').eq('vehicle_id',vid).gte('recorded_at',hf).lte('recorded_at',ht).order('recorded_at'))).filter(x=>EV[x.type]&&okFix(x));
  const Vh=vehicles.find(x=>x.id===vid)||{};
- TRIPS=splitTrips(data).map((pts,i)=>({n:i+1,pts,col:TCOL[i%TCOL.length],on:true,st:tStats(pts,Vh),ly:L.layerGroup(),evs:[]}));
+ TRIPS=splitTrips(data,Vh).map((pts,i)=>({n:i+1,pts,col:TCOL[i%TCOL.length],on:true,st:tStats(pts,Vh),ly:L.layerGroup(),evs:[]}));
  hLayer=L.layerGroup().addTo(mapH);
  HEVS.forEach(x=>{const t=tms(x),T=TRIPS.find(T=>t>=T.st.s-6e4&&t<=T.st.e+6e4);if(T)T.evs.push(x);else evMk(x).addTo(hLayer)});
  TRIPS.forEach(T=>{drawTrip(T,Vh);T.ly.addTo(mapH)});
@@ -1387,9 +1333,12 @@ async function saveOff(){const h=Math.min(720,Math.max(0.5,+$('offH').value||24)
  if(ADMIN){const {error}=await sb.from('app_settings').upsert({key:'offline_after_h',value:String(h)});if(error)return toast(error.message);logAct('Saved configuration','Offline threshold '+h+' h without a signal')}
  renderList();fitAll();toast('A vehicle with no signal for over '+h+' h is shown offline',1)}
 async function loadCfg(){await loadRules();await getSet();
- $('s_mov').value=SET.moving_interval||10;$('s_stp').value=SET.stopped_interval||60;
+ $('s_mov').value=MOV_S({});$('s_stp').value=STP_S({});
  $('sc_g').value=SET.score_green??1;$('sc_r').value=SET.score_red??3;
- $('s_bb').checked=SET.bb_on!=='0';$('s_bbd').value=SET.bb_days||3;$('s_z').checked=SET.zones_on!=='0';
+ $('s_bb').checked=SET.bb_on!=='0';$('s_bbd').value=SET.bb_days||3;$('s_bbmin').value=BBMIN();$('s_z').checked=SET.zones_on!=='0';
+ // the two login waits show their own default until the database has them, so the page
+ // never offers an empty box that would save as nothing
+ $('s_lw').value=LWIN();$('s_ll').value=LLOCK();
  // dms_on ships as '0', so an unset key means off - a build that has just learned to
  // watch the driver must not start doing it by itself. The other five are the schema's
  // own defaults and appear as soon as they are saved here.
@@ -1397,7 +1346,7 @@ async function loadCfg(){await loadRules();await getSet();
  $('d_pre').value=SET.dms_pre_s??3;$('d_post').value=SET.dms_post_s??1;$('d_fps').value=SET.dms_fps??5;$('d_keep').value=SET.dms_keep_d??7;
  zTable();bbTable();
 
- const cols=[['speed_limit','Overspeed limit','km/h',RULES.overspeed?.threshold],['speed_buffer','Overspeed buffer','km/h',0],['brake_limit','Harsh braking','km/h/s',RULES.harsh_braking?.threshold],['accel_limit','Harsh accel.','km/h/s',RULES.harsh_acceleration?.threshold],['max_accel_warning','Warning level','km/h/s',0],['moving_interval','Record moving','seconds',SET.moving_interval||10],['stopped_interval','Record stopped','seconds',SET.stopped_interval||60],['min_moving_distance','Min. distance before events','metres',0],['fuel_moving','Fuel moving','L/100 km',''],['fuel_idle','Fuel idling','L/hour','']];
+ const cols=[['speed_limit','Overspeed limit','km/h',RULES.overspeed?.threshold],['speed_buffer','Overspeed buffer','km/h',0],['brake_limit','Harsh braking','km/h/s',RULES.harsh_braking?.threshold],['accel_limit','Harsh accel.','km/h/s',RULES.harsh_acceleration?.threshold],['max_accel_warning','Warning level','km/h/s',0],['moving_interval','Moving every','seconds',MOV_S({})],['stopped_interval','Parked every','seconds',STP_S({})],['min_moving_distance','Min. distance before events','metres',0],['fuel_moving','Fuel moving','L/100 km',''],['fuel_idle','Fuel idling','L/hour','']];
  $('cfgV').innerHTML=`<table><tr><th><input type="checkbox" onclick="selAllV(this)" title="Tick every vehicle"></th><th>Vehicle</th>${cols.map(c=>`<th>${c[1]}<br><small>${c[2]}${c[3]?' (default '+c[3]+')':''}</small></th>`).join('')}</tr>${vehicles.map(v=>{const cust=OV.some(k=>v[k]!=null&&v[k]!=='');
  return `<tr><td class="taC"><input type="checkbox" class="vsel" data-v="${v.id}" ${cust?'checked':''} title="Tick to include this vehicle in Reset selected"></td><td class="nw"><b>${esc(v.name)}</b>${cust?' <span class="chip" style="background:var(--orl);color:var(--ord)" title="This vehicle uses its own values instead of the fleet defaults">custom</span>':''}</td>${cols.map(c=>`<td><input type="number" step="any" min="0" data-v="${v.id}" data-k="${c[0]}" value="${v[c[0]]??''}" placeholder="${c[3]??''}" style="width:72px" title="${c[1]} (${c[2]})"></td>`).join('')}</tr>`}).join('')||'<tr><td colspan="12" class="empty">Add vehicles first.</td></tr>'}</table>`;tools($('cfgV'))}
 const selCfg=()=>[...document.querySelectorAll('#cfgV .vsel:checked')].map(i=>i.dataset.v);
@@ -1417,11 +1366,23 @@ async function saveCfg(){if(!ADMIN)return;
  // a typed 0 must survive: "0 seconds after the alert" is a choice, so the box is
  // read as text and only an empty box falls back to the schema default
  const cl=(id,lo,hi,d)=>{const v=$('d_'+id).value.trim(),n=v===''?d:Math.min(hi,Math.max(lo,+v||0));return String(n)};
+ // the two login waits, read the same way: an empty box keeps the default and a typed
+ // 0 survives on the lockout, where 0 is the answer "never opens by itself"
+ const lv=(id,lo,d)=>{const v=$(id).value.trim();return String(v===''?d:Math.min(1440,Math.max(lo,Math.round(+v)||0)))};
+ const lw=lv('s_lw',1,15),ll=lv('s_ll',0,15);$('s_lw').value=lw;$('s_ll').value=ll;
+ // the two recording waits and the speed the blackbox starts at, clamped here and written
+ // back into their boxes, so the page can never show a number the phones will not obey
+ const mov=String(Math.min(3600,Math.max(1,Math.round(+$('s_mov').value||10))));$('s_mov').value=mov;
+ const stp=String(Math.min(43200,Math.max(5,Math.round(+$('s_stp').value||3600))));$('s_stp').value=stp;
+ // read as text like the two waits: an empty box keeps the default, and a typed 0 is the
+ // answer "store every fix", not nothing
+ const bmin=(v=>String(v===''?BBMIN():Math.min(50,Math.max(0,+v||0))))($('s_bbmin').value.trim());$('s_bbmin').value=bmin;
  const byV={};document.querySelectorAll('#cfgV input[data-k]').forEach(i=>{(byV[i.dataset.v]??={})[i.dataset.k]=i.value===''?null:+i.value});
- const res=await Promise.all([sb.from('event_rules').upsert(rules),sb.from('app_settings').upsert([{key:'moving_interval',value:String(Math.max(1,+$('s_mov').value||10))},{key:'stopped_interval',value:String(Math.max(1,+$('s_stp').value||60))},{key:'score_green',value:String(Math.max(0,+$('sc_g').value||0))},{key:'score_red',value:String(Math.max(0,+$('sc_r').value||0))},{key:'voice_on',value:vls.length?'1':'0'},{key:'voice_lang',value:vls[0]||'en'},{key:'bb_on',value:$('s_bb').checked?'1':'0'},{key:'bb_days',value:String(Math.min(14,Math.max(1,+$('s_bbd').value||3)))},{key:'zones_on',value:$('s_z').checked?'1':'0'},
+ const res=await Promise.all([sb.from('event_rules').upsert(rules),sb.from('app_settings').upsert([{key:'moving_interval',value:mov},{key:'stopped_interval',value:stp},{key:'score_green',value:String(Math.max(0,+$('sc_g').value||0))},{key:'score_red',value:String(Math.max(0,+$('sc_r').value||0))},{key:'voice_on',value:vls.length?'1':'0'},{key:'voice_lang',value:vls[0]||'en'},{key:'bb_on',value:$('s_bb').checked?'1':'0'},{key:'bb_days',value:String(Math.min(14,Math.max(1,+$('s_bbd').value||3)))},{key:'bb_min_kmh',value:bmin},{key:'zones_on',value:$('s_z').checked?'1':'0'},
+  {key:'login_window_m',value:lw},{key:'login_lock_m',value:ll},
   {key:'dms_on',value:$('d_on').checked?'1':'0'},{key:'dms_preview',value:$('d_pv').checked?'1':'0'},{key:'dms_pre_s',value:cl('pre',0,10,3)},{key:'dms_post_s',value:cl('post',0,10,1)},{key:'dms_fps',value:cl('fps',1,15,5)},{key:'dms_keep_d',value:cl('keep',1,30,7)}]),...Object.entries(byV).map(([id,o])=>sb.from('vehicles').update({...o,custom:OV.some(k=>o[k]!=null)}).eq('id',id))]);
  const e=res.find(r=>r.error);if(e)return toast(e.error.message);
- logAct('Saved configuration','Limits '+rules.map(r=>r.label+' '+(r.threshold??'off')).join(', ')+'; recording '+$('s_mov').value+'/'+$('s_stp').value+' s; score bands '+$('sc_g').value+'-'+$('sc_r').value+'; voice '+(vls.length?vls.join('/'):'off')+'; camera '+($('d_on').checked?'on '+$('d_pre').value+'+'+$('d_post').value+'s':'off')+'; '+Object.keys(byV).length+' vehicle row(s)');
+ logAct('Saved configuration','Limits '+rules.map(r=>r.label+' '+(r.threshold??'off')).join(', ')+'; recording '+mov+'/'+stp+' s; blackbox from '+bmin+' km/h'+'; score bands '+$('sc_g').value+'-'+$('sc_r').value+'; voice '+(vls.length?vls.join('/'):'off')+'; camera '+($('d_on').checked?'on '+$('d_pre').value+'+'+$('d_post').value+'s':'off')+'; lockout '+lw+'m quiet/'+ll+'m lock'+'; '+Object.keys(byV).length+' vehicle row(s)');
  toast('Configuration saved. Phones apply it within 5 minutes or at the next trip start.',1);await refs();loadCfg()}
 // ---- audio: one shared context, unlocked by the first click or key press. A
 // context created later from a realtime callback starts suspended and stays
