@@ -103,7 +103,7 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 <div class="top"><div><small>Welcome,</small> <b id="wn"></b><b>!</b></div><div><button class="ib hide" id="dash" onclick="openDash()" title="Open dashboard"><i class="fa-solid fa-chart-line"></i></button><button class="ib" onclick="testAlert()" title="Test the buzzer and the voice alert"><i class="fa-solid fa-bell"></i></button><button class="ib" onclick="pwUi()" title="Change password"><i class="fa-solid fa-key"></i></button><button class="ib" onclick="signOut()" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i></button></div></div>
 <div class="card id"><div class="av" style="width:38px;height:38px;font-size:17px"><i id="vi" class="fa-solid fa-car"></i></div><div><b id="vn"></b><br><small><i class="fa-solid fa-id-card"></i> <span id="dn"></span></small><br><select id="pk" class="hide" onchange="pickV()" style="margin-top:6px;max-width:190px"></select></div><span class="chip" id="stc">Parking</span></div>
 <div class="card spd"><div><b id="sp">0</b><span>km/h</span></div><div class="pr"><small>Position</small><b id="v_pos">-</b><br><small id="lt">No record yet</small></div></div>
-<div id="map"><div id="fr"></div><div class="mn hide" id="mn"><i class="fa-solid fa-wifi"></i> No signal: this area was not cached, the route and zones are still drawn</div><div class="layN hide" id="layN"></div><div id="camV" class="hide"><img id="camI" alt="Driver camera view"><i id="camVi" class="fa-solid fa-video"></i></div><div class="mcl"><button id="muteB" onclick="muteTog()" title="Mute the alerts"><i class="fa-solid fa-volume-high"></i></button><button id="layB" onclick="togMap()" title="Map style"><i class="fa-solid fa-layer-group"></i></button><button id="fsB" onclick="fsMap()" title="Full screen"><i class="fa-solid fa-expand"></i></button><button id="pinB" class="on" onclick="togPin()" title="Pin: keep the vehicle in the centre"><i class="fa-solid fa-thumbtack"></i></button><button id="camB" class="hide" onclick="camTog()" title="Show the driver camera view"><i class="fa-solid fa-video"></i></button></div></div>
+<div id="map"><div id="fr"></div><div class="mn hide" id="mn"><i class="fa-solid fa-wifi"></i> No signal: this area was not cached, the route and zones are still drawn</div><div class="layN hide" id="layN"></div><div id="camV" class="hide"><img id="camI" alt="Driver camera view"><i id="camVi" class="fa-solid fa-video"></i></div><div class="mcl"><button id="muteB" onclick="muteTog()" title="Mute the alerts"><i class="fa-solid fa-volume-high"></i></button><button id="layB" onclick="togMap()" title="Map style"><i class="fa-solid fa-layer-group"></i></button><button id="fsB" onclick="fsMap()" title="Full screen"><i class="fa-solid fa-expand"></i></button><button id="pinB" class="on" onclick="togPin()" title="Pin: keep the vehicle in the centre"><i class="fa-solid fa-thumbtack"></i></button><button id="camB" class="hide" onclick="camTog()" title="Show the driver camera view"><i class="fa-solid fa-video"></i></button><button id="lvB" class="hide" onclick="lvTog()" title="Live view: show your face to the office"><i class="fa-solid fa-tower-broadcast"></i></button></div></div>
 <div class="grid3" id="vals"></div>
 <div class="btns"><button id="go" class="btn g" onclick="start()"><i class="fa-solid fa-play"></i>Start trip</button><button id="stp" class="btn r hide" onclick="stop()"><i class="fa-solid fa-stop"></i>End trip</button></div>
 <div class="foot">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</div>
@@ -740,7 +740,8 @@ function camPaint(show){CAMD=!!show&&dmsOn();
  if(b){b.classList.toggle('hide',!dmsOn());b.classList.toggle('on',CAMD);
   b.title=CAMD?'Hide the view of your face':'Show the view of your face'}
  if(v){v.classList.toggle('hide',!CAMD);
-  if(!CAMD){const i=$('camI');if(i)i.removeAttribute('src');const x=$('camVi');if(x)x.classList.remove('hide')}}}
+  if(!CAMD){const i=$('camI');if(i)i.removeAttribute('src');const x=$('camVi');if(x)x.classList.remove('hide')}}
+ lvUi()}
 async function camBox(show){camPaint(show);if(!dmsHas())return;
  try{await CapPlugins.Dms.preview({show:CAMD})}catch(e){}}
 function camTog(){camBox(!CAMD)}
@@ -750,23 +751,61 @@ function camTog(){camBox(!CAMD)}
 // the moment another app or the lock screen takes over. So a request that cannot be met
 // is refused out loud, and the reason reaches the dashboard instead of leaving a
 // supervisor to stare at a black box and guess.
-let LV=null,LVT=0,LVP=0,LVB=false,LVCH=null,LVIMG='',LVN=0,LVO=false,LVSH=0,LVU=0;
+let LV=null,LVT=0,LVP=0,LVB=false,LVCH=null,LVIMG='',LVN=0,LVO=false,LVSH=0,LVU=0,LVSELF=false;
+const LVMIN=3;
 // a name coming off the server still has to be safe to put into the notice strip
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const lvVeh=()=>(asg&&asg.vehicles&&asg.vehicles.name)||lvId()||'this vehicle';
 const lvId=()=>(asg&&asg.vehicle_id)||'';
 // the driver's notice is the whole point of doing this from the dashboard: he is never
 // watched without knowing, so it is re-shown every few seconds instead of fading out
+const lvLeft=()=>{const s=Math.max(0,Math.round((Date.parse((LV||{}).stop_at||0)-Date.now())/1000));
+ return Math.floor(s/60)+':'+(s%60<10?'0':'')+s%60};
 function lvSay(){if(!LV)return;LVSH=Date.now();
- banner('<i class="fa-solid fa-video"></i> Live camera: '+esc(LV.requested_name||'a supervisor')+' is watching this screen',7000)}
+ banner('<i class="fa-solid fa-video"></i> '+(LVSELF?'Live view: the office can see this screen'
+  :'Live camera: '+esc(LV.requested_name||'a supervisor')+' is watching this screen')
+  +' · '+lvLeft()+' left · '+LVN+' picture'+(LVN===1?'':'s')+' sent',7000);lvUi()}
+// why this phone cannot stream right now, in the words the driver needs to hear. The
+// button is never left to do nothing: a press that cannot be answered says so on screen,
+// because a silent phone is what makes a supervisor think the feature is broken
+const lvWhy=()=>!dmsHas()?'This build has no driver camera'
+ :!dmsOn()?'Driver alerts are switched off for this fleet'
+ :!CAMON?'Start a trip first: the camera only runs during a trip'
+ :!lvId()?'This login holds no vehicle, so the office cannot find it'
+ :!navigator.onLine?'No signal right now': '';
+function lvUi(){const b=$('lvB');if(!b)return;
+ // a build that has no camera has nothing to offer, the same rule as the preview button
+ b.classList.toggle('hide',!dmsHas());if(!dmsHas())return;
+ b.classList.toggle('on',!!LV);
+ b.innerHTML='<i class="fa-solid fa-'+(LV?'video':'tower-broadcast')+'"></i>';
+ b.title=LV?lvLeft()+' left of this view':lvWhy()||'Live view: show your face to the office'}
+// the driver opening his own view: the same session the dashboard makes, started from
+// this side instead. It gives the office a face to look at the moment it is needed and
+// gives this phone a way to prove the whole path works without someone else pressing
+async function lvTog(){if(LV)return LVSELF?lvEnd('you stopped it')
+ : banner('<i class="fa-solid fa-video"></i> The office is already watching this screen',6000);
+ const why=lvWhy();
+ if(why){banner('<i class="fa-solid fa-video-slash"></i> Live view is off: '+esc(why),7000);lvUi();return}
+ const {data,error}=await sb.from('dms_live').insert({vehicle_id:lvId(),vehicle_name:lvVeh(),
+  requested_by:me.id,status:'live',
+  requested_name:(asg&&asg.drivers&&asg.drivers.name)||me.email||'the driver',
+  stop_at:new Date(Date.now()+LVMIN*60000).toISOString()}).select().single();
+ if(error)return banner('<i class="fa-solid fa-video-slash"></i> Live view could not start: '+esc(error.message||'the database refused it'),8000);
+ if(!data)return banner('<i class="fa-solid fa-video-slash"></i> Live view could not start: this database has no live camera table yet',8000);
+ await lvAsk(data,true);
+ logAct('Live view opened',lvVeh()+' by the driver')}
 // what the dashboard receives is a small copy of the corner picture - a second of it
 // costs a few kilobytes instead of the whole camera frame
 function lvSmall(url){return new Promise(res=>{const im=new Image();
  im.onload=()=>{try{const w=176,h=Math.max(1,Math.round(w*im.height/im.width)),c=document.createElement('canvas');
   c.width=w;c.height=h;c.getContext('2d').drawImage(im,0,0,w,h);res(c.toDataURL('image/jpeg',0.55))}catch(e){res(url)}};
  im.onerror=()=>res(url);im.src=url})}
-async function lvRefuse(q,why){try{await sb.from('dms_live').update({status:'failed',answered_at:new Date().toISOString(),error:why}).eq('id',q.id)}catch(e){}}
-async function lvAsk(q){LV=q;LVN=0;LVU=0;LVO=CAMD;LVIMG='';
+async function lvRefuse(q,why){try{await sb.from('dms_live').update({status:'failed',answered_at:new Date().toISOString(),error:why}).eq('id',q.id)}catch(e){}
+ banner('<i class="fa-solid fa-video-slash"></i> Live camera not opened: '+esc(why),7000)}
+async function lvAsk(q,self){LV=q;LVN=0;LVU=0;LVO=CAMD;LVIMG='';
+ // a view this phone started itself reads differently on the strip, and the driver may
+ // put it down again - one he did not start he cannot stop, which is the rule he agreed
+ LVSELF=!!self;
  const {error}=await sb.from('dms_live').update({status:'live',answered_at:new Date().toISOString()}).eq('id',q.id);
  if(error){LV=null;$('err').textContent='Live camera: '+error.message;return}
  // the lens is opened at once, not a second later: a supervisor who pressed the
@@ -787,14 +826,15 @@ async function lvTick(){if(!LV)return;
  if(LVIMG){const img=LVIMG;LVIMG='';
   const {error}=await sb.from('dms_frame').insert({live_id:LV.id,vehicle_id:lvId(),img:await lvSmall(img)});
   if(!error)LVN++}}
-async function lvEnd(reason){if(!LV)return;const q=LV,n=LVN,who=q.requested_name||'a supervisor';LV=null;LVIMG='';LVN=0;
+async function lvEnd(reason){if(!LV)return;const q=LV,n=LVN,who=q.requested_name||'a supervisor',self=LVSELF;LV=null;LVIMG='';LVN=0;LVSELF=false;
  clearInterval(LVT);LVT=0;camBox(LVO);
  try{await sb.from('dms_live').update({status:'ended',ended_at:new Date().toISOString(),n_frames:n,
   error:'This phone closed the view: '+reason}).eq('id',q.id)}catch(e){}
  // the pictures go the moment the watch ends; only the record that it happened stays
  try{await sb.from('dms_frame').delete().eq('live_id',q.id)}catch(e){}
- logAct('Live camera closed',lvVeh()+' - '+reason+' - '+n+' picture(s)');
- banner('<i class="fa-solid fa-video-slash"></i> Live camera closed: '+esc(who)+' is no longer watching',5000)}
+ logAct(self?'Live view stopped':'Live camera closed',lvVeh()+' - '+reason+' - '+n+' picture(s)');
+ banner('<i class="fa-solid fa-video-slash"></i> '+(self?'Live view stopped':'Live camera closed: '+esc(who)+' is no longer watching')
+  +' · '+n+' picture'+(n===1?'':'s')+' sent',5000);lvUi()}
 // a phone that is locked, off or out of coverage never sees the request in time, so it
 // is asked for on its own clock too. A request whose time has already run out is left
 // alone - nobody can watch it any more, and answering it late would only surprise the
