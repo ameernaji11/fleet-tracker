@@ -711,6 +711,68 @@ insert into app_settings (key, value) values
   ('dms_fps','5'), ('dms_keep_d','7'), ('dms_preview','1')
   on conflict (key) do nothing;
 
+-- ----------------------------------------------------- v20 live camera view ----
+-- v20: the "look at the driver now" button on Live Tracking. A blackbox pull asks
+-- the phone for rows it already stored and can wait hours for a signal; a live face
+-- check cannot — it is only worth having while that handset is answering. So every
+-- request carries an expiry: the dashboard watches until stop_at, then says plainly
+-- that the driver's app did not open the camera, instead of spinning for ever.
+--
+-- The pictures themselves are the frames the preview already hands to the page,
+-- pushed into dms_frame about once a second and deleted when the session ends. That
+-- is deliberate: this phase stays entirely inside the two web layers with no new
+-- native code, and the table holds a handful of rows rather than a video archive.
+-- Answering while the phone is locked or in another app is the next phase and needs
+-- the camera to move into the service instead of the page.
+create table if not exists dms_live (
+  id uuid primary key default gen_random_uuid(),
+  vehicle_id uuid not null, vehicle_name text,
+  status text not null default 'pending',          -- pending | live | ended | failed
+  requested_by uuid, requested_name text,          -- who to name on the driver's banner
+  requested_at timestamptz default now(), answered_at timestamptz, ended_at timestamptz,
+  stop_at timestamptz not null,                    -- nobody may watch past this moment
+  n_frames int, error text);
+create index if not exists dms_live_vehicle on dms_live (vehicle_id, requested_at desc);
+-- the phone's own poll: only an unanswered request whose window is still open matters
+create index if not exists dms_live_open on dms_live (status, stop_at);
+
+create table if not exists dms_frame (
+  id uuid primary key default gen_random_uuid(),
+  live_id uuid not null references dms_live(id) on delete cascade,
+  vehicle_id uuid, img text, taken_at timestamptz default now());
+create index if not exists dms_frame_live on dms_frame (live_id, taken_at);
+
+alter table dms_live  enable row level security;
+alter table dms_frame enable row level security;
+
+-- A supervisor may open, read and close any session. A driver sees only requests
+-- about a vehicle assigned to him and may answer those — which is what lets the
+-- phone mark its own row live, stamp who answered and end it, without inventing a
+-- session or rewriting anybody else's. Same shape as the three blackbox rules.
+drop policy if exists "dms live admin" on dms_live;
+create policy "dms live admin" on dms_live for all using (is_admin()) with check (is_admin());
+drop policy if exists "dms live read own" on dms_live;
+create policy "dms live read own" on dms_live for select to authenticated
+  using (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()));
+drop policy if exists "dms live answer own" on dms_live;
+create policy "dms live answer own" on dms_live for update to authenticated
+  using (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()))
+  with check (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()));
+
+-- Frames travel one way: the handset of that vehicle writes them, an administrator
+-- reads them. A handset may also delete its own pictures, which is how an abandoned
+-- or crashed viewer stops filling the table instead of leaving base64 behind. The
+-- admin rule is a full one so that removing a session row also clears its frames —
+-- Postgres applies the frame rules even to its own cascade delete.
+drop policy if exists "dms frame write own" on dms_frame;
+create policy "dms frame write own" on dms_frame for insert to authenticated
+  with check (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()));
+drop policy if exists "dms frame admin" on dms_frame;
+create policy "dms frame admin" on dms_frame for all using (is_admin()) with check (is_admin());
+drop policy if exists "dms frame clear own" on dms_frame;
+create policy "dms frame clear own" on dms_frame for delete to authenticated
+  using (vehicle_id in (select vehicle_id from assignments where user_id = auth.uid()));
+
 -- ------------------------------------------------------------- realtime ----
 -- the dashboard listens for position and event inserts; both must be in the
 -- publication. Guarded so re-running this file does not error.
@@ -726,6 +788,15 @@ do $$ begin
   -- answers the request when it next gets a signal.
   if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='bb_requests') then
     alter publication supabase_realtime add table bb_requests;
+  end if;
+  -- v20: the dashboard waits for frames as they land, and the phone waits for the
+  -- request that tells it to start. Both are picture-rate events, so neither app
+  -- polls harder than it already does for blackbox pulls.
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='dms_live') then
+    alter publication supabase_realtime add table dms_live;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='dms_frame') then
+    alter publication supabase_realtime add table dms_frame;
   end if;
 end $$;
 
@@ -942,4 +1013,18 @@ end $$;
 --   database that has not been told about them, and the Configuration page warns you when speed_min is missing.
 --   The clip bucket itself is created in the next phase, together with the rights that let a handset write into
 --   it and an administrator read it back.
+--
+-- v20, on top of the above (a supervisor opens the driver's camera on demand):
+--   dms_live table + 3 policies + publication entry                       -> one row per "show me the driver"
+--        press: the vehicle, who asked and by what name, pending until the handset answers, and stop_at — the
+--        moment the watch ends by itself. An administrator opens, reads and closes any session; a driver only sees
+--        and answers requests about a vehicle assigned to him, the same trio of rules the blackbox pull uses.
+--   dms_frame table + 3 policies + publication entry                      -> the short-lived base64 pictures the
+--        phone pushes about once a second while a session is live. Only that vehicle's handset may write them, only
+--        an administrator reads them, and the handset may delete its own, so an abandoned viewer cannot leave a
+--        pile of images behind. Rows are removed when the session ends.
+--   Nothing else changes. There is no new setting and no new column on an existing table, and the phone still
+--   streams only while its app is on screen — the camera lives in the page, not yet in the background service.
+--        Run this file BEFORE publishing the dashboard build with the video button: an insert into a table the
+--   database has not been told about is refused, and the panel would report a missing service instead of a picture.
 -- ============================================================================
