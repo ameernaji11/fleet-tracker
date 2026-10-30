@@ -324,6 +324,10 @@ async function init(fresh,who){
  // a phone Android restarted while a trip was running has already raised warnings of
  // its own: hear about them from the first moment, not only after Start is pressed
  dmsListen();
+ // a phone killed in the middle of a live view leaves the camera service holding the
+ // lens with no page to send pictures to. Nothing but a view opens the lens when this
+ // fleet has driver alerts switched off, so this page owns no view and the lens goes back.
+ lvReap();
  const nm=(me.email||'').replace('@fleet.local','');$('wn').textContent=nm;
  const v=asg?.vehicles;$('vn').textContent=v?.name||'No vehicle linked';$('dn').textContent=asg?.drivers?.name||'No driver linked';$('vi').className='fa-solid '+(TI[v?.type]||'fa-car');
  logAct(fresh?'Signed in':'Opened app',$('vn').textContent);sessStart();
@@ -735,7 +739,9 @@ function dmsListen(){if(DMSL||!dmsHas())return;DMSL=true;
  on('dmsFrame',x=>{if(!x||!x.img)return;LVIMG=x.img;if(!CAMD)return;CAMSEEN=true;const i=$('camI');if(i)i.src=x.img;
   const v=$('camVi');if(v)v.classList.add('hide')})}
 // the driver's own picture of himself, in the corner of the map he can put away
-function camPaint(show){CAMD=!!show&&dmsOn();
+// LV is in the test because a live view holds the lens open on its own account, and the
+// picture has to reach the office whether or not this fleet watches faces all day
+function camPaint(show){CAMD=!!show&&(dmsOn()||!!LV);
  const b=$('camB'),v=$('camV');
  if(b){b.classList.toggle('hide',!dmsOn());b.classList.toggle('on',CAMD);
   b.title=CAMD?'Hide the view of your face':'Show the view of your face'}
@@ -751,7 +757,7 @@ function camTog(){camBox(!CAMD)}
 // the moment another app or the lock screen takes over. So a request that cannot be met
 // is refused out loud, and the reason reaches the dashboard instead of leaving a
 // supervisor to stare at a black box and guess.
-let LV=null,LVT=0,LVP=0,LVB=false,LVCH=null,LVIMG='',LVN=0,LVO=false,LVSH=0,LVU=0,LVSELF=false;
+let LV=null,LVT=0,LVP=0,LVB=false,LVCH=null,LVIMG='',LVN=0,LVO=false,LVSH=0,LVU=0,LVSELF=false,LVLENS=false;
 const LVMIN=3;
 // a name coming off the server still has to be safe to put into the notice strip
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -767,10 +773,10 @@ function lvSay(){if(!LV)return;LVSH=Date.now();
   +' · '+lvLeft()+' left · '+LVN+' picture'+(LVN===1?'':'s')+' sent',7000);lvUi()}
 // why this phone cannot stream right now, in the words the driver needs to hear. The
 // button is never left to do nothing: a press that cannot be answered says so on screen,
-// because a silent phone is what makes a supervisor think the feature is broken
+// because a silent phone is what makes a supervisor think the feature is broken.
+// Driver alerts and a running trip are not in this list on purpose: a live view opens
+// its own lens, so the office is never locked out by a fleet setting.
 const lvWhy=()=>!dmsHas()?'This build has no driver camera'
- :!dmsOn()?'Driver alerts are switched off for this fleet'
- :!CAMON?'Start a trip first: the camera only runs during a trip'
  :!lvId()?'This login holds no vehicle, so the office cannot find it'
  :!navigator.onLine?'No signal right now': '';
 function lvUi(){const b=$('lvB');if(!b)return;
@@ -793,7 +799,8 @@ async function lvTog(){if(LV)return LVSELF?lvEnd('you stopped it')
  if(error)return banner('<i class="fa-solid fa-video-slash"></i> Live view could not start: '+esc(error.message||'the database refused it'),8000);
  if(!data)return banner('<i class="fa-solid fa-video-slash"></i> Live view could not start: this database has no live camera table yet',8000);
  await lvAsk(data,true);
- logAct('Live view opened',lvVeh()+' by the driver')}
+ // the lens may have refused it, and a watch that never opened is not a watch to log
+ if(LV)logAct('Live view opened',lvVeh()+' by the driver')}
 // what the dashboard receives is a small copy of the corner picture - a second of it
 // costs a few kilobytes instead of the whole camera frame
 function lvSmall(url){return new Promise(res=>{const im=new Image();
@@ -802,7 +809,40 @@ function lvSmall(url){return new Promise(res=>{const im=new Image();
  im.onerror=()=>res(url);im.src=url})}
 async function lvRefuse(q,why){try{await sb.from('dms_live').update({status:'failed',answered_at:new Date().toISOString(),error:why}).eq('id',q.id)}catch(e){}
  banner('<i class="fa-solid fa-video-slash"></i> Live camera not opened: '+esc(why),7000)}
-async function lvAsk(q,self){LV=q;LVN=0;LVU=0;LVO=CAMD;LVIMG='';
+// the settings this page hands the camera for the length of a live view: the lens open,
+// every one of the four face rules switched off. An empty rules list would not do it -
+// the plugin carries over a rule it was never told about - so each one is named and told
+// to stand down. A supervisor asking for a look is not a fleet agreeing to be watched.
+function lvCfg(){const c=dmsCfg();c.dms_on=true;c.dms_preview=true;c.dms_fps=2;
+ c.rules=DMS.map(t=>({type:t,enabled:false,threshold:0,hold_s:0,speed_min:1e9,alert:false,beep:false,voice:false}));
+ return c}
+// Open the lens for a view. When the trip's own camera is already running the view
+// simply borrows it, which is the cheap path and the one a driver has already agreed to.
+// When it is not, this page starts the camera itself and returns '' or, if Android or the
+// driver will not allow it, the reason to show on both screens.
+async function lvCamUp(){if(!dmsHas())return 'This build has no driver camera';
+ if(dmsOn()&&CAMON){await camBox(true);return ''}
+ // From here on this phone's camera holds a configuration that is not the fleet's, so
+ // every path out of the block below has to hand it back - including the one where the
+ // driver refuses the permission prompt and nothing ever opened.
+ LVLENS=true;
+ let why='',r=null;
+ try{await CapPlugins.Dms.configure({cfg:lvCfg()});r=await CapPlugins.Dms.start()}
+ catch(e){why='The camera could not be opened: '+(e.message||e)}
+ if(!why&&(!r||r.granted===false))why='the camera is not allowed on this phone';
+ if(!why){await camBox(true);
+  // a service that came up without a lens means another app is holding it, and that is
+  // worth saying rather than streaming a black square for three minutes
+  try{const s=await CapPlugins.Dms.status();
+   if(s&&s.running&&!s.camera)why='the camera stayed shut: '+(s.reason||'this phone would not hand it over')}catch(e){}}
+ if(why){await lvCamDown();return why}
+ return ''}
+async function lvCamDown(){if(!LVLENS)return;LVLENS=false;
+ try{await CapPlugins.Dms.stop()}catch(e){}
+ // the copy of the settings on disk goes back to what this fleet actually has, so a
+ // service Android wakes up later cannot reopen a lens nobody asked for
+ try{const c=lvCfg();c.dms_on=dmsOn();await CapPlugins.Dms.configure({cfg:c})}catch(e){}}
+async function lvAsk(q,self){if(LV)return;LV=q;LVN=0;LVU=0;LVO=CAMD;LVIMG='';
  // a view this phone started itself reads differently on the strip, and the driver may
  // put it down again - one he did not start he cannot stop, which is the rule he agreed
  LVSELF=!!self;
@@ -810,8 +850,13 @@ async function lvAsk(q,self){LV=q;LVN=0;LVU=0;LVO=CAMD;LVIMG='';
  if(error){LV=null;$('err').textContent='Live camera: '+error.message;return}
  // the lens is opened at once, not a second later: a supervisor who pressed the
  // button should see the first picture, and a driver must see the notice immediately
- camBox(true);lvSay();logAct('Live camera opened',esc(LV.requested_name||'a supervisor')+' watched '+lvVeh());
+ const why=await lvCamUp();if(why)return lvFail(why);
+ lvSay();logAct('Live camera opened',esc(LV.requested_name||'a supervisor')+' watched '+lvVeh());
  clearInterval(LVT);LVT=setInterval(lvTick,1000)}
+// the lens would not open after all: close the session on the database and say why,
+// rather than letting the watch sit there claiming to be live
+async function lvFail(why){const q=LV;LV=null;LVN=0;LVIMG='';LVSELF=false;clearInterval(LVT);LVT=0;
+ await lvCamDown();await lvRefuse(q,'The camera on this phone would not open: '+why)}
 async function lvTick(){if(!LV)return;
  if(document.hidden)return lvEnd('the app left the foreground');
  if(Date.now()>=Date.parse(LV.stop_at))return lvEnd('the watch time ran out');
@@ -827,7 +872,7 @@ async function lvTick(){if(!LV)return;
   const {error}=await sb.from('dms_frame').insert({live_id:LV.id,vehicle_id:lvId(),img:await lvSmall(img)});
   if(!error)LVN++}}
 async function lvEnd(reason){if(!LV)return;const q=LV,n=LVN,who=q.requested_name||'a supervisor',self=LVSELF;LV=null;LVIMG='';LVN=0;LVSELF=false;
- clearInterval(LVT);LVT=0;camBox(LVO);
+ clearInterval(LVT);LVT=0;await lvCamDown();camBox(LVO);
  try{await sb.from('dms_live').update({status:'ended',ended_at:new Date().toISOString(),n_frames:n,
   error:'This phone closed the view: '+reason}).eq('id',q.id)}catch(e){}
  // the pictures go the moment the watch ends; only the record that it happened stays
@@ -850,14 +895,17 @@ async function lvAnswer(){if(LV||LVB||!me||!ASGS.length||!navigator.onLine||docu
    if(Date.now()>=Date.parse(q.stop_at))continue;
    if(String(q.vehicle_id)!==String(lvId())){await lvRefuse(q,'This login holds that vehicle on another phone');continue}
    if(!dmsHas()){await lvRefuse(q,'This build has no driver camera');continue}
-   if(!dmsOn()){await lvRefuse(q,'The driver camera is switched off for this fleet');continue}
-   if(!CAMON){await lvRefuse(q,'No trip is running on this phone, so the camera is closed');continue}
    await lvAsk(q)}}
  catch(e){$('err').textContent='Live camera: '+(e.message||e)}
  LVB=false}
 function lvWatch(){clearInterval(LVP);LVP=setInterval(()=>{if(!document.hidden)lvAnswer()},4000);
  try{LVCH=sb.channel('lvq').on('postgres_changes',{event:'INSERT',schema:'public',table:'dms_live'},()=>lvAnswer()).subscribe()}catch(e){}}
 function lvOff(){clearInterval(LVP);LVP=0;if(LVCH){try{sb.removeChannel(LVCH)}catch(e){}LVCH=null}}
+// the orphan check, run once when this page comes up: with alerts off, a live view is
+// the only thing that ever opens the lens, so a service still running with no view on
+// this side is one left behind by a phone that was killed mid-watch
+async function lvReap(){if(!dmsHas()||LV||dmsOn())return;
+ try{const s=await CapPlugins.Dms.status();if(s&&s.running)await CapPlugins.Dms.stop()}catch(e){}}
 // the setup row for the lens: a build that cannot watch, or a phone that already
 // allowed it, has nothing left to say here. It never asks on its own: the driver
 // should decide when the camera starts being part of his app
