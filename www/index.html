@@ -69,6 +69,14 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
    tiles below it */
 .mcl{gap:4px}.mcl button{width:31px;height:31px;border-radius:8px;font-size:12px}}
 </style></head><body>
+<div id="wt" class="screen hide" style="text-align:center;padding-top:64px">
+<div class="lgname">Fleet Tracker</div>
+<p style="color:var(--mut);font-weight:600;margin:26px 0 0"><i class="fa-solid fa-circle-notch fa-spin"></i> Opening your last sign-in</p>
+<p style="color:var(--mut);margin:6px 0 0;font-size:12px">Nothing has to be typed. This only asks the server once whether the sign-in this phone kept is still valid.</p>
+<div class="foot">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</div></div>
+<!-- The form is the only screen not hidden in the markup: a page whose scripts never ran
+     still has to give the driver a way in. The last lines below hide it again the moment
+     the phone says a sign-in is worth opening. -->
 <div id="lg" class="screen" style="text-align:center;padding-top:40px">
 <div class="lgname">Fleet Tracker</div>
 <svg class="hero" viewBox="0 0 320 180" role="img" aria-label="A vehicle monitored along a safe, controlled route"><defs><linearGradient id="hsky" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e9f2fd"/><stop offset="1" stop-color="#e6f7ee"/></linearGradient><linearGradient id="hsh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3d8bf0"/><stop offset="1" stop-color="#1f5cbd"/></linearGradient></defs>
@@ -101,7 +109,7 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 <div class="card step" id="camcard"><i class="fa-solid fa-video"></i><div>Driver camera<br><small>Opens the forward lens on your own phone: while a trip is running it watches automatically if your fleet turns driver alerts on, and at any other time the video button on the map starts and stops it. Either way the phone looks at your face for tiredness, distraction or a phone in your hand and warns you. The judgement happens on this phone; only the warnings themselves are filed, and nothing goes anywhere without a signal.</small></div></div>
 <button class="btn o" id="camask" onclick="camAsk()"><i class="fa-solid fa-camera"></i>Allow the camera</button>
 <div class="card step"><i class="fa-solid fa-bell"></i><div>Alerts with the screen off<br><small>Keep Battery "Unrestricted" and notifications allowed: the buzzer and the voice are then produced by Android itself, so both work with the screen locked or another app open. Test them with the bell button once the trip has started. The speaker button at the top of the map silences every sound without losing the on-screen warning.</small></div></div>
-<button class="btn g" onclick="localStorage.perm='1';show('lg');init()"><i class="fa-solid fa-arrow-right"></i>Continue</button></div>
+<button class="btn g" onclick="pmGo()"><i class="fa-solid fa-arrow-right"></i>Continue</button></div>
 <div id="app" class="screen hide">
 <div class="top"><div><small>Welcome,</small> <b id="wn"></b><b>!</b></div><div><button class="ib hide" id="dash" onclick="openDash()" title="Open dashboard"><i class="fa-solid fa-chart-line"></i></button><button class="ib" onclick="testAlert()" title="Test the buzzer and the voice alert"><i class="fa-solid fa-bell"></i></button><button class="ib" onclick="pwUi()" title="Change password"><i class="fa-solid fa-key"></i></button><button class="ib" onclick="signOut()" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i></button></div></div>
 <div class="card id"><div class="av" style="width:38px;height:38px;font-size:17px"><i id="vi" class="fa-solid fa-car"></i></div><div><b id="vn"></b><br><small><i class="fa-solid fa-id-card"></i> <span id="dn"></span></small><br><select id="pk" class="hide" onchange="pickV()" style="margin-top:6px;max-width:190px"></select></div><span class="chip" id="stc">Parking</span></div>
@@ -166,7 +174,7 @@ const outCount=()=>new Promise(res=>{const s=outSt('readonly');
  try{const c=s.count();c.onsuccess=()=>res(c.result+MEMQ.length);c.onerror=()=>res(MEMQ.length)}catch(e){res(MEMQ.length)}});
 const mk=r=>supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storage:r?localStorage:sessionStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'implicit'}});
 try{if(!/^https:\/\/[a-z0-9]{15,30}\.supabase\.co$/.test(SUPABASE_URL)||!String(SUPABASE_KEY).startsWith('eyJ'))throw new Error('config.js has a wrong address or key');sb=mk(REM)}catch(e){$('err').textContent='Setup error: '+(e.message||e)}
-const show=s=>{['lg','pm','app'].forEach(x=>$(x).classList.toggle('hide',x!==s));if(s==='app'&&map)setTimeout(()=>map.invalidateSize(),100)};
+const show=s=>{['wt','lg','pm','app'].forEach(x=>$(x).classList.toggle('hide',x!==s));if(s==='app'&&map)setTimeout(()=>map.invalidateSize(),100)};
 function eye(){const i=$('pw');i.type=i.type==='password'?'text':'password';$('eyei').className='fa-solid '+(i.type==='password'?'fa-eye':'fa-eye-slash')}
 // ---- signing in with no signal. The server cannot be reached from a basement, a
 // tunnel or a dead spot, so the phone keeps its own way of checking the driver's
@@ -312,7 +320,11 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){sessStop()
  // coming back to the front: stop a tone whose deadline passed while we were away,
  // and push whatever the phone saved in the meantime - including the warnings the
  // driver camera raised while this page was frozen
- toneEnd();outUi();if(PEND)flush();maybeResume();dmsDrain()});
+ toneEnd();outUi();if(PEND)flush();maybeResume();dmsDrain();
+ // the pictures the camera kept for an event that went out without one, and the clips
+ // the fleet's retention window has just passed over - both only ever about this driver's
+ // own folder, which is the only one these rights reach
+ clipSweep();clipPrune()});
 addEventListener('pagehide',sessStop);
 // A driver with no signal still has to be able to open the app, start a trip and be
 // warned. The session may be unreadable offline, so the last identity the phone proved
@@ -343,7 +355,10 @@ async function init(fresh,who){
   // the lock is not named on the sign-in screen for simply opening the app - that
   // sentence belongs to the moment the driver presses Sign in - and the phone loses
   // its offline credential with it, so a lock cannot be signed around with no signal
-  if(g?g.locked:lockOn(a)){await sb.auth.signOut();localStorage.removeItem('offl');show('lg');$('err').textContent='';return}
+  if(g?g.locked:lockOn(a)){await sb.auth.signOut();localStorage.removeItem('offl');
+   // the sign-in is gone, so this phone has no identity any more - which is also what
+   // tells the opening screen to stop waiting and show the form
+   me=null;OFFL=false;show('lg');$('err').textContent='';return}
   if(a&&a.must_change)pwUi(1)}catch(e){}
  await outInit();
  await loadRules();
@@ -392,7 +407,22 @@ function lgHint(){const h=$('offh');if(h)h.classList.toggle('hide',navigator.onL
 // a queue that stops being written to still has to drain: the trip callback only
 // fires while the vehicle is moving
 setInterval(()=>{if(!document.hidden&&PEND&&!fl)flush()},60000);
-function enter(){show('app');initMap();showLast()}
+const pmOpen=()=>!$('pm').classList.contains('hide');
+// The sign-in this phone already holds is asked about while the Permissions card is still
+// on screen on a first run, and the map cannot be built behind a page that is not shown -
+// so the finished start waits here, and Continue hands the app over when the map has a
+// container that has a size. An old trip stays asleep until then, which is the same rule.
+let PARKD=false;
+function pmGo(){localStorage.perm='1';
+ if(PARKD){PARKD=false;showApp();if(!document.hidden)maybeResume();return}
+ show('lg')}
+function enter(){if(pmOpen()){PARKD=true;return}showApp()}
+// whether the app page has actually been painted. The sign-in the phone kept is
+// assigned before the queue and the rules are opened, so "there is no me" cannot be
+// used to tell a bad sign-in from a start that threw halfway through - and a start
+// that threw would otherwise leave the opening screen spinning for ever.
+let INAPP=false;
+function showApp(){PARKD=false;INAPP=true;show('app');initMap();showLast()}
 // ---- map
 let map,mrk,trail,tiles,follow=true,MI=0;
 const G=l=>'https://{s}.google.com/vt/lyrs='+l+'&x={x}&y={y}&z={z}',GS={subdomains:['mt0','mt1','mt2','mt3']};
@@ -756,8 +786,9 @@ async function dmsDrain(){if(!dmsHas())return;let items=null;
   // began; whoever is signed in now is what the events table must be filed against
   if(me)p.user_id=me.id;
   if(asg){p.vehicle_id=asg.vehicle_id;p.driver_id=asg.driver_id;p.vehicle_name=v.name||null;p.driver_name=d.name||null}
-  // a clip is a file on this phone, and the phase that uploads it is not built yet, so
-  // the name is dropped here rather than written into a column nothing can serve
+  // the video the camera wrote for this row is not carried here: it is a file on this
+  // phone named after the id above, and the queue picks it up by that id when the row it
+  // belongs to is sent - see clipFor()
   outAdd({t:'ev',p})}
  flush()}
 function dmsListen(){if(DMSL||!dmsHas())return;DMSL=true;
@@ -852,7 +883,14 @@ async function dwTog(){
  banner('<i class="fa-solid fa-video"></i> The forward camera is watching: tiredness, distraction, phone use and a blocked lens are now warned about and recorded on this phone',8000);
  // a lens that has not handed over a picture after a few seconds is a lens that is not
  // working, and the reason belongs on the screen now, not at the end of the shift
- setTimeout(()=>{if(!CAMW||CAMSEEN)return;CapPlugins.Dms.status().then(dmsSay).catch(()=>{})},5000)}
+ setTimeout(async()=>{if(!CAMW||CAMSEEN)return;let s=null;
+  try{s=await CapPlugins.Dms.status()}catch(e){}
+  // pressing this button just after pressing stop can reach the service that is still on
+  // its way out, and that one drops the ask rather than opening a lens into a service
+  // that is closing. A status that says nothing is running is that case: ask once more,
+  // which reaches the service that has taken its place.
+  if(s&&!s.running){try{await CapPlugins.Dms.start()}catch(e){}return}
+  dmsSay(s)},5000)}
 // a phone Android restarted has no memory of a watch this page started: the service can
 // still be holding the lens with nothing on this side asking for it. With the fleet's own
 // switch off and the driver's own button not pressed, that is a lens to close.
@@ -955,13 +993,86 @@ const uid=()=>{try{if(crypto.randomUUID)return crypto.randomUUID()}catch(e){}
  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=(crypto.getRandomValues(new Uint8Array(1))[0]||Math.random()*256)%16;
   return (c==='x'?r:(r&3|8)).toString(16)})};
 let PEND=0,OFFL=false,lastTry=0;
+// ---- the short video an alert left behind
+// The camera writes a few seconds of picture around the alert and keeps it on this phone,
+// named after the event that asked for it. This is the only way it ever leaves: the page
+// is the one thing in this app holding a session, so the file goes to the fleet's own
+// Supabase Storage - no new service, no new key, nothing paid for twice - and the row
+// keeps the path in the column v19 reserved for it. Nobody else can read that folder and
+// the database says so: the rights on the file are the rights on the event.
+const CLIPB='dms-clips';
+// One clip onto the server, answered with the path its row should carry. Empty answers
+// mean an event with no picture, never an event lost: a clip that will not go is only a
+// clip nobody watches, and the trip carries on regardless.
+async function clipPut(cid){
+ if(!cid||!dmsHas()||!me||!sb||!navigator.onLine)return '';
+ const p=String(me.id)+'/'+cid+'.mp4';
+ try{
+  const d=await CapPlugins.Dms.clipData({cid});
+  if(!d||d.missing||!d.b64)return '';
+  const u8=Uint8Array.from(atob(d.b64),c=>c.charCodeAt(0));
+  // no upsert: replacing an object the server already holds asks for rights a clip does
+  // not need. A path already taken is this same picture from an earlier attempt at sending
+  // this row, which is the file being where it belongs rather than a failure.
+  const {error}=await q(sb.storage.from(CLIPB).upload(p,u8,{contentType:'video/mp4'}));
+  if(error&&!/already exists/i.test(String(error.message||'')))return '';
+  // the server has it, so the handset has nothing left to carry: this is what keeps the
+  // phone's own folder inside the days the Configuration page set
+  try{const x=CapPlugins.Dms.clipDrop({cid});if(x&&x.catch)x.catch(()=>{})}catch(e){}
+  return p;
+ }catch(e){return ''}
+}
+// Attach a clip to a row on its way out. A picture is finished about a second after the
+// alert that made it, so an event normally carries its path when it is born; a closing
+// update takes the one that was not ready yet, which is the last moment this phone is
+// allowed to touch its own row at all.
+async function clipFor(cid,p){
+ if(!p||p.clip_path||DMS.indexOf(p.type)<0)return;
+ const path=await clipPut(cid);
+ if(path)p.clip_path=path;
+}
+// The pictures still on this phone that belong to a row already sent: an app that died
+// mid-clip, a trip that ended before the queue got there. Only a row that is still open
+// can be named, because that is the only update the events policy lets this account make.
+async function clipSweep(){
+ if(!dmsHas()||!me||!sb||!navigator.onLine)return;
+ let cids=[];try{const r=await CapPlugins.Dms.clips();cids=(r&&r.cids)||[]}catch(e){return}
+ if(!cids.length)return;
+ for(let i=0;i<cids.length;i+=80){
+  const part=cids.slice(i,i+80);
+  const {data,error}=await q(sb.from('events').select('cid,clip_path,ended_at').in('cid',part));
+  if(error||!data)continue;
+  for(const r of data){
+   if(r.clip_path||r.ended_at)continue;
+   const path=await clipPut(r.cid);
+   if(!path)continue;
+   await q(sb.from('events').update({clip_path:path}).eq('cid',r.cid));
+  }
+ }
+}
+// The retention days the Configuration page sets for the phone's clips are the same window
+// on the server, and this handset is the thing that notices a day has gone by. A bucket
+// folder nobody can reach but its own driver is what makes that safe to do on his own.
+let PRUNED=false;
+async function clipPrune(){
+ if(PRUNED||!me||!sb||!navigator.onLine)return;
+ PRUNED=true;
+ const keep=Math.max(1,+V.dms_keep_d||7);
+ try{
+  const {data}=await q(sb.storage.from(CLIPB).list(String(me.id),{limit:1000}));
+  const old=(data||[]).filter(o=>o&&o.name&&o.name.endsWith('.mp4')&&
+    Date.now()-new Date(o.created_at||0).getTime()>keep*864e5).map(o=>String(me.id)+'/'+o.name);
+  if(old.length)await q(sb.storage.from(CLIPB).remove(old));
+ }catch(e){}
+}
 // send one queued item; answers true when the server took it
 async function outSend(r){const v=r.v;
  if(v.t==='pos'){const {error}=await q(sb.from('positions').insert(v.p));return {ok:!error,error}}
- if(v.t==='ev'){const {error}=await q(sb.from('events').insert(v.p));return {ok:!error,error}}
+ if(v.t==='ev'){await clipFor(v.p.cid,v.p);const {error}=await q(sb.from('events').insert(v.p));return {ok:!error,error}}
  // a close the server refuses must not hold the whole queue behind it
  // the row is found by the name the phone gave it, because that is the only id it
  // knows while it is offline; a refused close must not hold the queue behind it
+ await clipFor(v.id,v.p);
  const {error}=await q(sb.from('events').update(v.p).eq('cid',v.id));return {ok:true,error:error&&error.message&&('Event end not saved: '+error.message)}}
 async function flush(){if(fl||!me)return;fl=true;
  try{let after=0,rounds=0,stop=false,why='';
@@ -1217,6 +1328,22 @@ if('serviceWorker'in navigator&&/^https?:$/.test(location.protocol))addEventList
  try{navigator.serviceWorker.register('sw.js',{scope:'./'}).catch(()=>{})}catch(e){}});
 lgHint();
 if(localStorage.user){$('em').value=localStorage.user;$('rem').checked=true}
-if(localStorage.perm!=='1'){show('pm');camPermUi()}
-init();
+// A sign-in this phone can still open with: the one Supabase left in the store "Remember
+// me" writes to, or - with no signal at all - the identity this handset last proved.
+const hasWho=()=>{try{const s=REM?localStorage:sessionStorage;
+ if(Object.keys(s).some(k=>/^sb-.+-auth-token$/.test(k)&&String(s[k]||'').length>40))return true}catch(e){}
+ return !navigator.onLine&&!!cachedWho()};
+if(localStorage.perm!=='1'){show('pm');camPermUi()}else show(hasWho()?'wt':'lg');
+// A driver who signed in before has nothing to type, so he must not be shown an empty form
+// while the phone asks the server about the sign-in it kept. The opening screen stays up
+// until that answer arrives: the app when the sign-in is still good, the form only when it
+// is not - and never a form that fills itself in a few seconds later, which is what made a
+// remembered sign-in look like somebody else opening the account.
+function settle(){if(INAPP||pmOpen())return;
+ // the sign-in is there but the start could not finish (the queue would not open, the
+ // settings did not come back): the driver still has his account, so he gets the app
+ // and the reason on the alert - not an empty form that invites him to sign in again
+ if(me){showApp();banner('<i class="fa-solid fa-triangle-exclamation"></i> The app opened, but getting ready did not finish. Close it and open it again, or tell the administrator.',9000)}
+ else show('lg')}
+init().catch(()=>{}).then(settle);
 </script></body></html>
