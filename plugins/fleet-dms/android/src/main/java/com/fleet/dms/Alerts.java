@@ -47,9 +47,11 @@ class Alerts {
     private static final String CH_QUIET = CH_PREFIX + "quiet";
     private static final String CH_TRIP = CH_PREFIX + "trip";
 
-    /** The four rules, named the way the event rows are named. */
+    /** The nine rules, named the way the event rows are named. */
     static final String FATIGUE = "dms_fatigue", DISTRACTED = "dms_distraction",
-            PHONE = "dms_phone_use", BLOCKED = "dms_cam_blocked";
+            PHONE = "dms_phone_use", BLOCKED = "dms_cam_blocked", YAWN = "dms_yawning",
+            TALK = "dms_talking", EAT = "dms_eating", DRINK = "dms_drinking",
+            SMOKE = "dms_smoking";
 
     private static final Map<String, String> FALLBACK = new HashMap<>();
     static {
@@ -57,6 +59,11 @@ class Alerts {
         FALLBACK.put(DISTRACTED, "Please keep your eyes on the road.");
         FALLBACK.put(PHONE, "Please do not use a phone while driving.");
         FALLBACK.put(BLOCKED, "The driver camera is covered. Keep the view clear.");
+        FALLBACK.put(YAWN, "You are yawning. Please take a break.");
+        FALLBACK.put(TALK, "Please keep conversations short while driving.");
+        FALLBACK.put(EAT, "Please do not eat while driving.");
+        FALLBACK.put(DRINK, "Please do not drink while driving.");
+        FALLBACK.put(SMOKE, "Please keep your hands on the wheel.");
     }
 
     private final Context ctx;
@@ -221,10 +228,16 @@ class Alerts {
         }
     }
 
+    /** The headline of the notice. The body already says what was measured. */
     private String title(String type) {
         if (type.equals(FATIGUE)) return "Driver fatigued";
         if (type.equals(DISTRACTED)) return "Driver distracted";
         if (type.equals(PHONE)) return "Phone in hand";
+        if (type.equals(YAWN)) return "Driver yawning";
+        if (type.equals(TALK)) return "Talking while driving";
+        if (type.equals(EAT)) return "Eating while driving";
+        if (type.equals(DRINK)) return "Drinking while driving";
+        if (type.equals(SMOKE)) return "Hand at the mouth";
         return "Camera blocked";
     }
 

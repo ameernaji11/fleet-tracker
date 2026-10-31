@@ -21,7 +21,14 @@ import java.util.Map;
 public class Config {
 
     static final String PREFS = "fleet.dms";
-    static final String[] TYPES = {"dms_fatigue", "dms_distraction", "dms_phone_use", "dms_cam_blocked"};
+    /**
+     * The nine rules of the driver camera, in the order the Configuration page lists
+     * them. A type the page sends that is not in this list is a vehicle rule, and this
+     * plugin has nothing to say about it.
+     */
+    static final String[] TYPES = {"dms_fatigue", "dms_distraction", "dms_phone_use",
+            "dms_yawning", "dms_talking", "dms_eating", "dms_drinking", "dms_smoking",
+            "dms_cam_blocked"};
     private static final List<String> TYPES_LIST = new ArrayList<>();
     static { for (String t : TYPES) TYPES_LIST.add(t); }
 
@@ -130,13 +137,13 @@ public class Config {
                 JSONObject r = rs.optJSONObject(i);
                 if (r == null) continue;
                 String type = r.optString("type", "");
-                // only the four face rules are this plugin's business; the vehicle rules
+                // only the face rules are this plugin's business; the vehicle rules
                 // arrive in the same list and are ignored here on purpose
                 if (!TYPES_LIST.contains(type)) continue;
                 fresh.put(type, Rule.of(type, r));
             }
             // a rule the page did not send keeps whatever it had, so a phone that is
-            // offline and reading its own saved copy still has all four armed
+            // offline and reading its own saved copy still has all nine armed
             for (String t : TYPES) if (!fresh.containsKey(t) && c.rules.containsKey(t)) fresh.put(t, c.rules.get(t));
             c.rules.clear();
             c.rules.putAll(fresh);
