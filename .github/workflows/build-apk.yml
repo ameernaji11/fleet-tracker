@@ -116,23 +116,29 @@ jobs:
           done
           [ "$(ls www/vendor/fa/webfonts/*.woff2 2>/dev/null | wc -l)" -ge 3 ] || { echo "::error::no icon fonts in www/vendor/fa/webfonts - the buttons would render as empty boxes."; exit 1; }
           ls -l www/vendor www/vendor/fa/css www/vendor/fa/webfonts
-      # The driver's face is read on the handset, so the model that reads it travels
+      # The driver's face is read on the handset, so the models that read it travel
       # inside the APK: a driver in a dead spot cannot download one, and nothing about
-      # his eyes ever leaves the phone. It is fetched at build time rather than kept in
-      # git because it is a few megabytes of binary nobody can review, and the URL below
-      # is a version-pinned copy of it (float16/1).
-      - name: Fetch the driver-camera model
+      # his eyes or what he is holding ever leaves the phone. They are fetched at build
+      # time rather than kept in git because they are megabytes of binary nobody can
+      # review, and the URLs below are version-pinned copies (float16/1 and int8/1).
+      # The second one is the object model that names a phone, a cup or a piece of food
+      # in front of the driver, which no face model can tell the difference between.
+      - name: Fetch the driver-camera models
         run: |
-          trap 'echo "::error::the face model for the driver camera was not fetched (failing line $LINENO)"; exit 1' ERR
+          trap 'echo "::error::a driver-camera model was not fetched (failing line $LINENO)"; exit 1' ERR
           A=plugins/fleet-dms/android/src/main/assets
           mkdir -p "$A"
           curl -fsSL --retry 3 -o "$A/face_landmarker.task" \
             https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
+          curl -fsSL --retry 3 -o "$A/efficientdet_lite0.tflite" \
+            https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/int8/1/efficientdet_lite0.tflite
           # A half-downloaded file builds into an APK that quietly has no eyes for the
           # whole trip, which is a long way to find out about a bad mirror.
           SZ=$(stat -c %s "$A/face_landmarker.task")
           [ "$SZ" -gt 3000000 ] || { echo "::error::face_landmarker.task is only $SZ bytes - the download did not finish."; exit 1; }
-          echo "Driver-camera model ready: $SZ bytes."
+          SZ2=$(stat -c %s "$A/efficientdet_lite0.tflite")
+          [ "$SZ2" -gt 4000000 ] || { echo "::error::efficientdet_lite0.tflite is only $SZ2 bytes - the download did not finish."; exit 1; }
+          echo "Driver-camera models ready: face $SZ bytes, objects $SZ2 bytes."
       - name: Create the Android project
         run: |
           trap 'echo "::error::the Android project could not be created (failing line $LINENO)"; exit 1' ERR
