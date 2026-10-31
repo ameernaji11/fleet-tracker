@@ -1,5 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://geocode.arcgis.com https://photon.komoot.io https://nominatim.openstreetmap.org https://api.bigdatacloud.net; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self' https://*.supabase.co; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://geocode.arcgis.com https://photon.komoot.io https://nominatim.openstreetmap.org https://api.bigdatacloud.net; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="referrer" content="no-referrer">
 <title>Fleet Tracker</title>
@@ -107,7 +107,7 @@ td select{height:36px}#evt,#rep,#trip,#cfg,#hist{height:auto;min-height:100%}.cg
 .mk.pl{width:18px;height:18px;border-width:2px;font-size:8px;background:var(--or)}
 .leaflet-tooltip.pltip{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;box-shadow:0 1px 6px #0003;padding:3px 8px;font-weight:700;font-size:11px;line-height:1.3;white-space:nowrap}
 .leaflet-tooltip.pltip::before{display:none}
-#login{margin:auto;width:340px;padding:28px;display:flex;flex-direction:column;gap:14px;text-align:center}.lgname{font-weight:900;font-size:22px;letter-spacing:.2px}
+#login,#wt{margin:auto;width:340px;padding:28px;display:flex;flex-direction:column;gap:14px;text-align:center}.lgname{font-weight:900;font-size:22px;letter-spacing:.2px}
 .err{color:var(--rd);min-height:18px;margin:0;font-weight:600}
 .zgo{background:none;border:0;padding:0;color:var(--bl);cursor:pointer;text-align:left;text-decoration:underline}
 #toast{position:fixed;z-index:4100;bottom:20px;left:50%;transform:translateX(-50%);padding:10px 18px;border-radius:10px;color:#fff;font-weight:700;opacity:0;pointer-events:none;transition:opacity .2s}#toast.show{opacity:1}#toast.ok{background:var(--gr)}#toast.bad{background:var(--rd)}
@@ -196,6 +196,9 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 @media(max-width:1000px){.hwrap{grid-template-columns:1fr;grid-template-rows:auto auto}.hwrap .map{position:static;height:360px}}
 @media print{aside,header,.fgrid,.pbar,.pt,.tbar,.mt,#toast,.btn,.pagefoot{display:none!important}body,#app,.wrap,main{display:block!important;height:auto!important;overflow:visible!important}section{display:none!important}section.on{display:flex!important;height:auto!important}.cgrid{grid-template-columns:1fr 1fr}.printheader{display:block!important}}
 </style></head><body>
+<div id="wt" class="card hide"><div class="lgname">Fleet Tracker</div>
+<p style="font-weight:600;color:var(--mut);margin:0"><i class="fa-solid fa-circle-notch fa-spin"></i> Opening your last sign-in</p>
+<p style="font-size:12px;color:var(--mut);margin:0">Nothing has to be typed. This only asks the server once whether the sign-in this browser kept is still valid.</p></div>
 <div id="login" class="card"><div class="lgname">Fleet Tracker</div>
 <svg class="hero" viewBox="0 0 320 180" role="img" aria-label="A vehicle monitored along a safe, controlled route"><defs><linearGradient id="hsky" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e9f2fd"/><stop offset="1" stop-color="#e6f7ee"/></linearGradient><linearGradient id="hsh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3d8bf0"/><stop offset="1" stop-color="#1f5cbd"/></linearGradient></defs>
 <rect width="320" height="180" rx="18" fill="url(#hsky)"/>
@@ -343,6 +346,14 @@ const showErr=m=>{const s=('Error: '+((m&&m.message)||m)).slice(0,300),app=docum
  else{const l=document.getElementById('lerr');if(l)l.textContent=s}};
 window.onerror=(m,s,l)=>showErr(m+' (line '+l+')');
 window.addEventListener('unhandledrejection',e=>showErr(e.reason&&e.reason.message||e.reason));
+// The form is the only card left visible in the markup, so a page whose libraries never
+// load still has a way in. Because of that, the opening screen has to be chosen here -
+// before one file is fetched - otherwise a person who signed in before would see the
+// empty form while the libraries below were still downloading.
+const hasWho=()=>{try{if(/access_token=|refresh_token=/.test(location.hash))return true;
+ const s=localStorage.rem!=='0'?localStorage:sessionStorage;
+ return Object.keys(s).some(k=>/^sb-.+-auth-token$/.test(k)&&String(s[k]||'').length>40)}catch(e){return false}};
+if(hasWho()){document.getElementById('login').classList.add('hide');document.getElementById('wt').classList.remove('hide')}
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous" integrity="sha384-NElt3Op+9NBMCYaef5HxeJmU4Xeard/Lku8ek6hoPTvYkQPh3zLIrJP7KiRocsxO"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" crossorigin="anonymous" integrity="sha384-bs/nf9FbdNouRbMiFcrcZfLXYPKiPaGVGplVbv7dLGECccEXDW+S3zjqSKR5ZEaD"></script>
@@ -817,6 +828,12 @@ async function keepAlive(){try{const {data:{session}}=await sb.auth.getSession()
   // fail from here on, so say it once instead of letting each report show its own
   if(!session&&UID){toast('Your session ended. Sign in again to keep watching the fleet.',0);clearInterval(KA);KA=null}}catch(e){}}
 async function boot(fresh){
+ // the wait screen belongs to this function, not to whoever called it: whatever happens -
+ // no session, a lock, or a page that fails halfway - the driver or the administrator ends
+ // up on the sign-in form rather than looking for ever at a spinner that will not answer
+ try{await startApp(fresh)}
+ finally{if(!UID){$('wt').classList.add('hide');$('login').classList.remove('hide')}}}
+async function startApp(fresh){
  const {data:{session}}=await sb.auth.getSession();
  // the driver app hands its session over in the URL fragment. Supabase has read it
  // by now, so remove it from the address bar, the history and the referrer at once:
@@ -832,14 +849,14 @@ async function boot(fresh){
  let {data:p}=await sb.from('profiles').select('role,fails,locked_at,locked_until,must_change').eq('id',session.user.id).single();
  if(!p)p=(await sb.from('profiles').select('role,fails,locked_at,must_change').eq('id',session.user.id).single()).data;
  // a lock set while this tab was already open steps straight back out: a lockout
-// expires on its own, but an administrator's Lock is his decision, not something a page
-// left open all day rides through.
-// It says nothing about the lock on the sign-in screen - that sentence belongs to the
-// moment the person actually tries to sign in, not to simply opening the page.
+ // expires on its own, but an administrator's Lock is his decision, not something a
+ // page left open all day rides through.
+ // It says nothing about the lock on the sign-in screen - that sentence belongs to the
+ // moment the person actually tries to sign in, not to simply opening the page.
  if(lockOn(p)){await sb.auth.signOut();clearInterval(KA);KA=null;$('login').classList.remove('hide');
   $('lerr').textContent='';return}
  ADMIN=p?.role==='admin';UID=session.user.id;document.body.classList.toggle('usr',!ADMIN);
- $('login').classList.add('hide');$('app').classList.remove('hide');UNAME=(session.user.email||'').replace('@fleet.local','');$('me').textContent=UNAME;$('accWho').textContent='Welcome, '+UNAME+'!';if(localStorage.pin==='1')document.querySelector('aside').classList.add('pin');pinBtn();themeBtn();
+ $('login').classList.add('hide');$('wt').classList.add('hide');$('app').classList.remove('hide');UNAME=(session.user.email||'').replace('@fleet.local','');$('me').textContent=UNAME;$('accWho').textContent='Welcome, '+UNAME+'!';if(localStorage.pin==='1')document.querySelector('aside').classList.add('pin');pinBtn();themeBtn();
  // a password the administrator typed for somebody else is only ever temporary:
  // signing in with it opens the change box, and the box has no Cancel button
  if(p?.must_change){pwForm(1);toast('That password was set for you. Choose your own before anything else.',0)}
@@ -1207,7 +1224,7 @@ const evIcon=t=>L.divIcon({className:'',html:`<div class="mk sm" style="backgrou
 const evDur=x=>x.ended_at?(new Date(x.ended_at)-new Date(x.recorded_at))/1000:null;
 function evPop(x){const E=EVX(x.type),d=evDur(x),n=(a,u)=>a!=null&&a!==''?a+u:'-',
  val=x.type==='harsh_braking'||x.type==='harsh_acceleration'?`<br><i class="fa-solid fa-gauge"></i> ${(+x.value||0).toFixed(1)} km/h/s`:'';
- return `<div style="min-width:240px"><b style="font-size:15px;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</b>${HR}
+ return `<div style="min-width:240px"><b style="font-size:15px;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</b>${evClipBtn(x)}${HR}
  <i class="fa-solid fa-car"></i> <b>${esc(x.vehicle_name||'-')}</b><br><i class="fa-solid fa-id-card"></i> ${esc(x.driver_name||'-')}<br>
  <i class="fa-regular fa-clock"></i> ${new Date(x.recorded_at).toLocaleString()}${x.ended_at?'<br><i class="fa-regular fa-clock"></i> Ended '+new Date(x.ended_at).toLocaleTimeString()+' · <b>'+hms(d)+'</b>':''}<br>
  <i class="fa-solid fa-gauge-high"></i> ${Math.round(x.speed||0)} km/h${x.road_limit?' · limit '+x.road_limit+' km/h':''}${val}${x.details?'<br>'+esc(x.details):''}${HR}
@@ -1245,6 +1262,24 @@ function evReset(){EVF={};Object.keys(EVTB).forEach(id=>{const el=$(id);if(!el)r
  el.querySelectorAll('input.it').forEach(i=>i.checked=false);msLbl(id)});loadEvt()}
 function evSet(k,val){EVF[k]=EVF[k]===val?undefined:val;renderEvt()}
 const dayOf=r=>new Date(r.recorded_at).toLocaleDateString('en-CA');
+// The few seconds of picture the driver's camera wrote around an alert. The file sits in
+// that driver's own folder in this project's own Storage, and the database lets a clip be
+// read only by somebody who can already read the event it belongs to - so what opens here
+// is a link minted by the viewer's own session, good for five minutes, and a path that
+// names nothing on its own. The path is carried in a data attribute rather than in a click
+// handler, because it is a string a handset wrote.
+const CLIPB='dms-clips';
+const evClipBtn=x=>x&&x.clip_path?` <button class="btn gh sm" data-clip="${esc(x.clip_path)}" title="Watch the seconds the driver camera recorded around this event"><i class="fa-solid fa-video"></i></button>`:'';
+async function evClip(path){const m=$('modal'),box=h=>`<div class="card" style="max-width:min(600px,100%)"><div class="dlgT"><i class="fa-solid fa-video"></i> Driver camera clip</div>${h}</div>`;
+ m.innerHTML=box('<p>Loading the recording…</p>');m.classList.add('on');
+ const {data,error}=await sb.storage.from(CLIPB).createSignedUrl(path,300);
+ if(error||!data){m.innerHTML=box('<p>This event has no recording on the server, or your account may not open it: '+esc(error&&error.message||'no answer from the server')+'</p>');return}
+ // muted so it starts by itself: a driver who has to press play first has already missed
+ // the second that raised the alert, and these clips carry no sound anyway
+ m.innerHTML=box(`<video src="${data.signedUrl}" controls autoplay muted playsinline preload="metadata" style="width:100%;max-height:60vh;border-radius:10px;background:#000"></video><div class="dlgB"><button class="btn gh sm" onclick="$('modal').classList.remove('on')"><i class="fa-solid fa-xmark"></i>Close</button></div>`);
+}
+document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('[data-clip]');
+ if(b&&b.dataset.clip)evClip(b.dataset.clip)});
 function renderEvt(){
  const fx=r=>(!EVF.driver||(r.driver_name||'-')===EVF.driver)&&(!EVF.day||dayOf(r)===EVF.day),base=EVR.filter(fx),rows=base.filter(r=>!EVF.type||r.type===EVF.type),ty=cnt(rows,r=>r.type),K=Object.keys(EV);
  const tb=evTb(),ch=Object.entries(EVF).filter(x=>x[1]).map(x=>`<span class="chip chipB">${x[0]}: ${esc(x[0]==='type'?EVX(x[1])[0]:x[1])}</span>`).join(' ');
@@ -1260,7 +1295,7 @@ function renderEvt(){
  // only the two acceleration events hold a km/h/s reading; every other row keeps
  // the speed it breached in the Speed column, so this column has to stay empty
  const acc=r=>(r.type==='harsh_braking'||r.type==='harsh_acceleration')?(+r.value).toFixed(1):'-';
- $('evT').innerHTML=`<table><tr><th>Event Start</th><th>Event End</th><th>Duration</th><th>Vehicle</th><th>Driver</th><th>Event</th><th>Speed (km/h)</th><th>Acceleration / Deceleration (km/h/s)</th><th>Details</th><th>Location</th></tr>${rows.slice(0,1000).map(r=>{const E=EVX(r.type),d=evDur(r);return `<tr><td>${new Date(r.recorded_at).toLocaleString()}</td><td>${r.ended_at?new Date(r.ended_at).toLocaleString():'-'}</td><td class="nw">${d==null?'-':hms(d)}</td><td>${esc(r.vehicle_name)}</td><td>${esc(r.driver_name)}</td><td><span class="chip" style="background:${E[2]}22;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</span></td><td>${Math.round(r.speed||0)}</td><td>${acc(r)}</td><td>${esc(r.details||'-')}</td><td><a href="#" onclick="goHist('${r.vehicle_id}','${r.recorded_at}',${r.lat},${r.lng});return false"><i class="fa-solid fa-map-location-dot"></i> ${(+r.lat).toFixed(5)}, ${(+r.lng).toFixed(5)}</a></td></tr>`}).join('')||'<tr><td colspan="10" class="empty">No events in this period.</td></tr>'}</table>`;tools($('evT'))}
+ $('evT').innerHTML=`<table><tr><th>Event Start</th><th>Event End</th><th>Duration</th><th>Vehicle</th><th>Driver</th><th>Event</th><th>Speed (km/h)</th><th>Acceleration / Deceleration (km/h/s)</th><th>Details</th><th>Location</th></tr>${rows.slice(0,1000).map(r=>{const E=EVX(r.type),d=evDur(r);return `<tr><td>${new Date(r.recorded_at).toLocaleString()}</td><td>${r.ended_at?new Date(r.ended_at).toLocaleString():'-'}</td><td class="nw">${d==null?'-':hms(d)}</td><td>${esc(r.vehicle_name)}</td><td>${esc(r.driver_name)}</td><td><span class="chip" style="background:${E[2]}22;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</span>${evClipBtn(r)}</td><td>${Math.round(r.speed||0)}</td><td>${acc(r)}</td><td>${esc(r.details||'-')}</td><td><a href="#" onclick="goHist('${r.vehicle_id}','${r.recorded_at}',${r.lat},${r.lng});return false"><i class="fa-solid fa-map-location-dot"></i> ${(+r.lat).toFixed(5)}, ${(+r.lng).toFixed(5)}</a></td></tr>`}).join('')||'<tr><td colspan="10" class="empty">No events in this period.</td></tr>'}</table>`;tools($('evT'))}
 async function goHist(vid,iso,lat,lng){document.querySelector('.nb[data-t=hist]').click();$('hv').value=vid;const t=new Date(iso).getTime();$('hf')._flatpickr.setDate(new Date(t-9e5),true);$('ht')._flatpickr.setDate(new Date(t+9e5),true);await loadHist(1);mapH.setView([lat,lng],17)}
 async function loadRep(){fSave('rep');
  const F=new Date($('rp_f').value),T=new Date($('rp_t').value);
@@ -1738,7 +1773,11 @@ function panels(sec){const g=document.querySelector('#'+sec+' .cgrid');if(!g)ret
  try{const L=JSON.parse(localStorage[key]||'{}');(L.o||[]).forEach(id=>{const c=g.querySelector(`[data-id="${id}"]`);c&&g.appendChild(c)});(L.h||[]).forEach(id=>g.querySelector(`[data-id="${id}"]`)?.classList.add('hide'))}catch(e){}
  draw()}
 if(localStorage.user){$('em').value=localStorage.user;$('rem').checked=true}
-boot();
+// A person who was signed in before is not shown an empty form while the page asks the
+// server about the sign-in the browser kept: the form only appears when that answer says
+// there is nothing to open - and the opening screen was already chosen before the libraries
+// were fetched. Signing in by hand keeps its own "Signing in..." button.
+boot().catch(e=>{if(!UID)toast('The page could not start: '+(e&&e.message||e))});
 // the driver app hands a session over in the URL fragment; once Supabase has read it, keep it out of the address bar and browser history
 
 </script></body></html>
