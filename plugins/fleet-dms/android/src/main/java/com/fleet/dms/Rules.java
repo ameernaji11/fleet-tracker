@@ -33,11 +33,22 @@ class Rules {
     // The share of the lower face that has to be covered before the object in front of
     // it is treated as the reason the face disappeared.
     private static final double COVER_OWN = 35;
+    // How long a rule may see nothing wrong before its breach is written off. The
+    // camera is looked at five times a second and a reading is a measurement of one
+    // picture, so a head turned away for the whole tolerance can give one clean frame
+    // in the middle of it - and a breach that starts again from nothing on every such
+    // frame never reaches its tolerance however long the driver keeps it up. This is
+    // the window that survives that flicker; it is not long enough to let a driver
+    // who really has recovered keep an event open.
+    private static final long GAP_MS = 1200;
 
     /** The open breach of one rule, and the id its row and its clip will share. */
     private static class Br {
         String cid;
         long start;
+        long acc;      // the time actually spent out of bounds, gaps left out
+        long last;     // the last frame that counted towards acc
+        long gapAt;    // when the reading first came back inside the limit, 0 while out
         double peak;
         int why;
         boolean row;
@@ -113,6 +124,7 @@ class Rules {
         if (b == null) {
             b = new Br();
             b.start = now;
+            b.last = now;
             b.peak = val;
             b.why = why;
             open.put(type, b);
@@ -130,12 +142,26 @@ class Rules {
             b.peak = val;
             b.why = why;
         }
-        if (!b.row && (now - b.start) / 1000.0 >= rule.holdS) write(type, rule, b, now);
+        // The time spent back inside the limit is never added to the breach: a frame
+        // that returns from a quiet stretch only starts counting again from itself.
+        if (b.gapAt != 0) b.gapAt = 0;
+        else b.acc += Math.max(0, now - b.last);
+        b.last = now;
+        if (!b.row && b.acc / 1000.0 >= rule.holdS) write(type, rule, b, now);
     }
 
     private void recover(String type, Config.Rule rule, long now) {
-        Br b = open.remove(type);
-        if (b != null && b.row) close(type, rule, b, now);
+        Br b = open.get(type);
+        if (b == null) return;
+        if (b.gapAt == 0) {
+            b.gapAt = now;
+            return;
+        }
+        if (now - b.gapAt < GAP_MS) return;
+        // longer than a flicker of the same reading: the episode is over, and its row
+        // closes at the last frame that was actually out of bounds
+        open.remove(type);
+        if (b.row) close(type, rule, b, Math.max(b.last, b.start));
     }
 
     /**

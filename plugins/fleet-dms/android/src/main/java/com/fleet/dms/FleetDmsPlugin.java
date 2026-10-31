@@ -67,6 +67,24 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
         DmsService.setHost(this);
     }
 
+    /**
+     * Run one of the page's commands where nothing can escape.
+     *
+     * Capacitor takes an exception that leaves a plugin method and rethrows it on its
+     * own thread, where it is uncaught and the whole app goes down with it. The camera
+     * service, the queue on disk and the settings file are all things a phone can refuse
+     * at a moment's notice, so each command is run inside this: the page gets a rejection
+     * it can put on the screen, and the app stays open to be told why.
+     */
+    private void safe(PluginCall call, Runnable work) {
+        try {
+            work.run();
+        } catch (Throwable t) {
+            Logger.error("fleet-dms: " + name(t), t);
+            call.reject(name(t));
+        }
+    }
+
     // ---- the page's commands
 
     /**
@@ -76,50 +94,56 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
      */
     @PluginMethod
     public void start(PluginCall call) {
-        // A new trip opens the box the way the dashboard has it set; the driver's own
-        // button then changes it for the rest of that trip.
-        wantBox = Config.load(getContext()).preview;
-        if (getPermissionState(CAMERA) != PermissionState.GRANTED) {
-            requestPermissionForAlias(CAMERA, call, "cameraResult");
-            return;
-        }
-        launch();
-        JSObject r = new JSObject();
-        r.put("granted", true);
-        r.put("running", DmsService.get() != null);
-        r.put("preview", wantBox);
-        call.resolve(r);
+        safe(call, () -> {
+            // A new trip opens the box the way the dashboard has it set; the driver's own
+            // button then changes it for the rest of that trip.
+            wantBox = Config.load(getContext()).preview;
+            if (getPermissionState(CAMERA) != PermissionState.GRANTED) {
+                requestPermissionForAlias(CAMERA, call, "cameraResult");
+                return;
+            }
+            launch();
+            JSObject r = new JSObject();
+            r.put("granted", true);
+            r.put("running", DmsService.get() != null);
+            r.put("preview", wantBox);
+            call.resolve(r);
+        });
     }
 
     /** Android's answer to the camera prompt, which the driver may have refused. */
     @PermissionCallback
     private void cameraResult(PluginCall call) {
-        boolean granted = getPermissionState(CAMERA) == PermissionState.GRANTED;
-        if (granted) launch();
-        JSObject r = new JSObject();
-        r.put("granted", granted);
-        call.resolve(r);
+        safe(call, () -> {
+            boolean granted = getPermissionState(CAMERA) == PermissionState.GRANTED;
+            if (granted) launch();
+            JSObject r = new JSObject();
+            r.put("granted", granted);
+            call.resolve(r);
+        });
     }
 
     /** End the trip's watch: the lens goes back to whoever wants it. */
     @PluginMethod
     public void stop(PluginCall call) {
-        wantBox = false;
-        DmsService s = DmsService.get();
-        if (s == null) {
-            // nothing holds the camera, but the flag that tells Android to bring the
-            // service back by itself still has to be cleared
-            DmsService.tripSet(getContext(), false);
-        } else {
-            Intent i = new Intent(getContext(), DmsService.class);
-            i.setAction(DmsService.ACTION_STOP);
-            try {
-                getContext().startService(i);
-            } catch (Exception ignore) {
-                // a service that refuses the stop is being taken down anyway
+        safe(call, () -> {
+            wantBox = false;
+            DmsService s = DmsService.get();
+            if (s == null) {
+                // nothing holds the camera, but the flag that tells Android to bring the
+                // service back by itself still has to be cleared
+                DmsService.tripSet(getContext(), false);
+            } else {
+                Intent i = new Intent(getContext(), DmsService.class);
+                i.setAction(DmsService.ACTION_STOP);
+                try {
+                    getContext().startService(i);
+                } catch (Exception ignore) {
+                    // a service that refuses the stop is being taken down anyway
+                }
             }
-        }
-        call.resolve();
+            call.resolve();
+        });
     }
 
     /**
@@ -128,41 +152,45 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
      */
     @PluginMethod
     public void configure(PluginCall call) {
-        JSONObject j = call.getObject("cfg");
-        if (j == null) {
-            call.reject("configure needs the settings object");
-            return;
-        }
-        DmsService s = DmsService.get();
-        Config next;
-        try {
-            next = Config.parse(j, s != null ? s.cfg() : Config.load(getContext()));
-        } catch (Exception e) {
-            call.reject("The settings could not be read: " + e.getMessage());
-            return;
-        }
-        next.save(getContext());
-        if (s != null) s.applyNewConfig(next);
-        JSObject r = new JSObject();
-        r.put("on", next.on);
-        r.put("running", s != null);
-        r.put("camera", s != null && s.statusJson().optBoolean("camera"));
-        call.resolve(r);
+        safe(call, () -> {
+            JSONObject j = call.getObject("cfg");
+            if (j == null) {
+                call.reject("configure needs the settings object");
+                return;
+            }
+            DmsService s = DmsService.get();
+            Config next;
+            try {
+                next = Config.parse(j, s != null ? s.cfg() : Config.load(getContext()));
+            } catch (Exception e) {
+                call.reject("The settings could not be read: " + e.getMessage());
+                return;
+            }
+            next.save(getContext());
+            if (s != null) s.applyNewConfig(next);
+            JSObject r = new JSObject();
+            r.put("on", next.on);
+            r.put("running", s != null);
+            r.put("camera", s != null && s.statusJson().optBoolean("camera"));
+            call.resolve(r);
+        });
     }
 
     /** The position and speed the vehicle's own watcher has, so an event can say where. */
     @PluginMethod
     public void feed(PluginCall call) {
-        DmsService s = DmsService.get();
-        if (s != null) {
-            s.feed(call.getDouble("lat", 0.0), call.getDouble("lng", 0.0),
-                    call.getDouble("acc", Double.NaN), call.getDouble("alt", Double.NaN),
-                    call.getDouble("heading", Double.NaN), call.getDouble("kmh", 0.0),
-                    call.getLong("at", System.currentTimeMillis()));
-        }
-        JSObject r = new JSObject();
-        r.put("ran", s != null);
-        call.resolve(r);
+        safe(call, () -> {
+            DmsService s = DmsService.get();
+            if (s != null) {
+                s.feed(call.getDouble("lat", 0.0), call.getDouble("lng", 0.0),
+                        call.getDouble("acc", Double.NaN), call.getDouble("alt", Double.NaN),
+                        call.getDouble("heading", Double.NaN), call.getDouble("kmh", 0.0),
+                        call.getLong("at", System.currentTimeMillis()));
+            }
+            JSObject r = new JSObject();
+            r.put("ran", s != null);
+            call.resolve(r);
+        });
     }
 
     /**
@@ -173,40 +201,46 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
      */
     @PluginMethod
     public void ui(PluginCall call) {
-        pageVisible = call.getBoolean("visible", true);
-        if (pageVisible && resumed) ping();
-        call.resolve();
+        safe(call, () -> {
+            pageVisible = call.getBoolean("visible", true);
+            if (pageVisible && resumed) ping();
+            call.resolve();
+        });
     }
 
     /** Show or hide the driver's own picture box. */
     @PluginMethod
     public void preview(PluginCall call) {
-        wantBox = call.getBoolean("show", false);
-        JSObject r = new JSObject();
-        r.put("show", wantBox);
-        call.resolve(r);
+        safe(call, () -> {
+            wantBox = call.getBoolean("show", false);
+            JSObject r = new JSObject();
+            r.put("show", wantBox);
+            call.resolve(r);
+        });
     }
 
     /** What the camera is doing, and why it may not be doing it. */
     @PluginMethod
     public void status(PluginCall call) {
-        DmsService s = DmsService.get();
-        JSObject r = new JSObject();
-        if (s != null) {
-            try {
-                r = JSObject.fromJSONObject(s.statusJson());
-            } catch (Exception e) {
-                r.put("error", "The service would not answer: " + e.getMessage());
+        safe(call, () -> {
+            DmsService s = DmsService.get();
+            JSObject r = new JSObject();
+            if (s != null) {
+                try {
+                    r = JSObject.fromJSONObject(s.statusJson());
+                } catch (Exception e) {
+                    r.put("error", "The service would not answer: " + e.getMessage());
+                }
+            } else {
+                Config c = Config.load(getContext());
+                r.put("running", false).put("camera", false).put("on", c.on)
+                        .put("reason", "The driver app has not started a trip.")
+                        .put("queued", new Outbox(getContext()).size());
             }
-        } else {
-            Config c = Config.load(getContext());
-            r.put("running", false).put("camera", false).put("on", c.on)
-                    .put("reason", "The driver app has not started a trip.")
-                    .put("queued", new Outbox(getContext()).size());
-        }
-        r.put("granted", getPermissionState(CAMERA) == PermissionState.GRANTED);
-        r.put("preview", wantBox);
-        call.resolve(r);
+            r.put("granted", getPermissionState(CAMERA) == PermissionState.GRANTED);
+            r.put("preview", wantBox);
+            call.resolve(r);
+        });
     }
 
     /**
@@ -216,25 +250,83 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
      */
     @PluginMethod
     public void drain(PluginCall call) {
-        DmsService s = DmsService.get();
-        JSONArray items = s != null ? s.drain() : new Outbox(getContext()).drain();
-        JSObject r = new JSObject();
-        try {
+        safe(call, () -> {
+            DmsService s = DmsService.get();
+            JSONArray items = s != null ? s.drain() : new Outbox(getContext()).drain();
+            JSObject r = new JSObject();
             r.put("items", items);
-        } catch (Exception ignore) {
-            // a queue item with no room in it is a queue item nobody asked for
-        }
-        call.resolve(r);
+            call.resolve(r);
+        });
     }
 
     /** Sign-out: the events and pictures on this phone stop belonging to this driver. */
     @PluginMethod
     public void clear(PluginCall call) {
-        wantBox = false;
+        safe(call, () -> {
+            wantBox = false;
+            DmsService s = DmsService.get();
+            if (s != null) s.clearAll();
+            else new Outbox(getContext()).clear();
+            call.resolve();
+        });
+    }
+
+    // ---- the clips an alert left on this phone
+
+    /**
+     * The clip folder, whether or not a trip is running. A phone is asked for the
+     * picture of an event it recorded an hour ago, with the camera long shut and the
+     * service gone, and the files outlive both.
+     */
+    private Clip clipNow() {
         DmsService s = DmsService.get();
-        if (s != null) s.clearAll();
-        else new Outbox(getContext()).clear();
-        call.resolve();
+        return s != null ? s.clip() : new Clip(getContext());
+    }
+
+    /** The clips this phone still holds, each named by the event it belongs to. */
+    @PluginMethod
+    public void clips(PluginCall call) {
+        safe(call, () -> {
+            Clip c = clipNow();
+            JSONArray a = new JSONArray();
+            if (c != null) {
+                for (String cid : c.cids()) a.put(cid);
+            }
+            JSObject r = new JSObject();
+            r.put("cids", a);
+            call.resolve(r);
+        });
+    }
+
+    /**
+     * One clip as text small enough to travel the bridge. The page is the only thing in
+     * this app holding a session, so it is the page that puts the file where an
+     * administrator can watch it - and nothing uploads from here.
+     */
+    @PluginMethod
+    public void clipData(PluginCall call) {
+        safe(call, () -> {
+            String cid = call.getString("cid", "");
+            byte[] b = clipNow().read(cid);
+            JSObject r = new JSObject();
+            if (b == null) {
+                r.put("missing", true);
+                call.resolve(r);
+                return;
+            }
+            r.put("bytes", b.length);
+            r.put("b64", Base64.encodeToString(b, Base64.NO_WRAP));
+            call.resolve(r);
+        });
+    }
+
+    /** The server has the picture: this phone stops carrying it. */
+    @PluginMethod
+    public void clipDrop(PluginCall call) {
+        safe(call, () -> {
+            clipNow().drop(call.getString("cid", ""));
+            call.resolve();
+        });
     }
 
     // ---- what the service hands the page

@@ -27,6 +27,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.nio.ByteBuffer;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -121,6 +122,30 @@ public class DmsService extends Service implements LifecycleOwner {
     private int[] pix;
     private byte[] brow;
     private boolean cameraOn;
+    // Set in onDestroy, before anything is put down. Every thread but this one is
+    // stopped by it, because it is the answer the frame callback gives on its way in.
+    private volatile boolean dead;
+
+    /**
+     * The executor CameraX is allowed to hand frames to.
+     *
+     * Passing it the pool itself is a crash with the lens still open: the service shuts
+     * the pool down while the camera is finishing what it had already started to feed,
+     * and a refused task throws inside CameraX's own thread, where nobody is there to
+     * catch it and the whole app goes down with the exception. This is the catcher. A
+     * frame that arrives after the service has said goodbye is a frame nobody asked for,
+     * so it is dropped rather than thrown.
+     */
+    private final Executor frameExec = task -> {
+        if (dead) return;
+        ExecutorService e = analysis;
+        if (e == null) return;
+        try {
+            e.execute(task);
+        } catch (Throwable ignore) {
+            // the last frames of a dying trip cost nothing to lose
+        }
+    };
 
     // ---- lifecycle
 
@@ -138,6 +163,13 @@ public class DmsService extends Service implements LifecycleOwner {
         reader = new FaceReader(this);
         rules = new Rules(this);
         analysis = Executors.newSingleThreadExecutor();
+        // A Service is not an activity, so nothing drives its lifecycle for it and CameraX
+        // would never be told to open. These two events are the whole of what it needs, and
+        // they are sent once, here: a lens closed and opened again inside one trip is an
+        // unbind and a bind, not a second round of events, and a registry that is made to
+        // go back over states it has already passed is how the main thread ends up throwing.
+        lc.handleLifecycleEvent(Lifecycle.Event.ON_CREATE);
+        lc.handleLifecycleEvent(Lifecycle.Event.ON_START);
         PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
         // the screen is off a lot of the working day, and a sleeping CPU stops reading
         // the camera with it; a partial wake lock costs battery and is the only way to
@@ -151,6 +183,13 @@ public class DmsService extends Service implements LifecycleOwner {
 
     @Override
     public int onStartCommand(@Nullable Intent intent, int flags, int startId) {
+        if (dead) {
+            // Android can hand a fresh start to an instance that has already been told to
+            // go away, and opening a lens into a service that is on its way out is not a
+            // camera, it is a crash. The page is told by its own status call, and asking
+            // again a moment later reaches the new instance that replaces this one.
+            return START_NOT_STICKY;
+        }
         String act = intent == null ? null : intent.getAction();
         if (ACTION_STOP.equals(act)) {
             stopSelf();
@@ -166,24 +205,71 @@ public class DmsService extends Service implements LifecycleOwner {
 
     @Override
     public void onDestroy() {
+        // First, and before anything is put down: every thread but the main one is
+        // stopped by this flag, because it is the answer the frame callback gives on its
+        // way in and it is what the executor wrapper reads.
+        dead = true;
         instance = null;
+        cameraOn = false;
         tripSet(this, false);
-        try {
-            rules.closeOpen(cfg, System.currentTimeMillis());
-        } catch (Exception ignore) {
-            // the last events of a trip are a courtesy; nothing here may throw
-        }
         closeCamera();
-        clip.close();
-        reader.close();
         alerts.stopVoice();
         if (wake != null && wake.isHeld()) wake.release();
         lc.handleLifecycleEvent(Lifecycle.Event.ON_STOP);
         lc.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY);
-        recycleBoth();
-        if (analysis != null) analysis.shutdownNow();
-        stopForeground(true);
+        try {
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE);
+        } catch (Throwable ignore) {
+            // a service Android already took off the foreground has nothing to take down
+        }
+        // The model, the ring of pictures and the two bitmaps belong to the analysis
+        // thread, and are put down on it, behind whatever frame it is still working on.
+        // Closing the native face graph beside a frame that is reading it is a crash no
+        // Java catch can see coming, and recycling a bitmap the camera thread is drawing
+        // with is the black picture that gives the rules nothing to judge.
+        ExecutorService e = analysis;
+        if (e != null) {
+            try {
+                e.execute(this::teardown);
+            } catch (Throwable t) {
+                teardown();
+            }
+            e.shutdown();
+        } else {
+            teardown();
+        }
         super.onDestroy();
+    }
+
+    /** The last thing the analysis thread ever does for this trip. */
+    private void teardown() {
+        // Everything the camera thread owns is put down here, behind the last frame it
+        // was working on: the events still open are closed, the breaches are forgotten,
+        // the native face graph is released and the two pictures are given back. Done on
+        // any other thread, each of them is a read or a free beside the frame that was
+        // still using it - and a face graph taken away under a detection is a crash that
+        // no catch in this file can see coming.
+        try {
+            rules.closeOpen(cfg, System.currentTimeMillis());
+        } catch (Throwable ignore) {
+            // the last events of a trip are a courtesy; nothing here may throw
+        }
+        try {
+            rules.reset();
+        } catch (Throwable ignore) {
+            // as above
+        }
+        try {
+            if (reader != null) reader.close();
+        } catch (Throwable ignore) {
+            // a graph that refuses to close is already gone
+        }
+        try {
+            if (clip != null) clip.close();
+        } catch (Throwable ignore) {
+            // an unfinished clip costs an event its video and nothing else
+        }
+        recycleBoth();
     }
 
     @Nullable
@@ -202,6 +288,7 @@ public class DmsService extends Service implements LifecycleOwner {
     /** The trip has begun: take the wake lock, open the lens and start judging frames. */
     void trip(boolean yes) {
         tripSet(this, yes);
+        if (dead) return;
         if (!yes) {
             stopSelf();
             return;
@@ -213,6 +300,7 @@ public class DmsService extends Service implements LifecycleOwner {
 
     void applyNewConfig(Config next) {
         cfg = next;
+        if (dead) return;
         alerts.setMessages(next.msgs);
         clip.setRate(next.fps);
         clip.age(next.keepD);
@@ -222,8 +310,19 @@ public class DmsService extends Service implements LifecycleOwner {
             // held by one app and a driver who has turned this off should not be blocking
             // the camera for anybody else
             closeCamera();
-            rules.reset();
-            clip.finish();
+            ExecutorService e = analysis;
+            if (e != null) {
+                try {
+                    // the open breaches and the ring of pictures belong to the camera
+                    // thread, so they are cleared on it rather than beside a frame
+                    e.execute(() -> {
+                        rules.reset();
+                        clip.finish();
+                    });
+                } catch (Throwable ignore) {
+                    // a thread that will not take the chore has already been told to stop
+                }
+            }
         }
         foreground(next.on ? "Watching the driver" : "Driver monitoring is switched off");
     }
@@ -245,7 +344,18 @@ public class DmsService extends Service implements LifecycleOwner {
     void clearAll() {
         outbox.clear();
         clip.clearAll();
-        rules.reset();
+        ExecutorService e = analysis;
+        if (e == null) {
+            rules.reset();
+            return;
+        }
+        try {
+            // an open breach is the camera thread's own list, so it is cleared on that
+            // thread rather than beside a frame that is still reading it
+            e.execute(rules::reset);
+        } catch (Throwable t) {
+            rules.reset();
+        }
     }
 
     // ---- the status the page shows
@@ -274,22 +384,42 @@ public class DmsService extends Service implements LifecycleOwner {
     // ---- the camera
 
     private void openCamera() {
+        if (dead || cameraOn) return;
         if (checkSelfPermission(android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             reason = "The camera permission has not been given to this app.";
             return;
         }
-        if (cameraOn) return;
+        androidx.camera.lifecycle.ProcessCameraProvider p = providerNow();
+        if (p != null) {
+            bind(p);
+            return;
+        }
         try {
-            androidx.camera.lifecycle.ProcessCameraProvider.getInstance(this).addListener(() -> {
-                try {
-                    bind(androidx.camera.lifecycle.ProcessCameraProvider.getInstance(this).get());
-                } catch (Throwable t) {
-                    reason = "Camera: " + name(t);
-                    cameraOn = false;
-                }
-            }, ContextCompat.getMainExecutor(this));
+            // Only the first open of a process has to wait for CameraX to build its
+            // provider. Every open after that finds one already made and is bound on the
+            // spot, which is what keeps a close and a re-open from racing a listener that
+            // would arrive after the service asking for it has gone.
+            androidx.camera.lifecycle.ProcessCameraProvider.getInstance(this)
+                    .addListener(() -> {
+                        androidx.camera.lifecycle.ProcessCameraProvider q = providerNow();
+                        if (q != null) bind(q);
+                    }, ContextCompat.getMainExecutor(this));
         } catch (Throwable t) {
             reason = "Camera: " + name(t);
+        }
+    }
+
+    /** The provider, if this handset has finished building it, and null while it has not. */
+    private androidx.camera.lifecycle.ProcessCameraProvider providerNow() {
+        try {
+            java.util.concurrent.Future<androidx.camera.lifecycle.ProcessCameraProvider> f =
+                    androidx.camera.lifecycle.ProcessCameraProvider.getInstance(this);
+            // asked only when it is already finished, so this never waits for a lens
+            if (!f.isDone()) return null;
+            return f.get();
+        } catch (Throwable t) {
+            reason = "Camera: " + name(t);
+            return null;
         }
     }
 
@@ -304,6 +434,7 @@ public class DmsService extends Service implements LifecycleOwner {
     }
 
     private void bind(androidx.camera.lifecycle.ProcessCameraProvider p) {
+        if (dead) return;
         try {
             androidx.camera.core.CameraSelector sel = "back".equals(cfg.lens)
                     ? androidx.camera.core.CameraSelector.DEFAULT_BACK_CAMERA
@@ -325,12 +456,11 @@ public class DmsService extends Service implements LifecycleOwner {
                     .setOutputImageFormat(androidx.camera.core.ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                     .setTargetResolution(new android.util.Size(ANALYSIS_W, ANALYSIS_H))
                     .build();
-            a.setAnalyzer(analysis, this::analyse);
-            // A Service is not an activity, so nothing drives its lifecycle for it and
-            // CameraX would never be told to open. These two events are the whole of
-            // what binding a use-case needs, and they are undone in onDestroy.
-            lc.handleLifecycleEvent(Lifecycle.Event.ON_CREATE);
-            lc.handleLifecycleEvent(Lifecycle.Event.ON_START);
+            a.setAnalyzer(frameExec, this::analyse);
+            // The owner's lifecycle was driven once when this service was made; a lens
+            // that was put away is opened again by binding into the state it is already
+            // in, which is the supported way to do it and the only way that never asks
+            // CameraX to move through states a hand-built registry has passed already.
             p.unbindAll();
             p.bindToLifecycle(this, sel, a);
             cameraOn = true;
@@ -344,19 +474,18 @@ public class DmsService extends Service implements LifecycleOwner {
     private void closeCamera() {
         if (!cameraOn) return;
         cameraOn = false;
-        rules.reset();
+        // Unbound here, on the thread that owns the lens, rather than from a listener
+        // that may not run until the service asking for it has gone: what is left bound
+        // after that feeds a thread that no longer exists, and that is the crash.
+        // The breaches and the ring are the camera thread's own business and are put
+        // down by it, not from here.
+        androidx.camera.lifecycle.ProcessCameraProvider p = providerNow();
+        if (p == null) return;
         try {
-            androidx.camera.lifecycle.ProcessCameraProvider.getInstance(this).addListener(() -> {
-                try {
-                    androidx.camera.lifecycle.ProcessCameraProvider.getInstance(this).get().unbindAll();
-                } catch (Throwable ignore) {
-                    // a provider that cannot be reached has already let the lens go
-                }
-            }, ContextCompat.getMainExecutor(this));
+            p.unbindAll();
         } catch (Throwable ignore) {
-            // nothing to unbind if the future itself is gone
+            // a provider that cannot be reached has already let the lens go
         }
-        lc.handleLifecycleEvent(Lifecycle.Event.ON_STOP);
     }
 
     /**
@@ -365,7 +494,10 @@ public class DmsService extends Service implements LifecycleOwner {
      */
     private void analyse(androidx.camera.core.ImageProxy proxy) {
         try {
-            if (!cfg.on) return;
+            // A frame that was already queued when the trip ended must not be judged:
+            // the model it reads with is put down by the task behind this one, and a
+            // picture taken after that has nobody left to look at it.
+            if (dead || !cfg.on) return;
             long now = System.currentTimeMillis();
             long every = Math.max(40, (long) (1000.0 / cfg.fps));
             if (now - lastFrame < every) return;
@@ -499,9 +631,14 @@ public class DmsService extends Service implements LifecycleOwner {
         } catch (Throwable t) {
             // Android refuses a camera service whose permission was revoked while it was
             // running. Say so, because the silent version of this is a driver who is not
-            // being watched and does not know it
+            // being watched and does not know it - and go down at once rather than stay
+            // a started service that never declared itself: the second refusal is the one
+            // that is not thrown back at us, it is Android killing the app a few seconds
+            // later for a foreground service that never came up.
             reason = "Foreground: " + name(t);
+            closeCamera();
             cameraOn = false;
+            if (!dead) stopSelf();
         }
     }
 
@@ -529,11 +666,16 @@ public class DmsService extends Service implements LifecycleOwner {
      * the main one, so the work is handed over rather than done here.
      */
     void announced(String type, String detail, double peak, Config.Rule rule) {
+        if (dead) return;
         final boolean ui = host != null && host.uiVisible();
         final boolean voice = rule.voice && cfg.voiceOn;
         final String lang = rule.voiceLang;
         final boolean mute = cfg.mute;
         main.post(() -> {
+            // the trip can have ended between the frame that decided this and the main
+            // thread getting round to it, and a notice for a dead service is a sound
+            // from an app that is no longer watching anybody
+            if (dead) return;
             Host h = host;
             if (h != null && ui) {
                 h.notice(type, detail, peak);

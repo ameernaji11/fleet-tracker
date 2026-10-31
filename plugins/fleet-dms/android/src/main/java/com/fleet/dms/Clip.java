@@ -8,6 +8,7 @@ import android.media.MediaCodecList;
 import android.media.MediaFormat;
 import android.media.MediaMuxer;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
@@ -197,6 +198,63 @@ class Clip {
 
     File fileFor(String cid) {
         return new File(dir, cid + ".mp4");
+    }
+
+    /**
+     * Whether a name the page gave can be a clip of this service's own making. A clip
+     * is named after the event id the camera invented, which is a UUID, and the page is
+     * only ever meant to hand one of those back: anything with a slash or a dot in it
+     * is a way out of the clip folder, and is refused before a file is opened.
+     */
+    private static boolean ownName(String cid) {
+        return cid != null && cid.matches("[0-9a-fA-F-]{1,64}");
+    }
+
+    /** The clips still on this phone, each named by the event it belongs to. */
+    List<String> cids() {
+        List<String> out = new ArrayList<>();
+        File[] all = dir.listFiles();
+        if (all != null) {
+            for (File f : all) {
+                String n = f.getName();
+                if (!n.endsWith(".mp4") || n.endsWith(".tmp.mp4")) continue;
+                String cid = n.substring(0, n.length() - 4);
+                if (ownName(cid)) out.add(cid);
+            }
+        }
+        return out;
+    }
+
+    // A clip is a few seconds at 320x240, which is tens of kilobytes; anything far
+    // beyond that is not a clip this code wrote, and reading it into memory would be
+    // the phone's last act anyway.
+    private static final long MAX_READ = 4L * 1024 * 1024;
+
+    /** The whole file, or null when this phone no longer has it. */
+    byte[] read(String cid) {
+        if (!ownName(cid)) return null;
+        File f = fileFor(cid);
+        if (!f.isFile() || f.length() <= 0 || f.length() > MAX_READ) return null;
+        try (java.io.InputStream in = new java.io.FileInputStream(f)) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream((int) f.length());
+            byte[] buf = new byte[16384];
+            int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            return out.toByteArray();
+        } catch (Throwable t) {
+            // a file the phone will not give up costs an event its picture only
+            return null;
+        }
+    }
+
+    /** Put a clip away once the server has it, so the phone does not carry it twice. */
+    void drop(String cid) {
+        if (!ownName(cid)) return;
+        File f = fileFor(cid);
+        if (f.isFile()) {
+            //noinspection ResultOfMethodCallIgnored
+            f.delete();
+        }
     }
 
     /** How many pictures are waiting on this phone, and how much room they take. */
