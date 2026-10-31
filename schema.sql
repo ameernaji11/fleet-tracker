@@ -946,6 +946,81 @@ end $$;
 insert into app_settings (key, value) values ('bb_min_kmh','1')
   on conflict (key) do nothing;
 
+-- ---------------------------------------------------- v24 the clip an alert leaves ----
+-- The camera has written a few seconds of picture around every driver alert since v19 and
+-- kept it on the handset, with the events row holding the path it would have pointed at.
+-- What was missing was the file store, so the pictures never left the phone and the
+-- administrator had the reading without the reason. This is that store: Supabase's own
+-- Storage, the same project and the same subscription, so no new service is asked for a
+-- key and nothing is paid for twice.
+--
+-- The rights below are the whole of its safety, and they are copied from the events table
+-- rather than invented: a handset may write only into a folder named after its own
+-- account, and a clip may be read back only by somebody who can already read the event it
+-- belongs to - the vehicle's owner, its driver, or an administrator. A short clip at the
+-- size the camera records is tens of kilobytes, so a whole fleet's alerts cost the project
+-- nothing it was not already paying for positions and photos.
+--
+-- Buckets are rows in Supabase's own storage schema, so an idempotent insert builds one.
+-- public = false means nothing on the internet can list it or reach a file in it; every
+-- read is a short link the viewer's own rights have to first answer for.
+insert into storage.buckets (id, name, public)
+  values ('dms-clips', 'dms-clips', false)
+  on conflict (id) do nothing;
+
+-- The path a phone writes is <its own account id>/<event id>.mp4: one folder deep, and
+-- the folder is the uploader, so no handset can put a picture of its driver into another
+-- driver's file. Only the phone's own clips are ever this shape, and an mp4 is the only
+-- thing accepted, so a bucket this fleet trusts cannot also hold a file somebody else
+-- would be surprised to open.
+drop policy if exists "dms clips write own folder" on storage.objects;
+create policy "dms clips write own folder" on storage.objects for insert to authenticated
+ with check (
+   bucket_id = 'dms-clips'
+   and name like '%.mp4'
+   and array_length(storage.foldername(name), 1) = 1
+   and (storage.foldername(name))[1] = auth.uid()::text
+ );
+
+-- Reading a clip is reading the event. The three tests are the ones every events policy in
+-- this file has always used, but the join is deliberately narrower than "the row names
+-- this path": a phone can write its own clip_path, so a row aimed at another driver's
+-- folder would otherwise hand out that driver's picture. The file must also be the one
+-- this event's own making - in its own driver's folder, under its own id - which is the
+-- shape the handset writes and the only shape that can be read that way.
+--
+-- A driver may always read his own folder: it holds his own face, the listing is what his
+-- phone uses to clear the days the Configuration page set, and Supabase needs SELECT for
+-- the list and the download alike. Nobody but that driver ever reaches that folder.
+drop policy if exists "dms clips read with the event" on storage.objects;
+create policy "dms clips read with the event" on storage.objects for select to authenticated
+ using (
+   bucket_id = 'dms-clips'
+   and ((storage.foldername(name))[1] = auth.uid()::text
+        or exists (select 1 from events e
+                    where e.clip_path = storage.objects.name
+                      and storage.objects.name = e.user_id::text || '/' || e.cid::text || '.mp4'
+                      and (is_admin() or owns_vehicle(e.vehicle_id) or owns_pair(e.vehicle_id, e.driver_id))))
+ );
+
+-- The retention days the Configuration page sets for the handset's own clips are the same
+-- window on the server, and the phone is the thing that knows when a day has passed: it
+-- clears its own folder on sign-in. An administrator can clear any folder, because a
+-- departed driver's account may not come back to do it.
+drop policy if exists "dms clips clear" on storage.objects;
+create policy "dms clips clear" on storage.objects for delete to authenticated
+ using (
+   bucket_id = 'dms-clips'
+   and (is_admin() or (storage.foldername(name))[1] = auth.uid()::text)
+ );
+
+-- A phone may put its own still-open event's clip path on the row - which is the only
+-- moment it is allowed to write one, since the policy above lets an account update its
+-- rows only while ended_at is still null. Nothing else on the row is reachable: the
+-- identity columns stay pinned by guard_events(), so an alert cannot be re-aimed at
+-- another vehicle, another type or another minute by way of its picture.
+-- No new policy is needed for the insert, and none is added for the close.
+
 -- ------------------------------------------------------------- admin seed ----
 -- Promote the owner account. Runs after the tables/policies exist, and is safe
 -- to re-run. If the profile does not exist yet (nobody has signed in with this
@@ -1259,4 +1334,22 @@ end $$;
 --   an older app simply never sees the new keys and keeps its own built-in defaults (60 s stopped, every fix
 --   stored) - but a newer phone holding a stopped_interval of 3600 while the dashboard still offers a 60 s box is
 --   a page that lies about what the fleet does.
+--
+-- v24, on top of the above (the short film an alert leaves behind):
+--   storage bucket 'dms-clips' (private)                                  -> the few seconds of forward camera the
+--        phone already records around every driver alert now have somewhere to go. It is Storage inside this same
+--        project, so no new service asks for a key and nothing is paid for twice.
+--   3 policies on storage.objects                                         -> a handset writes only
+--        <its own account id>/<event id>.mp4, and a clip opens for the same three people who can already read the
+--        event it belongs to: the vehicle's owner, its driver, an administrator. A driver can always list his own
+--        folder, which is what his phone uses to clear the days the Configuration page set. Nothing else in the
+--        project can reach a file in here, and the bucket is not public.
+--   events.clip_path                                                      -> the column v19 added is used at last.
+--        It is written while the row is still open - on the insert that opens it, or the update that closes it -
+--        because the phone's own policy on events ends the moment a row is closed. No new column and no new table:
+--        this version only gives the path a place to live.
+--   Run this file before publishing the phone build that uploads, and the dashboard build that shows the camera
+--   icon. An older dashboard simply never draws the icon; an older phone leaves the alerts on the handset, which is
+--   exactly the behaviour v23 shipped with. Nothing is lost by running it early, and nothing is gained by running
+--   it twice: the bucket insert is do-nothing and every policy is dropped and rebuilt.
 -- ============================================================================
