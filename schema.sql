@@ -1212,6 +1212,127 @@ comment on column event_rules.clip is
 update event_rules set label = 'Smoking'
   where type = 'dms_smoking' and label = 'Hand at the mouth';
 
+-- ------------------------------------------- v28 one handset per account ----
+-- A driver who signs in on a second phone while the first one is still working puts two
+-- streams of positions on one vehicle at the same time, and the trip then reads as though
+-- the cab was in two places. Supabase gives every device its own session, and the key a
+-- handset holds cannot take a session belonging to another one away, so the rule lives
+-- here instead: the account has one seat, a handset sits in it by naming itself, and the
+-- seat only comes free when the phone in it stops answering.
+--
+-- did is the install's own identifier - Android's per-app, per-device number, which
+-- survives an app update and changes only when the phone is wiped - and model is the name
+-- of that handset as the two messages this table produces show it. since is when this
+-- handset took the seat and renewed_at the last moment it proved it was still in it, which
+-- is the only number the rule reads. tripping says the phone in the seat has a trip
+-- running right now, and trip_since when that trip began.
+--
+-- The three tried_ columns hold the last refusal rather than a list: who asked, which
+-- phone it was, and when. It is written so that the handset already sitting in the seat
+-- can read it out loud on its next renewal - another phone tried to sign in as you - and
+-- it stays on the row afterwards for the Users page to show an attempt the driver never
+-- noticed. A second attempt replaces the first: the interesting question is whether the
+-- account is being used by more than one handset, and one row answers that.
+create table if not exists device_claim (
+  user_id uuid primary key references profiles(id) on delete cascade,
+  did text not null, model text,
+  since timestamptz not null default now(),
+  renewed_at timestamptz not null default now(),
+  tripping boolean not null default false, trip_since timestamptz,
+  tried_did text, tried_model text, tried_at timestamptz);
+
+-- The seat is read by the account that sits in it and by an administrator. It is written
+-- only by the two functions below, which is what stops the wait being talked around from
+-- a handset: a phone cannot mark itself fresh, and the refused one cannot empty the row.
+alter table device_claim enable row level security;
+drop policy if exists "claim read own or admin" on device_claim;
+create policy "claim read own or admin" on device_claim for select to authenticated
+  using (user_id = auth.uid() or is_admin());
+-- Releasing an account from the Users page is the one write an administrator makes here,
+-- and it is for a phone that is lost, broken or left in a drawer: his delete on this row
+-- is what frees the seat before the wait is up.
+drop policy if exists "claim admin release" on device_claim;
+create policy "claim admin release" on device_claim for delete to authenticated
+  using (is_admin());
+
+-- One handset asking for the seat, and every half minute afterwards telling the server it
+-- is still sitting in it. The seat is granted when it is empty, when it already belongs to
+-- this install, or when the phone holding it has not renewed for two minutes - silence of
+-- that length is a dead battery or a swipe-away, not a second phone in a pocket, and the
+-- driver who has to move to a spare handset should not have to hunt down an administrator
+-- first. While a trip is running the wait is five minutes instead, because a handset whose
+-- page Android has put to sleep mid-shift must not hand the same vehicle to a second phone
+-- and record the road twice: two minutes of sleep is ordinary, five minutes of it means
+-- the phone is really gone.
+--
+-- A refusal changes nothing about the seat - that is the whole point of it - and instead
+-- stamps the attempt for the phone in the seat to read out, and answers with the name of
+-- the handset holding the seat, the minutes left on its wait, and whether it is on a trip,
+-- which is what lets the sign-in screen tell the driver whose phone to go and close.
+drop function if exists device_take(text,text,boolean);
+create or replace function device_take(p_did text, p_model text, p_trip boolean default false)
+returns table(ok boolean, model text, since timestamptz, renewed timestamptz,
+              wait_s int, tripping boolean, trip_since timestamptz,
+              tried_model text, tried_at timestamptz)
+language plpgsql security definer set search_path = public as $$
+declare c device_claim%rowtype; win int;
+        m text := left(nullif(trim(coalesce(p_model,'')), ''), 60);
+        d text := left(trim(coalesce(p_did,'')), 60);
+begin
+  -- nobody signed in: there is no account to hold a seat, and nothing to say
+  if auth.uid() is null or d = '' then
+    return query select false, null::text, null::timestamptz, null::timestamptz,
+      0, false, null::timestamptz, null::text, null::timestamptz;
+    return;
+  end if;
+  -- An account that has never sat in the seat gets its row here, because the lock below
+  -- needs a row to lock. Two handsets arriving for the first time at the very same second
+  -- cannot both win: the second one's insert is thrown away by the primary key, so it
+  -- waits like any other second phone.
+  insert into device_claim (user_id, did, model, since, renewed_at)
+    values (auth.uid(), d, m, now(), now()) on conflict (user_id) do nothing;
+  select * into c from device_claim where user_id = auth.uid() for update;
+  win := case when c.tripping then 300 else 120 end;
+  if c.did = d or c.renewed_at is null or c.renewed_at < now() - make_interval(secs => win) then
+    update device_claim set did = d, model = m, renewed_at = now(),
+      tripping = coalesce(p_trip, false),
+      -- the handset already in the seat keeps the clock on its own trip; one taking the
+      -- seat over starts a fresh clock, and both keep the trip's own start where it was
+      trip_since = case when c.did = d then (case when p_trip then coalesce(trip_since, now()) end)
+                        when p_trip then now() end,
+      since = case when c.did = d then since else now() end
+     where user_id = auth.uid() returning * into c;
+    return query select true, c.model, c.since, c.renewed_at, 0, c.tripping, c.trip_since,
+      c.tried_model, c.tried_at;
+  end if;
+  update device_claim set tried_did = d, tried_model = m, tried_at = now()
+   where user_id = auth.uid() returning * into c;
+  return query select false, c.model, c.since, c.renewed_at,
+    greatest(1, ceil(extract(epoch from (c.renewed_at + make_interval(secs => win)))
+                   - extract(epoch from now()))::int),
+    c.tripping, c.trip_since, c.tried_model, c.tried_at;
+end $$;
+
+-- Signing out stands up from the seat at once, so the next handset - the driver's own the
+-- following morning, or the spare he picks up when this one dies - never has to wait out
+-- the silence. Only the install in the seat can empty it: the phone that was refused has
+-- no way to push the driver sitting in it out of the way, which is exactly the difference
+-- between this and a fight over the account.
+drop function if exists device_give(text);
+create or replace function device_give(p_did text) returns void
+language sql security definer set search_path = public as $$
+  delete from device_claim
+   where user_id = auth.uid() and did = left(trim(coalesce(p_did,'')), 60)
+$$;
+
+-- Both questions are about the account that asks them, so a handset that is not signed in
+-- has nothing to ask; and since the seat cannot be written any other way, the row is
+-- readable and nothing more.
+revoke execute on function device_take(text,text,boolean) from public;
+revoke execute on function device_give(text) from public;
+grant execute on function device_take(text,text,boolean) to authenticated;
+grant execute on function device_give(text) to authenticated;
+
 -- ------------------------------------------------------------- admin seed ----
 -- Promote the owner account. Runs after the tables/policies exist, and is safe
 
@@ -1578,4 +1699,20 @@ end $$;
 --        says a hand at the face); only the name changed, and an administrator's own wording is left alone.
 --        Both builds already say Smoking, so run this whenever convenient - a project that skips it shows one
 --        old name and nothing else goes wrong.
+--
+-- v28, on top of the above (one handset per account, so a vehicle cannot be driven twice):
+--   device_claim (one row per account: did, model, since, renewed_at, tripping, trip_since, tried_did/model/at)
+--        -> the seat. A handset running this build names itself there and renews about every half minute; a
+--        second handset signing in as the same account is refused while the first keeps answering, and the first
+--        one is only ever told that somebody tried. Reads are limited to the account itself and to an
+--        administrator; the row changes only through the two functions below.
+--   device_take(p_did, p_model, p_trip) -> takes the seat when it is empty, already this handset's, or left for
+--        two minutes (five while a trip runs), and otherwise stamps the attempt and says who is sitting in the
+--        seat. Granted to authenticated only.
+--   device_give(p_did)                  -> sign-out emptying the seat, and only ever the handset in it.
+--   Run this file BEFORE publishing the phone build that claims a seat. Until then no handset writes here, so
+--   every driver gets in on every phone as before and the Users page shows no phone for anybody - which is the
+--   honest state of a project that has the table but not the handsets. Publish the dashboard build after the
+--   phone one: its Release button only has rows to delete once handsets are making them.
+--   Releasing a seat by hand is the answer for a phone that is lost, broken or left in a drawer.
 -- ============================================================================
