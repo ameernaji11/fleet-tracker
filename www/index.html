@@ -116,7 +116,7 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 <div class="card spd"><div><b id="sp">0</b><span>km/h</span></div><div class="pr"><small>Position</small><b id="v_pos">-</b><br><small id="lt">No record yet</small></div></div>
 <div id="map"><div id="fr"></div><div class="mn hide" id="mn"><i class="fa-solid fa-wifi"></i> No signal: this area was not cached, the route and zones are still drawn</div><div class="layN hide" id="layN"></div><div id="camV" class="hide"><img id="camI" alt="Driver camera view"><i id="camVi" class="fa-solid fa-video"></i></div><div class="mcl"><button id="muteB" onclick="muteTog()" title="Mute the alerts"><i class="fa-solid fa-volume-high"></i></button><button id="layB" onclick="togMap()" title="Map style"><i class="fa-solid fa-layer-group"></i></button><button id="fsB" onclick="fsMap()" title="Full screen"><i class="fa-solid fa-expand"></i></button><button id="pinB" class="on" onclick="togPin()" title="Pin: keep the vehicle in the centre"><i class="fa-solid fa-thumbtack"></i></button><button id="camB" class="hide" onclick="camTog()" title="Show the view of your face"><i class="fa-solid fa-eye-slash"></i></button><button id="dwB" class="hide" onclick="dwTog()" title="Driver camera: start watching for tiredness and distraction"><i class="fa-solid fa-video-slash"></i></button></div></div>
 <div class="grid3" id="vals"></div>
-<div class="btns"><button id="go" class="btn g" onclick="start()"><i class="fa-solid fa-play"></i>Start trip</button><button id="stp" class="btn r hide" onclick="stop()"><i class="fa-solid fa-stop"></i>End trip</button></div>
+<div class="btns"><button id="go" class="btn g" onclick="start()" title="You can press this, but you no longer have to: a trip starts by itself once the vehicle has been moving for 5 seconds"><i class="fa-solid fa-play"></i>Start trip</button><button id="stp" class="btn r hide" onclick="stop()" title="A trip also ends by itself after 10 minutes with the vehicle standing still"><i class="fa-solid fa-stop"></i>End trip</button></div>
 <div class="foot">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</div>
 <div class="card hide" id="pwcard"><small id="pwnote" style="display:none;color:var(--or)">The administrator set the password you signed in with. Choose your own now.</small><small style="display:block;color:var(--mut)">New password — at least 6 characters</small>
 <input type="password" id="np1" placeholder="New password" autocomplete="new-password">
@@ -296,6 +296,9 @@ async function signIn(){
  catch(e){$('err').textContent=(e.soft?'':'Error: ')+(e.message||e)}
  b.disabled=false;b.innerHTML='<i class="fa-solid fa-right-to-bracket"></i>Sign in'}
 async function signOut(){sessStop();await logAct('Signed out','Phone');
+ // the phone stops listening for a vehicle that moves: his session, and the watcher that
+ // comes with it, end here
+ await senOff();
  // the watch ends with his session, and the warnings and pictures this phone kept of
  // him are deleted rather than left for the next driver of the same handset
  try{if(dmsHas()){await CapPlugins.Dms.stop();await dmsDrain();await CapPlugins.Dms.clear()}}catch(e){}
@@ -409,6 +412,9 @@ async function init(fresh,who){
  // holding the lens with no page behind it, because this page forgot his press. Nothing
  // else can put it down, so the lens goes back here.
  dwReap();
+ // From here the phone also listens for a vehicle that starts moving without anybody
+ // pressing anything. A trip - resumed or pressed by hand - takes the watcher back.
+ senOn();
  const nm=(me.email||'').replace('@fleet.local','');$('wn').textContent=nm;
  const v=asg?.vehicles;$('vn').textContent=v?.name||'No vehicle linked';$('dn').textContent=asg?.drivers?.name||'No driver linked';$('vi').className='fa-solid '+(TI[v?.type]||'fa-car');
  logAct(fresh?'Signed in':'Opened app',$('vn').textContent);sessStart();
@@ -451,9 +457,11 @@ setInterval(()=>{if(!document.hidden&&PEND&&!fl)flush()},60000);
 // after the alert that asked for it, so it normally rides out on the row it belongs to or
 // on the update that closes it; this is for the ones neither of them reached - an app
 // killed mid-encode, a trip that ended before the queue got there, a phone that was out of
-// signal when both of those records went. Until now it only ran when the driver brought
-// the app back to the front, which is not a thing that happens during a shift.
-setInterval(()=>{if(!document.hidden&&watcher&&(dmsOn()||CAMW))clipSweep()},5*60000);
+// signal when both of those records went. It asks the phone for its own folder first, so
+// a driver whose camera has nothing waiting costs one local call and no server traffic -
+// which is why it can be this blunt, and why it no longer waits for a trip that has often
+// ended by the time the picture is ready.
+setInterval(()=>{if(!document.hidden&&dmsHas())clipSweep()},60000);
 const pmOpen=()=>!$('pm').classList.contains('hide');
 // The sign-in this phone already holds is asked about while the Permissions card is still
 // on screen on a first run, and the map cannot be built behind a page that is not shown -
@@ -532,10 +540,15 @@ function mpos(loc,moving){const ll=[loc.latitude,loc.longitude];
 function alertRing(){ALRM=Date.now()+8000;$('fr').classList.add('on');if(mrk)mrk.setIcon(PICON);
  setTimeout(()=>{ALRM=0;$('fr').classList.remove('on');if(mrk&&MICON)mrk.setIcon(MICON)},8000)}
 // ---- permissions
-async function pAsk(){try{const id=await CapPlugins.BG.addWatcher({requestPermissions:true,backgroundTitle:'Fleet Tracker',backgroundMessage:'Checking permissions'},()=>{});setTimeout(()=>CapPlugins.BG.removeWatcher({id}),3000)}catch(e){$('err').textContent='Location: '+(e.message||e)}
+async function pAsk(){await senOff();
+ try{const id=await CapPlugins.BG.addWatcher({requestPermissions:true,backgroundTitle:'Fleet Tracker',backgroundMessage:'Checking permissions'},()=>{});
+  // one watcher at a time, so the sentry that waits for a vehicle to move stands down for
+  // the three seconds this probe needs and takes its place back afterwards
+  setTimeout(async()=>{try{await CapPlugins.BG.removeWatcher({id})}catch(e){}senOn()},3000)}
+ catch(e){$('err').textContent='Location: '+(e.message||e);senOn()}
  await askNotif()}
 // ---- alerts on the phone
-let RUL={};const EVN={harsh_braking:'Harsh braking',harsh_acceleration:'Harsh acceleration',overspeed:'Overspeed',zone_enter:'Entered zone',zone_exit:'Left zone',zone_overspeed:'Zone overspeed',dms_fatigue:'Driver fatigued',dms_distraction:'Driver distracted',dms_phone_use:'Phone in hand',dms_cam_blocked:'Camera blocked',dms_yawning:'Driver yawning',dms_talking:'Talking while driving',dms_eating:'Eating while driving',dms_drinking:'Drinking while driving',dms_smoking:'Hand at the mouth'};
+let RUL={};const EVN={harsh_braking:'Harsh braking',harsh_acceleration:'Harsh acceleration',overspeed:'Overspeed',zone_enter:'Entered zone',zone_exit:'Left zone',zone_overspeed:'Zone overspeed',dms_fatigue:'Driver fatigued',dms_distraction:'Driver distracted',dms_phone_use:'Phone in hand',dms_cam_blocked:'Camera blocked',dms_yawning:'Driver yawning',dms_talking:'Talking while driving',dms_eating:'Eating while driving',dms_drinking:'Drinking while driving',dms_smoking:'Smoking'};
 // Alerts must be audible even when the driver never opened the Permissions screen, so every
 // trip start re-asks for notification permission and registers the loud channel it posts to.
 let CHAN=false;
@@ -797,13 +810,16 @@ const OBJRULES=['dms_phone_use','dms_eating','dms_drinking','dms_smoking'];
 // fleet with recordings and a fleet whose Events table has no camera icon on any row.
 function dmsSay(s){if(!s)return;
  if(s.granted===false){$('err').textContent='Driver camera: allow the camera on the Permissions page, then start the trip again.';return}
+ // A lens the driver opened for himself is not a fleet watch: it has nothing to say about
+ // warnings, because it raises none. Only a trip's camera is ever described as watching.
+ if(s.running&&s.trip===false){$('err').textContent='';return}
  if(s.running&&s.model===false){$('err').textContent='Driver camera is not watching: this build has no face model.'+(s.error?' ('+s.error+')':'');return}
  if(s.running&&s.camera===false&&s.reason){$('err').textContent='Driver camera: '+s.reason;return}
  let w='';
  if(s.running&&s.notices===true)w='Notifications are off on this phone: camera warnings show on the screen only.';
  if(s.running&&s.objects===false&&OBJRULES.some(t=>RUL[t]&&ON[t]))
   w=(w?w+' ':'')+'This phone cannot say what the driver is holding'+(s.objectError?' ('+s.objectError+')':'')+
-    ': eating, drinking and a hand at the mouth stay quiet, and a phone is judged only by how much of his face it covers.';
+    ': eating, drinking and smoking stay quiet, and a phone is judged only by how much of his face it covers.';
  const nd=Math.max(0,+s.clipDropped||0),ce=String(s.clipError||'').replace(/^[0-9a-fA-F-]{12,}: /,'');
  if(s.running&&(nd||ce))w=(w?w+' ':'')+(nd?nd+' alert'+(nd===1?' has':'s have')+' no recording because the camera had no picture to keep. ':'')+
   (ce?'The last recording failed: '+ce+'. ':'');
@@ -815,7 +831,7 @@ async function dmsStatus(){if(!(dmsOn()||CAMW))return;try{dmsSay(await CapPlugin
 // so this only paints over the panel when the fleet's switch is the thing that opened it
 async function dmsStart(){if(CAMW&&!dmsOn())return;camPaint(false);if(!dmsOn())return;
  CAMSEEN=false;let r=null;
- try{r=await CapPlugins.Dms.start()}catch(e){$('err').textContent='Driver camera could not start: '+(e.message||e);return}
+ try{r=await CapPlugins.Dms.start({trip:true})}catch(e){$('err').textContent='Driver camera could not start: '+(e.message||e);return}
  dmsSay(r);if(!r||r.granted===false)return;
  // the phone opened the box the way the dashboard has it set, and says so; the
  // driver's own button then changes it for the rest of this trip
@@ -865,7 +881,10 @@ async function dmsDrain(){if(!dmsHas())return;let items=null;
 function dmsListen(){if(DMSL||!dmsHas())return;DMSL=true;
  const on=(n,f)=>{try{const p=CapPlugins.Dms.addListener(n,f);if(p&&p.catch)p.catch(()=>{})}catch(e){}};
  on('dmsBreach',x=>dmsAlert(x&&x.type,x&&x.detail));
- on('dmsPing',()=>dmsDrain());
+ // every record the service queues pings the page, so this is the moment that a fresh
+ // alert is closest to having its picture finished - hence the short look rather than
+ // waiting for the next turn of the minute-long timer
+ on('dmsPing',()=>{dmsDrain();sweepSoon(5000)});
  on('dmsFrame',x=>{if(!x||!x.img||!CAMD)return;CAMSEEN=true;const i=$('camI');if(i)i.src=x.img;
   const v=$('camVi');if(v)v.classList.add('hide')})}
 // the driver's own picture of himself, in the corner of the map he can put away
@@ -889,29 +908,29 @@ function camTog(){camBox(!CAMD)}
 // picture of this screen from the dashboard. That remote path is gone: it could only ever
 // answer while the phone was sitting on this screen with a strong signal, and it did not
 // work. What replaces it is the one thing a handset can always do - the driver presses the
-// video button on his own map and this page opens the forward lens and starts watching his
-// face for the four rules the fleet has set up: tiredness, looking away, a phone in the
-// hand, a blocked lens. The warnings, the buzzer, the voice and the rows written into the
-// events table are then exactly the ones the fleet's own "Watch the driver" switch produces,
-// because this sends the camera the same setup a trip sends. No server, and nobody else,
-// decides when his face is being looked at.
+// video button on his own map and this page opens the forward lens and shows him what it
+// sees. It shows him, and nothing else: the warnings, the buzzer, the voice and the rows
+// written into the events table belong to a trip, and are exactly the ones the fleet's own
+// "Watch the driver" switch produces when Start trip is pressed or the vehicle starts
+// moving by itself. A parked phone with its lens open is a mirror, not an offence.
+// No server, and nobody else, decides when his face is being looked at.
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let CAMW=false,CAMLENS=false;
-// A fleet setting and a running trip are deliberately not conditions here: a driver who
-// wants his own face watched gets it watched, whatever the fleet has its switch set to. What
-// is still required is a build that has a camera and a vehicle this login holds, because a
-// warning about a driver nobody can name is a record the dashboard cannot file.
+// A fleet setting is deliberately not a condition here: a driver who wants to see his own
+// picture gets it, whatever the fleet has its switch set to. What is still required is a
+// build that has a camera and a vehicle this login holds, because the lens is opened
+// against this app's setup and a watch with no vehicle behind it has nothing to hand back.
 const camVeh=()=>(asg&&asg.vehicles&&asg.vehicles.name)||'this vehicle';
 const dwWhy=()=>!dmsHas()?'this build has no driver camera'
  :!me?'sign in first, then press it again'
- :!(asg&&asg.vehicle_id)?'this login holds no vehicle, so a warning would have nowhere to be filed'
+ :!(asg&&asg.vehicle_id)?'this login holds no vehicle, so there is no camera setup to open'
  :'';
 function dwUi(){const b=$('dwB');if(!b)return;
  // a build that has no camera has nothing to offer, the same rule as the preview button
  b.classList.toggle('hide',!dmsHas());if(!dmsHas())return;
  b.classList.toggle('on',CAMW);
  b.innerHTML='<i class="fa-solid fa-'+(CAMW?'video':'video-slash')+'"></i>';
- b.title=CAMW?'Driver camera is watching you - press to stop':dwWhy()||'Driver camera: start watching for tiredness and distraction now'}
+ b.title=CAMW?'Your own camera view is open - press to stop':dwWhy()||'Driver camera: open your own view of the forward lens'}
 // The lens itself. When the trip's own camera is already running there is nothing to open,
 // so the picture box simply comes back and the fleet's setup is left alone.
 async function dwUp(){const why=dwWhy();if(why)return why;
@@ -920,7 +939,9 @@ async function dwUp(){const why=dwWhy();if(why)return why;
  // so every path out of this block has to hand it back - including the one where the driver
  // refuses the permission prompt and nothing ever opened.
  CAMLENS=true;let r=null,out='';
- try{await CapPlugins.Dms.configure({cfg:dmsCfg()});r=await CapPlugins.Dms.start()}
+ // {trip:false}: the lens opens, the picture comes, and the service judges nothing. This
+ // is the driver looking at his own cab, not a fleet recording a driver.
+ try{await CapPlugins.Dms.configure({cfg:dmsCfg()});r=await CapPlugins.Dms.start({trip:false})}
  catch(e){out='the camera could not be opened: '+(e.message||e)}
  if(!out&&(!r||r.granted===false))out='the camera is not allowed on this phone - allow it on the Permissions page, then press again';
  if(!out){CAMSEEN=false;await camBox(true);
@@ -935,7 +956,10 @@ async function dwUp(){const why=dwWhy();if(why)return why;
 // whether it closed the lens itself, which is how the trip ending knows not to ask twice.
 async function dwDown(){if(!CAMLENS)return false;CAMLENS=false;
  try{const c=dmsCfg();c.dms_on=dmsOn();await CapPlugins.Dms.configure({cfg:c})}catch(e){}
- if(dmsOn())return false;
+ // A trip of its own has the camera and this button is not its owner: leave it running.
+ // With no trip running there is nothing left to judge, so the lens goes back here rather
+ // than staying open over a phone that is lying on a seat.
+ if(CAMON)return false;
  try{await CapPlugins.Dms.stop()}catch(e){}return true}
 // putting the watch down again, from either side: the driver's finger, or the trip ending
 async function dwOff(){if(!CAMW)return false;CAMW=false;const s=await dwDown();dwUi();return s}
@@ -951,7 +975,7 @@ async function dwTog(){
  const why=await dwUp();
  if(why){CAMW=false;dwUi();banner('<i class="fa-solid fa-video-slash"></i> Driver camera is off: '+esc(why),8000);return}
  logAct('Driver camera started',camVeh());
- banner('<i class="fa-solid fa-video"></i> The forward camera is watching: tiredness, distraction, phone use and a blocked lens are now warned about and recorded on this phone',8000);
+ banner('<i class="fa-solid fa-video"></i> The forward camera is open for you to see. Warnings and records start with a trip - press Start trip, or set off and the phone starts one by itself',8000);
  // a lens that has not handed over a picture after a few seconds is a lens that is not
  // working, and the reason belongs on the screen now, not at the end of the shift
  setTimeout(async()=>{if(!CAMW||CAMSEEN)return;let s=null;
@@ -960,13 +984,16 @@ async function dwTog(){
   // its way out, and that one drops the ask rather than opening a lens into a service
   // that is closing. A status that says nothing is running is that case: ask once more,
   // which reaches the service that has taken its place.
-  if(s&&!s.running){try{await CapPlugins.Dms.start()}catch(e){}return}
+  if(s&&!s.running){try{await CapPlugins.Dms.start({trip:false})}catch(e){}return}
   dmsSay(s)},5000)}
 // a phone Android restarted has no memory of a watch this page started: the service can
-// still be holding the lens with nothing on this side asking for it. With the fleet's own
-// switch off and the driver's own button not pressed, that is a lens to close.
-async function dwReap(){if(!dmsHas()||CAMW||dmsOn())return;
- try{const s=await CapPlugins.Dms.status();if(s&&s.running)await CapPlugins.Dms.stop()}catch(e){}}
+// still be holding the lens with nothing on this side asking for it. The only thing that
+// ever asks for the camera is a trip this phone still carries a marker for, so a running
+// service that says it is not judging, with no trip marker on the phone, is a lens to
+// close - left alone it sits open over a driver in a pocket and covers itself.
+async function dwReap(){if(!dmsHas()||CAMW)return;
+ try{const s=await CapPlugins.Dms.status();
+  if(s&&s.running&&!s.trip&&!tripRead())await CapPlugins.Dms.stop()}catch(e){}}
 // the setup row for the lens: a build that cannot watch, or a phone that already
 // allowed it, has nothing left to say here. It never asks on its own: the driver
 // should decide when the camera starts being part of his app
@@ -989,7 +1016,7 @@ function pickUi(){const s=$('pk');if(!s)return;
  $('vn').textContent=asg?.vehicles?.name||'No vehicle linked';$('dn').textContent=asg?.drivers?.name||'No driver linked';
  if(ASGS.length<2){s.classList.add('hide');s.replaceChildren();return}
  s.classList.remove('hide');s.replaceChildren(...ASGS.map(x=>{const o=document.createElement('option');o.value=x.vehicle_id;o.textContent=x.vehicles?.name||'Vehicle';o.selected=x.vehicle_id===PICK;return o}))}
-function pickV(){PICK=$('pk').value;localStorage.pick=PICK;if(watcher){stop();watcher=null}
+function pickV(){PICK=$('pk').value;localStorage.pick=PICK;if(watcher||SRT)stop();
  $('err').textContent='';logAct('Switched vehicle',$('pk').selectedOptions[0]?.textContent||PICK);loadRules();showLast()}
 // The setup - which vehicle this login drives, the limits, the voice, the zones - is
 // copied into localStorage every time it is read successfully, because a driver in a
@@ -1107,7 +1134,7 @@ const CLIPB='dms-clips';
 // allowed into it - are both an error the server sends back and this used to throw away,
 // so a clip that fails is said out loud once, in the driver's own words, and once only
 // every few minutes so a bad bucket cannot fill the screen.
-let CLIPWHY='',CLIPTOLD=0;
+let CLIPWHY='',CLIPTOLD=0,SWEEPT=0;
 function clipFail(m){CLIPWHY=m;
  // the status line is the one place the camera says anything, and a trip that is
  // running must not have it overwritten every time a picture is tried
@@ -1141,8 +1168,8 @@ async function clipPut(cid){
 // alert that made it, so an event that was already waiting in the queue normally carries
 // its path when it is born; the closing update picks up the one that was not ready yet,
 // and clipSweep below is what catches anything neither of them reached.
-async function clipFor(cid,p){
- if(!p||p.clip_path||DMS.indexOf(p.type)<0)return;
+async function clipFor(cid,p,isDms){
+ if(!p||p.clip_path||(!isDms&&DMS.indexOf(p.type)<0))return;
  const path=await clipPut(cid);
  if(path)p.clip_path=path;
 }
@@ -1155,7 +1182,14 @@ async function clipFor(cid,p){
 async function clipSweep(){
  if(!dmsHas()||!me||!sb||!navigator.onLine)return;
  let cids=[];try{const r=await CapPlugins.Dms.clips();cids=(r&&r.cids)||[]}catch(e){return}
- if(!cids.length)return;
+ if(!cids.length){clearTimeout(SWEEPT);SWEEPT=0;return}
+ // A file still lying on this phone is a picture whose row has already gone out without
+ // it, and the reason is nearly always timing rather than trouble: a breach closes
+ // itself about a second after it opens, while the seconds of camera that followed it
+ // are still being assembled into the film. So the wait is answered by asking again
+ // soon, and asking stops the moment the folder is empty - this is what makes nineteen
+ // alerts of a shift reach nineteen rows instead of two. The next look is armed at the
+ // end of this one, so a slow folder cannot pile sweeps on top of each other.
  for(let i=0;i<cids.length;i+=80){
   const part=cids.slice(i,i+80);
   const {data,error}=await q(sb.from('events').select('cid,clip_path').in('cid',part));
@@ -1169,7 +1203,13 @@ async function clipSweep(){
    await q(sb.from('events').update({clip_path:path}).eq('cid',r.cid));
   }
  }
+ sweepSoon(20000);
 }
+// One look at a time, whenever the next one is worth taking. A clip is assembled a
+// second or two after the alert that asked for it, so the short delay is what answers a
+// fresh breach; the long one is the retry for a picture still waiting on a row the server
+// has not taken yet.
+function sweepSoon(ms){clearTimeout(SWEEPT);SWEEPT=setTimeout(clipSweep,ms)}
 // The retention days the Configuration page sets for the phone's clips are the same window
 // on the server, and this handset is the thing that notices a day has gone by. A bucket
 // folder nobody can reach but its own driver is what makes that safe to do on his own.
@@ -1194,7 +1234,7 @@ async function outSend(r){const v=r.v;
  // knows while it is offline; a refused close must not hold the queue behind it
  // a camera close has no type in its payload, so it says for itself that the picture
  // of the breach is waiting on this phone under the same id
- if(v.dms)await clipFor(v.id,v.p);
+ if(v.dms)await clipFor(v.id,v.p,1);
  const {error}=await q(sb.from('events').update(v.p).eq('cid',v.id));return {ok:true,error:error&&error.message&&('Event end not saved: '+error.message)}}
 async function flush(){if(fl||!me)return;fl=true;
  try{let after=0,rounds=0,stop=false,why='';
@@ -1252,6 +1292,43 @@ async function maybeResume(){
  if(asg.vehicle_id!==tr.v||Date.now()-(+tr.u||+tr.t||0)>12*3600e3){tripClear();return}
  await start(1);
  if(watcher)banner('<i class="fa-solid fa-road"></i> Trip picked back up - the phone closed the app while you were driving',7000)}
+// ---- the trip the driver forgets. A handset in a cab knows when the cab is moving, and a
+// fleet whose records only begin when a man remembers to press a button loses the whole
+// first hour of every shift. While no trip is running one watcher stays alive for this
+// page alone: five seconds above 5 km/h starts a trip by itself, and ten minutes below it
+// ends one. The same speed is the rule for both, so one number says what moving means.
+// Only one watcher is ever alive, because Android hands this app one background location
+// service rather than two: the sentry steps down before the trip's own takes its place,
+// and steps back up when the trip ends.
+const AUTO_KMH=5,AUTO_START_MS=5000,AUTO_END_MS=600000;
+let SEN=null,SENUP=0,STILLAT=0;
+async function senOff(){if(!SEN)return;const id=SEN;SEN=null;
+ try{await CapPlugins.BG.removeWatcher({id})}catch(e){}}
+async function senOn(){if(SEN||watcher||SRT||!me||!asg?.vehicle_id)return;
+ if(!window.CapPlugins||!CapPlugins.BG)return;
+ try{SEN=await CapPlugins.BG.addWatcher({requestPermissions:true,backgroundTitle:'Fleet Tracker',
+  backgroundMessage:'Waiting for you to set off',stale:false,distanceFilter:10},async(loc,err)=>{
+  const id=SEN;
+  // a fix that comes to a watcher this page has already stopped, or one that arrives while
+  // a trip holds its own callback, is not the sentry's business
+  if(!id||id!==SEN||watcher||SRT)return;
+  if(err||!loc)return;
+  const kmh=Math.max(0,(loc.speed||0)*3.6);
+  if(kmh<=AUTO_KMH){SENUP=0;return}
+  const n=Date.now();
+  if(!SENUP){SENUP=n;return}
+  if(n-SENUP<AUTO_START_MS)return;
+  SENUP=0;await senOff();
+  await start(0,1);
+  banner('<i class="fa-solid fa-road"></i> Trip started by itself: the vehicle has been moving for '+
+   Math.round(AUTO_START_MS/1000)+' seconds. Press End trip when you park, or the phone ends it for you',9000);
+ })}catch(e){SEN=null}}
+// the trip's own callback asks the same question on every fix it gets: a vehicle standing
+// still for ten minutes is parked, and a record left open until somebody presses a button
+// is a trip that every report counts again the next day.
+async function endAuto(){banner('<i class="fa-solid fa-road"></i> Trip ended by itself after '+
+  Math.round(AUTO_END_MS/60000)+' minutes without moving. Start a new one when you set off',9000);
+ await stop(1)}
 // ---- blackbox. Every fix the location watcher delivers above the fleet's own speed
 // (about one per second on the move, none at all while the vehicle stands still) is
 // stored on the handset in IndexedDB and never uploaded, so the server keeps only the
@@ -1383,10 +1460,13 @@ async function showLast(){if(!asg?.vehicle_id)return;
  if(old){const c=$('stc');c.textContent='Parking';c.style.background='var(--bll)';c.style.color='var(--bl)'}
  $('lt').textContent='Last record '+new Date(t).toLocaleString('en-GB');
  if(map){if(follow)map.setView(ll,Math.max(map.getZoom(),15));trail.addLatLng(ll)}}
-async function start(quiet){
+async function start(quiet,auto){
  if(!asg?.vehicle_id){$('err').textContent='No vehicle linked to this user. Ask your admin.';return}
  if(watcher||SRT)return;
- SRT=true;const myGen=++SGEN;
+ // one watcher per app: the sentry that watches for the vehicle starting has to hand its
+ // place over before the trip's own callback can take it
+ await senOff();
+ SRT=true;STILLAT=Date.now();const myGen=++SGEN;
  try{
  await loadRules();pollBat();batT=setInterval(pollBat,30000);cfgT=setInterval(loadRules,300000);prev=null;pp=null;HSENT=null;ODOM=quiet?Math.max(0,+(tripRead()?.o||0)):0;TS_TRIP=0;Object.keys(VS).forEach(k=>VS[k]=0);Object.keys(RST).forEach(k=>RST[k]=null);
  // a new trip starts from a clean slate: no alert left remembered as already buzzed
@@ -1402,6 +1482,10 @@ async function start(quiet){
   // the tone stops on its own deadline even if Android froze the timer that was
   // supposed to stop it, because these callbacks are what keep this page alive
   toneEnd();
+  // ten minutes of standing still ends the trip: the same speed the auto start measures
+  // against, so one number says what moving means for both halves of a shift
+  if(kmh>AUTO_KMH)STILLAT=n;else if(!STILLAT)STILLAT=n;
+  else if(n-STILLAT>=AUTO_END_MS){STILLAT=0;await endAuto();return}
   // keep the trip marker fresh: it is the only thing that survives a process
   // Android kills, and its timestamp is what says "this trip was still running"
   if(n-TS_TRIP>60000){TS_TRIP=n;tripSave()}
@@ -1429,7 +1513,8 @@ async function start(quiet){
   if(PEND>=Math.ceil(5/MOV)||!moving||n-lastTry>60000){lastTry=n;flush()}});
  $('go').classList.add('hide');$('stp').classList.remove('hide');$('err').textContent='';
  tripSave();
- logAct(quiet?'Resumed trip':'Started trip',(asg?.vehicles?.name||'')+' · records every '+MOV+' s moving, '+STP+' s parked');
+ logAct(quiet?'Resumed trip':auto?'Started trip automatically':'Started trip',(asg?.vehicles?.name||'')+
+  ' · records every '+MOV+' s moving, '+STP+' s parked'+(auto?' · started by speed, not by hand':''));
  await askNotif();
  // the driver camera opens with the trip, after the settings it is told to watch for
  // have been read and handed over by loadRules above
@@ -1437,14 +1522,17 @@ async function start(quiet){
  if(!navigator.onLine)banner('<i class="fa-solid fa-wifi"></i> No internet: records are kept on the phone and sent later',7000);
  }catch(e){$('err').textContent='Error: '+(e.message||e)}
  SRT=false}
-async function stop(){SGEN++;stopTone();clearInterval(batT);clearInterval(cfgT);prev=null;pp=null;closeAll(Date.now()/1000);
+async function stop(auto){SGEN++;stopTone();clearInterval(batT);clearInterval(cfgT);prev=null;pp=null;closeAll(Date.now()/1000);
  // the camera ends with the trip: a breach still open on the phone gets its end time
  // there and comes back here before anything is pushed
  await dmsStop();await dmsDrain();
  Object.keys(VS).forEach(k=>VS[k]=0);tripClear();
  if(lastLoc)outAdd({t:'pos',p:row(lastLoc,0,false)});flush();
- logAct('Ended trip',(asg?.vehicles?.name||'')+(lastLoc?' at '+lastLoc.latitude.toFixed(5)+', '+lastLoc.longitude.toFixed(5):''));
+ logAct(auto?'Ended trip automatically':'Ended trip',(asg?.vehicles?.name||'')+(lastLoc?' at '+lastLoc.latitude.toFixed(5)+', '+lastLoc.longitude.toFixed(5):''));
  if(watcher){await CapPlugins.BG.removeWatcher({id:watcher});watcher=null}
+ // the trip's watcher is gone, so the one that waits for the next start takes its place -
+ // including after this very callback ended a trip nobody had pressed a button for
+ STILLAT=0;senOn();
  $('go').classList.remove('hide');$('stp').classList.add('hide');const c=$('stc');c.textContent='Parking';c.style.background='var(--bll)';c.style.color='var(--bl)';$('sp').textContent='0'}
 async function openDash(){const {data:{session}}=await sb.auth.getSession();if(!session)return;
  logAct('Opened dashboard from app',(asg?.vehicles?.name||''));
