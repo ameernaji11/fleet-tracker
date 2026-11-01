@@ -779,7 +779,31 @@ function testAlert(){const R=RUL.overspeed||{};
 // ---- driving events and telemetry
 const MIN_MOVING_KMH=2;
 const sepm=(a,b)=>{const r=x=>x*Math.PI/180,dLa=r(b.latitude-a.latitude),dLo=r(b.longitude-a.longitude),x=Math.sin(dLa/2)**2+Math.cos(r(a.latitude))*Math.cos(r(b.latitude))*Math.sin(dLo/2)**2;return 12742000*Math.asin(Math.sqrt(x))};
-let V={voice_on:1,lang:'en',zones_on:1,bb_on:1,bb_days:3,bb_min_kmh:1,dms_on:0,dms_fps:5,dms_pre_s:3,dms_post_s:1,dms_keep_d:7,dms_preview:1};const LIM={speed:100,brake:-3,accel:2.5,buf:0,warn:0,dist:0,zbuf:0},HOLD={harsh_braking:0,harsh_acceleration:0,overspeed:0,zone_overspeed:0},ON={},lastEv={},lastNotify={},VS={},ANN={};let prev=null,lastA=0,lastLoc=null,ODOM=0,pp=null,bat={},fl=false,batT,cfgT,MOV=10,STP=3600;
+// A position a map can use: two real numbers, in range, and not the (0,0) a receiver
+// reports before it has locked anything. That pair is a point in the Gulf of Guinea, and an
+// event drawn there is worse than an event with no place at all.
+const goodXY=(lat,lng)=>{const a=+lat,b=+lng;return Number.isFinite(a)&&Number.isFinite(b)&&
+ Math.abs(a)<=90&&Math.abs(b)<=180&&Math.abs(a)+Math.abs(b)>.01};
+const goodLoc=l=>!!l&&goodXY(l.latitude,l.longitude);
+// The newest fix this handset really locked. Kept apart from lastLoc because that one is
+// whatever was reported last, good or not.
+let GOOD=null;
+// An event whose own reading had no place takes the last one the phone held: a fleet that
+// is told a breach happened somewhere looks for it on the map, and the last place the
+// vehicle was heard is the honest answer about where it was. Words are added to the row's
+// own details saying the place was borrowed and how long before, so nobody reads it as a
+// position measured at that second. When nothing has ever been locked there is nothing to
+// lend - the columns stay empty, and no event is ever stamped at 0,0.
+function evFix(p){if(!p||goodXY(p.lat,p.lng))return '';const l=GOOD;
+ if(!l){p.lat=null;p.lng=null;return ''}
+ p.lat=l.latitude;p.lng=l.longitude;
+ if(p.accuracy==null)p.accuracy=l.accuracy;
+ if(p.altitude==null)p.altitude=l.altitude;
+ if(p.heading==null)p.heading=l.bearing;
+ const g=Math.max(0,Math.round((Date.now()-(l.time||Date.now()))/1000));
+ return ' · place from the last GPS fix, '+(g<90?g+' s':Math.round(g/60)+' min')+' earlier'}
+let V={voice_on:1,lang:'en',
+zones_on:1,bb_on:1,bb_days:3,bb_min_kmh:1,dms_on:0,dms_fps:5,dms_pre_s:3,dms_post_s:1,dms_keep_d:7,dms_preview:1};const LIM={speed:100,brake:-3,accel:2.5,buf:0,warn:0,dist:0,zbuf:0},HOLD={harsh_braking:0,harsh_acceleration:0,overspeed:0,zone_overspeed:0},ON={},lastEv={},lastNotify={},VS={},ANN={};let prev=null,lastA=0,lastLoc=null,ODOM=0,pp=null,bat={},fl=false,batT,cfgT,MOV=10,STP=3600;
 // ---- geofences. An admin draws these on the dashboard's Live Tracking map and
 // gives each one a speed limit; the phone reads the shapes, tests every fix against
 // them and reports driving in, driving out or passing the zone's own limit.
@@ -799,13 +823,15 @@ function zEv(type,z,loc,kmh){if(!ON[type])return;
  // crossing. A duration column that is blank reads as lost data, and a moment that
  // lasted a second is the truest thing a fix rate of one per second can say about it.
  const at=new Date(loc.time||Date.now());
- outAdd({t:'ev',p:{cid:uid(),user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,
+ const P={cid:uid(),user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,
   vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,type,lat:loc.latitude,lng:loc.longitude,
   speed:Math.round(kmh),value:Math.round(kmh),
   details:(type==='zone_enter'?'Entered ':'Left ')+(z.name||'zone')+(z.speed_limit?' · limit '+z.speed_limit+' km/h':''),
   recorded_at:at.toISOString(),ended_at:new Date(at.getTime()+1000).toISOString(),
   accuracy:loc.accuracy,altitude:loc.altitude,heading:loc.bearing,accel:+(lastA*3.6).toFixed(1),
-  battery_pct:bat.p,charging:bat.c,ignition:true,road_limit:+z.speed_limit||null}});
+  battery_pct:bat.p,charging:bat.c,ignition:true,road_limit:+z.speed_limit||null};
+ P.details+=evFix(P);
+ outAdd({t:'ev',p:P});
  flush()}
 // the zones a fix falls inside, tightest speed limit first
 const zin=loc=>ZONES.filter(z=>z.pts&&z.pts.length>2&&inPoly(loc.latitude,loc.longitude,z.pts))
@@ -870,12 +896,16 @@ function ev(type){const b=VS[type];if(!b)return;RST[type]='';
  // the dashboard popup and report need no second query. The phone names the row
  // itself: that is what lets its closing update queue up behind it offline.
  const id=uid();
- outAdd({t:'ev',p:{cid:id,user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,
+ const P={cid:id,user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,
   vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,type,lat:loc.latitude,lng:loc.longitude,
   speed:Math.round(b.kmh),value:+(isSp(type)?b.kmh:b.val).toFixed(1),
   details:evTxt(type,b.kmh,b.val,b.peak,lvl),recorded_at:new Date(loc.time||b.t*1000).toISOString(),
   accuracy:loc.accuracy,altitude:loc.altitude,heading:loc.bearing,accel:+(lastA*3.6).toFixed(1),
-  battery_pct:bat.p,charging:bat.c,ignition:true,road_limit:lim}});
+  battery_pct:bat.p,charging:bat.c,ignition:true,road_limit:lim};
+ // which place the row carries is remembered on the breach, because the closing update
+ // writes these words again and must not turn a borrowed position into a measured one
+ b.bor=evFix(P);P.details+=b.bor;
+ outAdd({t:'ev',p:P});
  RST[type]=id;flush()}
 function endEv(type,t){const b=VS[type];if(!b)return;VS[type]=null;
  const dur=Math.max(0,t-b.t),id=RST[type];
@@ -883,7 +913,7 @@ function endEv(type,t){const b=VS[type];if(!b)return;VS[type]=null;
  if(id){const lvl=evLvl(type),peak=b.peak;
   outAdd({t:'upd',id,p:{ended_at:new Date(t*1000).toISOString(),
    value:+(isSp(type)?Math.max(b.kmh,peak||0).toFixed(1):peak.toFixed(1)),
-   details:evTxt(type,b.kmh,b.val,peak,lvl,dur)}})}
+   details:evTxt(type,b.kmh,b.val,peak,lvl,dur)+(b.bor||'')}})}
  RST[type]=null;
  // and the fix that closed it, so the breach has an end point on the map too
  if(b.loc)lastLoc=b.loc,outAdd({t:'pos',p:row(b.loc,Math.round(b.kmh),true)}),flush()}
@@ -902,12 +932,18 @@ function closeAll(t){Object.keys(VS).forEach(k=>endEv(k,t))}
 // no camera, no model or a refused permission drives and is recorded exactly as before.
 const DMS=['dms_fatigue','dms_distraction','dms_phone_use','dms_yawning','dms_talking',
  'dms_eating','dms_drinking','dms_smoking','dms_cam_blocked'];
-let DMSL=false,CAMD=false,CAMON=false,CAMSEEN=false;
+let DMSL=false,CAMD=false,CAMON=false,CAMSEEN=false,CAMERR=false,FEEDKM=0;
 // a settings number that keeps a real zero: a clip of nothing before the alert is a
 // choice the page can make, and a truth test would turn it back into 3 seconds
 function num(v,d){const n=+v;return Number.isFinite(n)&&n>=0?n:d}
 const dmsHas=()=>!!(window.CapPlugins&&CapPlugins.Dms);
 const dmsOn=()=>dmsHas()&&V.dms_on===1;
+// The lowest minimum speed among the rules this fleet has switched on. Below it the
+// camera is open, and reading the driver's face, and simply not allowed to say anything -
+// which is a fact a driver testing the lens in his own yard needs telling, not working
+// out. Zero when every rule answers at any speed, or when nothing has been read yet.
+function dmsMinKmh(){const a=DMS.filter(t=>RUL[t]&&RUL[t].enabled!==false)
+ .map(t=>Math.max(0,+RUL[t].speed_min||0));return a.length?Math.min.apply(null,a):0}
 // the whole setup, in the shape the plugin reads: the nine rules by their own column
 // names, the words to speak by language, and who to file a record against
 function dmsCfg(){const v=asg?.vehicles||{},d=asg?.drivers||{};
@@ -922,28 +958,44 @@ async function dmsSync(){if(!(dmsOn()||CAMW))return;try{await CapPlugins.Dms.con
 // is one of them although it can answer without it, because the named phone is the
 // reading worth having and the covered-face colour test is the fallback.
 const OBJRULES=['dms_phone_use','dms_eating','dms_drinking','dms_smoking'];
-// Every reason the watch may be doing less than the dashboard thinks it is, in the
-// order a driver can act on them: a lens he has not allowed, a build with no model in
-// it, a lens that never opened. The two at the end are the ones that used to be
-// invisible - that the second model refused to load, and that an alert asked for a
-// picture the encoder would not write - and both of them are the difference between a
-// fleet with recordings and a fleet whose Events table has no camera icon on any row.
+// Every reason the watch may be doing less than the dashboard thinks it is, in the order
+// a driver can act on them: a lens he has not allowed, a service that is not running or is
+// not judging this trip, a build with no model in it, a lens that never opened. The last
+// three used to be invisible - that the second model refused to load, that an alert asked
+// for a picture the encoder would not write, and that a camera which never heard a wheel
+// turn is armed by no rule at all - and each is the difference between a fleet with camera
+// events and a fleet whose Events table has no camera icon on any row.
+// Only clears the line it wrote itself. A driver's own watch has nothing to report, and
+// emptying the error strip to say so used to erase whatever else was on it - including
+// the reason a trip was not being watched.
+function camErr(t){const e=$('err');if(!e)return;if(t){e.textContent=t;CAMERR=true}else if(CAMERR){e.textContent='';CAMERR=false}}
 function dmsSay(s){if(!s)return;
- if(s.granted===false){$('err').textContent='Driver camera: allow the camera on the Permissions page, then start the trip again.';return}
+ if(s.granted===false){camErr('Driver camera: allow the camera on the Permissions page, then start the trip again.');return}
  // A lens the driver opened for himself is not a fleet watch: it has nothing to say about
- // warnings, because it raises none. Only a trip's camera is ever described as watching.
- if(s.running&&s.trip===false){$('err').textContent='';return}
- if(s.running&&s.model===false){$('err').textContent='Driver camera is not watching: this build has no face model.'+(s.error?' ('+s.error+')':'');return}
- if(s.running&&s.camera===false&&s.reason){$('err').textContent='Driver camera: '+s.reason;return}
+ // warnings, because it raises none. Only a trip's camera is ever described as watching -
+ // and a trip that believes it owns the lens while the service answers that it is judging
+ // nothing is the one failure the picture in the corner of the map cannot show.
+ if(s.running&&s.trip===false){camErr(CAMON?'Driver camera: the lens is open but this trip is not being watched: end the trip, then start it again':'');return}
+ // No service at all. Asked only ever by a page that thinks a trip has the camera, so the
+ // lens keeps painting from the last pictures the old service handed over and the driver
+ // is watching a screen nobody is reading.
+ if(!s.running){camErr(CAMON?'Driver camera: the phone is not watching this trip'+(s.reason?' ('+s.reason+')':''):'');return}
+ if(s.model===false){camErr('Driver camera is not watching: this build has no face model.'+(s.error?' ('+s.error+')':''));return}
+ if(s.camera===false&&s.reason){camErr('Driver camera: '+s.reason);return}
  let w='';
- if(s.running&&s.notices===true)w='Notifications are off on this phone: camera warnings show on the screen only.';
- if(s.running&&s.objects===false&&OBJRULES.some(t=>RUL[t]&&ON[t]))
+ if(s.notices===true)w='Notifications are off on this phone: camera warnings show on the screen only.';
+ // The speed is what arms every one of the nine rules, and the only thing in this app that
+ // can give the camera one is this page's own fix feed. A watch that says nothing while the
+ // page has been driving for a while is a feed that never arrived, and then no rule of the
+ // nine can ever speak - which looks, from the seat, exactly like a camera that works.
+ if(+s.kmh===0&&FEEDKM>=Math.max(10,dmsMinKmh()))w=(w?w+' ':'')+'the camera has not been told how fast this vehicle is going, so no warning can start';
+ if(s.objects===false&&OBJRULES.some(t=>RUL[t]&&ON[t]))
   w=(w?w+' ':'')+'This phone cannot say what the driver is holding'+(s.objectError?' ('+s.objectError+')':'')+
     ': eating, drinking and smoking stay quiet, and a phone is judged only by how much of his face it covers.';
  const nd=Math.max(0,+s.clipDropped||0),ce=String(s.clipError||'').replace(/^[0-9a-fA-F-]{12,}: /,'');
- if(s.running&&(nd||ce))w=(w?w+' ':'')+(nd?nd+' alert'+(nd===1?' has':'s have')+' no recording because the camera had no picture to keep. ':'')+
+ if(nd||ce)w=(w?w+' ':'')+(nd?nd+' alert'+(nd===1?' has':'s have')+' no recording because the camera had no picture to keep. ':'')+
   (ce?'The last recording failed: '+ce+'. ':'');
- if(w)$('err').textContent='Driver camera: '+w}
+ if(w)camErr('Driver camera: '+w);else camErr('')}
 async function dmsStatus(){if(!(dmsOn()||CAMW))return;try{dmsSay(await CapPlugins.Dms.status())}catch(e){}}
 // trip start: the lens opens with the trip, because Android only lets a camera service
 // begin while this app is the screen in front - which is exactly when Start is pressed.
@@ -951,18 +1003,31 @@ async function dmsStatus(){if(!(dmsOn()||CAMW))return;try{dmsSay(await CapPlugin
 // so this only paints over the panel when the fleet's switch is the thing that opened it
 async function dmsStart(){if(CAMW&&!dmsOn())return;camPaint(false);if(!dmsOn())return;
  CAMSEEN=false;let r=null;
- try{r=await CapPlugins.Dms.start({trip:true})}catch(e){$('err').textContent='Driver camera could not start: '+(e.message||e);return}
+ try{r=await CapPlugins.Dms.start({trip:true})}catch(e){camErr('Driver camera could not start: '+(e.message||e));return}
+ // Android will not let an app that is off screen raise a camera service. The page asked
+ // from its own button, so this is the rare answer - and it has always been the one the
+ // driver could least afford, because a trip that believes it opened a lens that never
+ // opened runs its whole shift unwatched and says nothing about it.
+ if(r&&r.started===false){camErr('Driver camera: '+(r.reason||'this phone would not start the camera service'));return}
  dmsSay(r);if(!r||r.granted===false)return;
  // the phone opened the box the way the dashboard has it set, and says so; the
  // driver's own button then changes it for the rest of this trip
  camPaint(r.preview!==false);CAMON=true;
- // a lens that has not handed over a picture after a few seconds is a lens that is not
- // working, and the reason is worth saying out loud before the trip is over
- setTimeout(()=>{if(!CAMSEEN)dmsStatus()},5000)}
-async function dmsStop(){const closed=await dwOff();CAMON=false;camPaint(false);if(!dmsHas()||closed)return;try{await CapPlugins.Dms.stop()}catch(e){}}
+ const lo=dmsMinKmh();
+ if(lo)banner('<i class="fa-solid fa-video"></i> Camera warnings on this fleet start above '+lo+' km/h: a vehicle that is stopped or crawling raises nothing',8000);
+ // a picture in the corner is not the same thing as a lens that is judging, and every way
+ // the two differ is invisible from the map, so the trip's camera is asked what it is doing
+ // whether or not a frame ever arrived
+ setTimeout(()=>{if(CAMON)dmsStatus()},5000)}
+async function dmsStop(){const closed=await dwOff();CAMON=false;camErr('');camPaint(false);if(!dmsHas()||closed)return;try{await CapPlugins.Dms.stop()}catch(e){}}
 // every fix the vehicle's own watcher already produces, so an event can say where the
 // driver was and how fast the vehicle was going at the moment his face was judged
 function dmsFeed(loc,kmh){if(!(dmsOn()||CAMW))return;
+ FEEDKM=kmh;
+ // a reading the receiver has not locked is not sent to the service at all: it would
+ // replace the good place the camera was holding with a 0,0, and every alert raised in
+ // the next minute would be stamped in the sea rather than in the yard
+ if(!goodLoc(loc))return;
  try{const p=CapPlugins.Dms.feed({lat:loc.latitude,lng:loc.longitude,acc:loc.accuracy,alt:loc.altitude,
   heading:loc.bearing,kmh,at:Date.now()});if(p&&p.catch)p.catch(()=>{})}catch(e){}}
 function dmsUi(){if(!dmsHas())return;
@@ -996,6 +1061,11 @@ async function dmsDrain(){if(!dmsHas())return;let items=null;
   // the video the camera wrote for this row is not carried here: it is a file on this
   // phone named after the id above, and the queue picks it up by that id when the row it
   // belongs to is sent - see clipFor()
+  // the lens often fires before the receiver has locked anything - a trip started in a
+  // basement, or one Android restarted without a fresh fix - so the place is filled from
+  // the last fix this page held, which is the same thing the page writes for its own
+  // breaches. A close is left alone: it carries only what changed.
+  p.details=(p.details||'')+evFix(p);
   outAdd({t:'ev',p})}
  flush()}
 function dmsListen(){if(DMSL||!dmsHas())return;DMSL=true;
@@ -1064,6 +1134,7 @@ async function dwUp(){const why=dwWhy();if(why)return why;
  try{await CapPlugins.Dms.configure({cfg:dmsCfg()});r=await CapPlugins.Dms.start({trip:false})}
  catch(e){out='the camera could not be opened: '+(e.message||e)}
  if(!out&&(!r||r.granted===false))out='the camera is not allowed on this phone - allow it on the Permissions page, then press again';
+ if(!out&&r&&r.started===false)out=(r.reason||'this phone would not start the camera service');
  if(!out){CAMSEEN=false;await camBox(true);
   // a service that came up without a lens means another app is holding it, and that is
   // worth saying rather than watching a black square for a whole shift
@@ -1576,7 +1647,13 @@ async function showLast(){if(!asg?.vehicle_id)return;
  // unreachable, and the phone has not recorded one yet in this session
  const r=await q(sb.from('positions').select('*').eq('vehicle_id',asg.vehicle_id).order('recorded_at',{ascending:false}).limit(1));
  const p=r.data&&r.data[0];if(!p)return;const ll=[+p.lat,+p.lng],t=Date.parse(p.recorded_at),old=Date.now()-t>120000;
- upd({latitude:+p.lat,longitude:+p.lng,accuracy:p.accuracy,altitude:p.altitude,bearing:p.heading,time:t},old?0:p.speed||0,!old&&(p.speed||0)>=MIN_MOVING_KMH);
+ const o={latitude:+p.lat,longitude:+p.lng,accuracy:p.accuracy,altitude:p.altitude,bearing:p.heading,time:t};
+ // the newest fix this vehicle has on the server is also the last place it was ever heard,
+ // so it is what an event raised before this phone locked anything falls back to. A trip
+ // started in a basement therefore says where the vehicle was when it last spoke, with that
+ // point's own age written into the row - which is the truth, rather than a blank or a 0,0
+ if(goodLoc(o)&&(!GOOD||o.time>(GOOD.time||0)))GOOD=o;
+ upd(o,old?0:p.speed||0,!old&&(p.speed||0)>=MIN_MOVING_KMH);
  if(old){const c=$('stc');c.textContent='Parking';c.style.background='var(--bll)';c.style.color='var(--bl)'}
  $('lt').textContent='Last record '+new Date(t).toLocaleString('en-GB');
  if(map){if(follow)map.setView(ll,Math.max(map.getZoom(),15));trail.addLatLng(ll)}}
@@ -1622,6 +1699,12 @@ async function start(quiet,auto){
   bbPut(bbPack(loc,kmh));
   // and the driver camera is told where the vehicle is, so a warning raised with the
   // screen locked still lands on a position and a speed
+  // this is also where the phone keeps its last real lock, which is the place every
+  // event raised without one falls back to. It is taken here, before the send throttle
+  // below drops most fixes, because the watcher speaks every second whether the fleet is
+  // being told or not - and a fallback that is a minute old is a worse guess than one
+  // that is a second old
+  if(goodLoc(loc))GOOD=loc;
   dmsFeed(loc,kmh);
   // detect first: the Accel. tile then shows the value that just triggered the alert
   detect(loc,kmh);upd(loc,kmh,moving);
