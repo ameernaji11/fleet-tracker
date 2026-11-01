@@ -488,7 +488,7 @@ function alertRing(){ALRM=Date.now()+8000;$('fr').classList.add('on');if(mrk)mrk
 async function pAsk(){try{const id=await CapPlugins.BG.addWatcher({requestPermissions:true,backgroundTitle:'Fleet Tracker',backgroundMessage:'Checking permissions'},()=>{});setTimeout(()=>CapPlugins.BG.removeWatcher({id}),3000)}catch(e){$('err').textContent='Location: '+(e.message||e)}
  await askNotif()}
 // ---- alerts on the phone
-let RUL={};const EVN={harsh_braking:'Harsh braking',harsh_acceleration:'Harsh acceleration',overspeed:'Overspeed',zone_enter:'Entered zone',zone_exit:'Left zone',zone_overspeed:'Zone overspeed',dms_fatigue:'Driver fatigued',dms_distraction:'Driver distracted',dms_phone_use:'Phone in hand',dms_cam_blocked:'Camera blocked'};
+let RUL={};const EVN={harsh_braking:'Harsh braking',harsh_acceleration:'Harsh acceleration',overspeed:'Overspeed',zone_enter:'Entered zone',zone_exit:'Left zone',zone_overspeed:'Zone overspeed',dms_fatigue:'Driver fatigued',dms_distraction:'Driver distracted',dms_phone_use:'Phone in hand',dms_cam_blocked:'Camera blocked',dms_yawning:'Driver yawning',dms_talking:'Talking while driving',dms_eating:'Eating while driving',dms_drinking:'Drinking while driving',dms_smoking:'Hand at the mouth'};
 // Alerts must be audible even when the driver never opened the Permissions screen, so every
 // trip start re-asks for notification permission and registers the loud channel it posts to.
 let CHAN=false;
@@ -528,10 +528,10 @@ async function askNotif(){await logAct('Allowed permissions');
 // the on/off switches come from the dashboard Configuration page.
 const VLANG={en:['English','en-US'],ar:['Arabic','ar-SA'],hi:['Hindi','hi-IN'],ur:['Urdu','ur-PK']};
 const VMSG={
- en:{overspeed:'You are over the speed limit. Please slow down.',harsh_braking:'Harsh braking detected. Keep a safe distance and brake gently.',harsh_acceleration:'Harsh acceleration detected. Please accelerate smoothly.',zone_enter:'You have entered a restricted zone.',zone_exit:'You have left the zone.',zone_overspeed:'You are over the speed limit for this zone. Please slow down.',dms_fatigue:'You look tired. Please take a break.',dms_distraction:'Please keep your eyes on the road.',dms_phone_use:'Please do not use a phone while driving.',dms_cam_blocked:'The driver camera is covered. Keep the view clear.'},
- ar:{overspeed:'لقد تجاوزت حد السرعة. يرجى تخفيف السرعة.',harsh_braking:'تم رصد فرملة قوية. حافظ على مسافة آمنة واضغط على الفرامل بهدوء.',harsh_acceleration:'تم رصد تسارع قوي. يرجى التسارع بسلاسة.',zone_enter:'لقد دخلت المنطقة المحددة.',zone_exit:'لقد غادرت المنطقة المحددة.',zone_overspeed:'لقد تجاوزت السرعة المحددة داخل هذه المنطقة. يرجى تخفيف السرعة.',dms_fatigue:'يبدو أنك متعب. يرجى أخذ استراحة.',dms_distraction:'رجاءً أبقِ ناظريك على الطريق.',dms_phone_use:'رجاءً لا تستخدم الهاتف أثناء القيادة.',dms_cam_blocked:'كاميرا السائق مغطاة. أبقِ الرؤية واضحة.'},
- hi:{overspeed:'आप गति सीमा से ऊपर हैं। कृपया गति कम करें।',harsh_braking:'तेज़ ब्रेक लगाया गया। सुरक्षित दूरी रखें और धीरे ब्रेक लगाएँ।',harsh_acceleration:'तेज़ रफ़्तार पकड़ी गई। कृपया धीरे-धीरे गति बढ़ाएँ।',zone_enter:'आप निर्धारित क्षेत्र में प्रवेश कर गए हैं।',zone_exit:'आप निर्धारित क्षेत्र से बाहर निकल गए हैं।',zone_overspeed:'इस क्षेत्र की गति सीमा से ऊपर चल रहे हैं। कृपया गति कम करें।',dms_fatigue:'आप थके हुए लगते हैं। कृपया विश्राम करें।',dms_distraction:'कृपया नज़र सड़क पर रखें।',dms_phone_use:'कृपया ड्राइव करते समय फ़ोन का उपयोग न करें।',dms_cam_blocked:'ड्राइवर कैमरा ढका है। दृश्य साफ़ रखें।'},
- ur:{overspeed:'آپ رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',harsh_braking:'سخت بریک لگائی گئی۔ محفوظ فاصلہ رکھیں اور آہستہ بریک لگائیں۔',harsh_acceleration:'تیز رفتاری پکڑی گئی۔ براہ کرم آہستہ آہستہ رفتار بڑھائیں۔',zone_enter:'آپ مقررہ علاقے میں داخل ہو گئے ہیں۔',zone_exit:'آپ مقررہ علاقے سے باہر نکل گئے ہیں۔',zone_overspeed:'اس علاقے کی رفتار کی حد سے اوپر جا رہے ہیں۔ براہ کرم رفتار کم کریں۔',dms_fatigue:'آپ تھکے ہوئے لگتے ہیں۔ براہ کرم آرام کریں۔',dms_distraction:'براہ کرم نظر سڑک پر رکھیں۔',dms_phone_use:'براہ کرم ڈرائیو کرتے وقت فون استعمال نہ کریں۔',dms_cam_blocked:'ڈرائیور کیمیر ڈھکا ہوا ہے۔ دید صاف رکھیں۔'}};
+ en:{overspeed:'You are over the speed limit. Please slow down.',harsh_braking:'Harsh braking detected. Keep a safe distance and brake gently.',harsh_acceleration:'Harsh acceleration detected. Please accelerate smoothly.',zone_enter:'You have entered a restricted zone.',zone_exit:'You have left the zone.',zone_overspeed:'You are over the speed limit for this zone. Please slow down.',dms_fatigue:'You look tired. Please take a break.',dms_distraction:'Please keep your eyes on the road.',dms_phone_use:'Please do not use a phone while driving.',dms_cam_blocked:'The driver camera is covered. Keep the view clear.',dms_yawning:'You are yawning. Please take a break.',dms_talking:'Please keep conversations short while driving.',dms_eating:'Please do not eat while driving.',dms_drinking:'Please do not drink while driving.',dms_smoking:'Please keep your hands on the wheel.'},
+ ar:{overspeed:'لقد تجاوزت حد السرعة. يرجى تخفيف السرعة.',harsh_braking:'تم رصد فرملة قوية. حافظ على مسافة آمنة واضغط على الفرامل بهدوء.',harsh_acceleration:'تم رصد تسارع قوي. يرجى التسارع بسلاسة.',zone_enter:'لقد دخلت المنطقة المحددة.',zone_exit:'لقد غادرت المنطقة المحددة.',zone_overspeed:'لقد تجاوزت السرعة المحددة داخل هذه المنطقة. يرجى تخفيف السرعة.',dms_fatigue:'يبدو أنك متعب. يرجى أخذ استراحة.',dms_distraction:'رجاءً أبقِ ناظريك على الطريق.',dms_phone_use:'رجاءً لا تستخدم الهاتف أثناء القيادة.',dms_cam_blocked:'كاميرا السائق مغطاة. أبقِ الرؤية واضحة.',dms_yawning:'أنت تتثاءب. يرجى أخذ استراحة.',dms_talking:'رجاءً اجعل المحادثات قصيرة أثناء القيادة.',dms_eating:'رجاءً لا تأكل أثناء القيادة.',dms_drinking:'رجاءً لا تشرب أثناء القيادة.',dms_smoking:'رجاءً أبقِ يديك على المقود.'},
+ hi:{overspeed:'आप गति सीमा से ऊपर हैं। कृपया गति कम करें।',harsh_braking:'तेज़ ब्रेक लगाया गया। सुरक्षित दूरी रखें और धीरे ब्रेक लगाएँ।',harsh_acceleration:'तेज़ रफ़्तार पकड़ी गई। कृपया धीरे-धीरे गति बढ़ाएँ।',zone_enter:'आप निर्धारित क्षेत्र में प्रवेश कर गए हैं।',zone_exit:'आप निर्धारित क्षेत्र से बाहर निकल गए हैं।',zone_overspeed:'इस क्षेत्र की गति सीमा से ऊपर चल रहे हैं। कृपया गति कम करें।',dms_fatigue:'आप थके हुए लगते हैं। कृपया विश्राम करें।',dms_distraction:'कृपया नज़र सड़क पर रखें।',dms_phone_use:'कृपया ड्राइव करते समय फ़ोन का उपयोग न करें।',dms_cam_blocked:'ड्राइवर कैमरा ढका है। दृश्य साफ़ रखें।',dms_yawning:'आप उबासी ले रहे हैं। कृपया विश्राम करें।',dms_talking:'कृपया ड्राइव करते समय बातें छोटी रखें।',dms_eating:'कृपया ड्राइव करते समय कुछ न खाएँ।',dms_drinking:'कृपया ड्राइव करते समय कुछ न पिएँ।',dms_smoking:'कृपया अपने हाथ स्टीयरिंग पर रखें।'},
+ ur:{overspeed:'آپ رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',harsh_braking:'سخت بریک لگائی گئی۔ محفوظ فاصلہ رکھیں اور آہستہ بریک لگائیں۔',harsh_acceleration:'تیز رفتاری پکڑی گئی۔ براہ کرم آہستہ آہستہ رفتار بڑھائیں۔',zone_enter:'آپ مقررہ علاقے میں داخل ہو گئے ہیں۔',zone_exit:'آپ مقررہ علاقے سے باہر نکل گئے ہیں۔',zone_overspeed:'اس علاقے کی رفتار کی حد سے اوپر جا رہے ہیں۔ براہ کرم رفتار کم کریں۔',dms_fatigue:'آپ تھکے ہوئے لگتے ہیں۔ براہ کرم آرام کریں۔',dms_distraction:'براہ کرم نظر سڑک پر رکھیں۔',dms_phone_use:'براہ کرم ڈرائیو کرتے وقت فون استعمال نہ کریں۔',dms_cam_blocked:'ڈرائیور کیمیر ڈھکا ہوا ہے۔ دید صاف رکھیں۔',dms_yawning:'آپ اونگھ رہے ہیں۔ براہ کرم آرام کریں۔',dms_talking:'براہ کرم ڈرائیو کرتے وقت باتیں مختصر رکھیں۔',dms_eating:'براہ کرم ڈرائیو کے دوران کھانا نہ کھائیں۔',dms_drinking:'براہ کرم ڈرائیو کے دوران کچھ نہ پئیں۔',dms_smoking:'براہ کرم اپنے ہاتھ اسٹیئرنگ پر رکھیں۔'}};
 const vrMsg=(t,l)=>(VMSG[l]||VMSG.en)[t]||VMSG.en[t]||'';
 // the WebView's own speechSynthesis is unreliable on Android, so the native
 // text-to-speech plugin is tried first and the browser voice is the fallback.
@@ -614,13 +614,16 @@ function zDraw(){if(!map)return;if(zLayer){zLayer.remove();zLayer=null}
   L.polygon(z.pts,{color:z.color||'#2f7fe6',weight:2,fillOpacity:.08,dashArray:'6 4'})
    .bindTooltip(z.name+(z.speed_limit?' · '+z.speed_limit+' km/h':''),{permanent:false}).addTo(zLayer)})}
 function zEv(type,z,loc,kmh){if(!ON[type])return;
- // a zone change is a moment, not a breach that grows, so it is written straight
- // away with the readings of the fix that crossed the line
+ // a zone change is a moment, not a breach that grows: nothing ever comes back to
+ // close it, so the row carries its own end time one second after the instant of the
+ // crossing. A duration column that is blank reads as lost data, and a moment that
+ // lasted a second is the truest thing a fix rate of one per second can say about it.
+ const at=new Date(loc.time||Date.now());
  outAdd({t:'ev',p:{cid:uid(),user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,
   vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,type,lat:loc.latitude,lng:loc.longitude,
   speed:Math.round(kmh),value:Math.round(kmh),
   details:(type==='zone_enter'?'Entered ':'Left ')+(z.name||'zone')+(z.speed_limit?' · limit '+z.speed_limit+' km/h':''),
-  recorded_at:new Date(loc.time||Date.now()).toISOString(),
+  recorded_at:at.toISOString(),ended_at:new Date(at.getTime()+1000).toISOString(),
   accuracy:loc.accuracy,altitude:loc.altitude,heading:loc.bearing,accel:+(lastA*3.6).toFixed(1),
   battery_pct:bat.p,charging:bat.c,ignition:true,road_limit:+z.speed_limit||null}});
  flush()}
@@ -717,14 +720,15 @@ function closeAll(t){Object.keys(VS).forEach(k=>endEv(k,t))}
 // which is what keeps the driver's own rights and the guards on the events table the
 // thing that decides what a record becomes. Nothing here can stop a trip: a phone with
 // no camera, no model or a refused permission drives and is recorded exactly as before.
-const DMS=['dms_fatigue','dms_distraction','dms_phone_use','dms_cam_blocked'];
+const DMS=['dms_fatigue','dms_distraction','dms_phone_use','dms_yawning','dms_talking',
+ 'dms_eating','dms_drinking','dms_smoking','dms_cam_blocked'];
 let DMSL=false,CAMD=false,CAMON=false,CAMSEEN=false;
 // a settings number that keeps a real zero: a clip of nothing before the alert is a
 // choice the page can make, and a truth test would turn it back into 3 seconds
 function num(v,d){const n=+v;return Number.isFinite(n)&&n>=0?n:d}
 const dmsHas=()=>!!(window.CapPlugins&&CapPlugins.Dms);
 const dmsOn=()=>dmsHas()&&V.dms_on===1;
-// the whole setup, in the shape the plugin reads: the four rules by their own column
+// the whole setup, in the shape the plugin reads: the nine rules by their own column
 // names, the words to speak by language, and who to file a record against
 function dmsCfg(){const v=asg?.vehicles||{},d=asg?.drivers||{};
  return{dms_on:true,dms_fps:V.dms_fps,dms_pre_s:V.dms_pre_s,dms_post_s:V.dms_post_s,dms_keep_d:V.dms_keep_d,
@@ -734,11 +738,29 @@ function dmsCfg(){const v=asg?.vehicles||{},d=asg?.drivers||{};
   msgs:VMSG,rules:DMS.map(t=>RUL[t]).filter(Boolean)}}
 async function dmsSync(){if(!(dmsOn()||CAMW))return;try{await CapPlugins.Dms.configure({cfg:dmsCfg()})}catch(e){}}
 // why the lens is not watching, in the driver's own words
+// The rules that ask the second model to name a thing in the driver's hand. Phone use
+// is one of them although it can answer without it, because the named phone is the
+// reading worth having and the covered-face colour test is the fallback.
+const OBJRULES=['dms_phone_use','dms_eating','dms_drinking','dms_smoking'];
+// Every reason the watch may be doing less than the dashboard thinks it is, in the
+// order a driver can act on them: a lens he has not allowed, a build with no model in
+// it, a lens that never opened. The two at the end are the ones that used to be
+// invisible - that the second model refused to load, and that an alert asked for a
+// picture the encoder would not write - and both of them are the difference between a
+// fleet with recordings and a fleet whose Events table has no camera icon on any row.
 function dmsSay(s){if(!s)return;
  if(s.granted===false){$('err').textContent='Driver camera: allow the camera on the Permissions page, then start the trip again.';return}
  if(s.running&&s.model===false){$('err').textContent='Driver camera is not watching: this build has no face model.'+(s.error?' ('+s.error+')':'');return}
  if(s.running&&s.camera===false&&s.reason){$('err').textContent='Driver camera: '+s.reason;return}
- if(s.running&&s.notices===true)$('err').textContent='Notifications are off on this phone: camera warnings show on the screen only.'}
+ let w='';
+ if(s.running&&s.notices===true)w='Notifications are off on this phone: camera warnings show on the screen only.';
+ if(s.running&&s.objects===false&&OBJRULES.some(t=>RUL[t]&&ON[t]))
+  w=(w?w+' ':'')+'This phone cannot say what the driver is holding'+(s.objectError?' ('+s.objectError+')':'')+
+    ': eating, drinking and a hand at the mouth stay quiet, and a phone is judged only by how much of his face it covers.';
+ const nd=Math.max(0,+s.clipDropped||0),ce=String(s.clipError||'').replace(/^[0-9a-fA-F-]{12,}: /,'');
+ if(s.running&&(nd||ce))w=(w?w+' ':'')+(nd?nd+' alert'+(nd===1?' has':'s have')+' no recording because the camera had no picture to keep. ':'')+
+  (ce?'The last recording failed: '+ce+'. ':'');
+ if(w)$('err').textContent='Driver camera: '+w}
 async function dmsStatus(){if(!(dmsOn()||CAMW))return;try{dmsSay(await CapPlugins.Dms.status())}catch(e){}}
 // trip start: the lens opens with the trip, because Android only lets a camera service
 // begin while this app is the screen in front - which is exactly when Start is pressed.
@@ -1004,6 +1026,18 @@ const CLIPB='dms-clips';
 // One clip onto the server, answered with the path its row should carry. Empty answers
 // mean an event with no picture, never an event lost: a clip that will not go is only a
 // clip nobody watches, and the trip carries on regardless.
+//
+// It does not, however, carry on unnoticed. The two reasons a whole fleet can end up with
+// no recordings at all - the file store has never been created, or this account is not
+// allowed into it - are both an error the server sends back and this used to throw away,
+// so a clip that fails is said out loud once, in the driver's own words, and once only
+// every few minutes so a bad bucket cannot fill the screen.
+let CLIPWHY='',CLIPTOLD=0;
+function clipFail(m){CLIPWHY=m;
+ // the status line is the one place the camera says anything, and a trip that is
+ // running must not have it overwritten every time a picture is tried
+ if(Date.now()-CLIPTOLD<18e4)return;CLIPTOLD=Date.now();
+ $('err').textContent='Driver camera: '+m}
 async function clipPut(cid){
  if(!cid||!dmsHas()||!me||!sb||!navigator.onLine)return '';
  const p=String(me.id)+'/'+cid+'.mp4';
@@ -1015,37 +1049,48 @@ async function clipPut(cid){
   // not need. A path already taken is this same picture from an earlier attempt at sending
   // this row, which is the file being where it belongs rather than a failure.
   const {error}=await q(sb.storage.from(CLIPB).upload(p,u8,{contentType:'video/mp4'}));
-  if(error&&!/already exists/i.test(String(error.message||'')))return '';
+  if(error&&!/already exists/i.test(String(error.message||''))){
+   const m=String(error.message||error.statusCode||'the file store refused it');
+   clipFail(/bucket|policy|permission|authoriz|row-level|not found/i.test(m)
+    ? 'there is nowhere on the server to keep a recording, so no alert will have a video. Run schema.sql in Supabase once (SQL Editor) - the events themselves are still saved.'
+    : 'a recording could not be stored: '+m);
+   return ''}
   // the server has it, so the handset has nothing left to carry: this is what keeps the
   // phone's own folder inside the days the Configuration page set
   try{const x=CapPlugins.Dms.clipDrop({cid});if(x&&x.catch)x.catch(()=>{})}catch(e){}
+  CLIPWHY='';
   return p;
- }catch(e){return ''}
+ }catch(e){clipFail('a recording could not be read from this phone: '+((e&&e.message)||e));return ''}
 }
 // Attach a clip to a row on its way out. A picture is finished about a second after the
-// alert that made it, so an event normally carries its path when it is born; a closing
-// update takes the one that was not ready yet, which is the last moment this phone is
-// allowed to touch its own row at all.
+// alert that made it, so an event that was already waiting in the queue normally carries
+// its path when it is born; the closing update picks up the one that was not ready yet,
+// and clipSweep below is what catches anything neither of them reached.
 async function clipFor(cid,p){
  if(!p||p.clip_path||DMS.indexOf(p.type)<0)return;
  const path=await clipPut(cid);
  if(path)p.clip_path=path;
 }
 // The pictures still on this phone that belong to a row already sent: an app that died
-// mid-clip, a trip that ended before the queue got there. Only a row that is still open
-// can be named, because that is the only update the events policy lets this account make.
+// mid-clip, a trip that ended before the queue got there, and - the usual case - a
+// breach that closed itself a second after it opened while its clip was still being
+// assembled from the second of camera that followed it. Naming a closed row is what the
+// events policy of v25 allows for exactly this one column; before it, every camera
+// alert of that shape lost its video and nobody anywhere could see why.
 async function clipSweep(){
  if(!dmsHas()||!me||!sb||!navigator.onLine)return;
  let cids=[];try{const r=await CapPlugins.Dms.clips();cids=(r&&r.cids)||[]}catch(e){return}
  if(!cids.length)return;
  for(let i=0;i<cids.length;i+=80){
   const part=cids.slice(i,i+80);
-  const {data,error}=await q(sb.from('events').select('cid,clip_path,ended_at').in('cid',part));
+  const {data,error}=await q(sb.from('events').select('cid,clip_path').in('cid',part));
   if(error||!data)continue;
   for(const r of data){
-   if(r.clip_path||r.ended_at)continue;
+   if(r.clip_path)continue;
    const path=await clipPut(r.cid);
    if(!path)continue;
+   // a refusal here is not worth a message to the driver: the file stays on the phone
+   // and the next sweep tries it again, and the row keeps its reading either way
    await q(sb.from('events').update({clip_path:path}).eq('cid',r.cid));
   }
  }
