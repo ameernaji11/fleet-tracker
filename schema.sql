@@ -62,6 +62,22 @@
 --   app_settings bb_min_kmh (1) -- the blackbox stores a fix only from this speed up, so
 --   a stationary shift stops filling the handset with positions nobody will ever ask for.
 --
+-- New in v24 (the store a clip is kept in) -- adds:
+--   the dms-clips storage bucket and its three policies: a handset writes a picture of
+--   its own driver into a folder named after its own account, and one may be read back
+--   only by somebody who can already read the event it belongs to. No new service, no
+--   new key — the same project's own file store.
+--
+-- New in v25 (five more things the camera can see, and the clip finally arrives) -- adds:
+--   five event_rules rows: dms_yawning, dms_talking, dms_eating, dms_drinking and
+--   dms_smoking. dms_smoking is seeded switched off, because what the shipped model can
+--   actually see is a bare hand at the mouth rather than a cigarette. The events insert
+--   policy takes fifteen types instead of ten.
+--   the update policy widened by one column: a phone may now name the video of an event
+--   it has already closed, which is the only way a camera alert ever has one, because
+--   the picture is not finished until after the breach has. guard_events() holds the
+--   line — on a closed row nothing but clip_path may move.
+--
 -- The "admin seed" block makes ameer@fleettrack.com role=admin, so the separate
 -- Admin.sql saved query in Supabase is no longer needed — delete it once this
 -- file has run and you have confirmed: select email, role from profiles;
@@ -832,10 +848,14 @@ grant execute on function login_gate(text), login_fail(text), login_ok(text), cl
 --                    (PERCLOS). hold_s = how long that may go on before the event.
 --   dms_distraction  threshold = how far the head may turn away from the road, degrees.
 --                    hold_s = how many seconds it may stay turned.
---   dms_phone_use    threshold = how much of the lower face a hand or object covers,
---                    percent. hold_s = seconds it must last. This one is a shape
---                    guess, not a certainty, so it is the rule most likely to need
---                    tuning against your own cabs and light.
+--   dms_phone_use    threshold = how much of the last second a phone was at this
+--                    driver's face or at one of his ears, percent. hold_s = seconds it
+--                    must last. From v25 the phone names the handset and puts it in
+--                    front of the face or against an ear; on a handset whose model
+--                    cannot report where it saw a thing this falls back to the older
+--                    reading, which is how much of the lower face is covered by
+--                    something. Either way it is the rule most likely to need tuning
+--                    against your own cabs and light.
 --   dms_cam_blocked  threshold is unused (the page prints "no limit"): no face in
 --                    view, or the picture has stopped changing, and hold_s is how
 --                    many seconds of that before the alert.
@@ -854,13 +874,17 @@ insert into event_rules (type, label, enabled, threshold, alert, hold_s, speed_m
   ('dms_cam_blocked', 'Camera blocked',    true,  0, true, 15, 10)
   on conflict (type) do nothing;
 
--- ten types now, the six the vehicle already produced plus the four the camera does.
+-- ten types the camera and the vehicle produced from v19, and fifteen since v25 added
+-- the five behaviours: the six the vehicle already made plus the nine the driver camera
+-- does. A type outside this list cannot be written by a handset, which is what makes the
+-- Configuration page the only place a category can exist.
 drop policy if exists "events insert own" on events;
 create policy "events insert own" on events for insert with check (
   user_id = auth.uid() and owns_vehicle(vehicle_id) and owns_pair(vehicle_id, driver_id)
   and type in ('harsh_braking','harsh_acceleration','overspeed',
                'zone_enter','zone_exit','zone_overspeed',
-               'dms_fatigue','dms_distraction','dms_phone_use','dms_cam_blocked'));
+               'dms_fatigue','dms_distraction','dms_phone_use','dms_cam_blocked',
+               'dms_yawning','dms_talking','dms_eating','dms_drinking','dms_smoking'));
 
 -- Where the short video an event leaves behind is kept. The camera holds a rolling
 -- buffer all trip and writes the seconds before and after the alert into it, so the
@@ -886,7 +910,7 @@ insert into app_settings (key, value) values
 -- written by either app any more, so the statements that created them are gone and the
 -- v22 block near the end of this file drops whatever a v20 database still holds.
 -- The events the camera produces are untouched: they are ordinary rows in the events
--- table, which is what the dashboard's four driver rules and every report read.
+-- table, which is what the dashboard's driver rules and every report read.
 
 -- ------------------------------------------------------------- realtime ----
 -- the dashboard listens for position and event inserts; both must be in the
@@ -918,7 +942,7 @@ end $$;
 -- One drop per table is the whole of the clean-up: Postgres takes the table's policies,
 -- indexes, grants and publication membership down with it, and dms_frame's rows belonged
 -- to a session through "on delete cascade", so no pictures are left behind either. The
--- clip column v19 added to events and the four driver rule rows are deliberately untouched.
+-- clip column v19 added to events and the driver rule rows are deliberately untouched.
 drop table if exists dms_frame;
 drop table if exists dms_live;
 
@@ -1014,12 +1038,124 @@ create policy "dms clips clear" on storage.objects for delete to authenticated
    and (is_admin() or (storage.foldername(name))[1] = auth.uid()::text)
  );
 
--- A phone may put its own still-open event's clip path on the row - which is the only
--- moment it is allowed to write one, since the policy above lets an account update its
--- rows only while ended_at is still null. Nothing else on the row is reachable: the
--- identity columns stay pinned by guard_events(), so an alert cannot be re-aimed at
--- another vehicle, another type or another minute by way of its picture.
--- No new policy is needed for the insert, and none is added for the close.
+-- A phone may put its own event's clip path on the row. Until v25 that was only ever
+-- possible while ended_at was still null, which in practice meant never: a camera alert
+-- closes itself a second or two after it opens, and its picture is not finished until
+-- after that. v25 widens the update policy and pins what may move in guard_events(), so
+-- the row is described below rather than here.
+
+-- ------------------------------------------- v25 five behaviours, and the clip's turn ----
+-- The camera already measured the mouth and named what the driver was holding; this is
+-- the version that says what to do about it. Five rules join the four that existed:
+--
+--   dms_yawning    threshold = how wide this driver's own mouth has to open, as a
+--                  percentage of its width. The phone will not call anything a yawn
+--                  below 14 % however the row is set, because that is where talking
+--                  stops and a yawn begins - so a threshold under 14 behaves like 14.
+--                  hold_s = 0 is the honest setting: a yawn is a moment, and waiting
+--                  for it to last makes the event disappear instead of the driver stop
+--                  yawning.
+--   dms_talking    threshold = how many times a minute the mouth may move. This is a
+--                  rate, not a percentage, and the Configuration page prints "a minute"
+--                  after the number instead of a per-cent sign. A single long open
+--                  mouth never counts, because the phone only ever counts a movement
+--                  that begins after the mouth has closed again.
+--   dms_eating     threshold = the percentage of the last second the model saw food at
+--                  this driver's mouth.
+--   dms_drinking   threshold = the percentage of the last second it saw a cup or bottle
+--                  there.
+--   dms_smoking    threshold = the percentage of the last second a bare hand was at the
+--                  mouth, over lips the camera could still see.
+--
+-- Two of these deserve to be said plainly, because an administrator who reads the row
+-- afterwards deserves to know what the machine actually looked at:
+--
+-- The model the phone ships with is the one that comes out of the box with the face
+-- toolkit. It knows food, a cup and a bottle, and it does not know a cigarette - there
+-- is no cigarette class for it to answer with. So dms_smoking is not "a cigarette was
+-- seen": it is "a hand was at the mouth, holding nothing the camera could name", which
+-- is also what a driver scratching his nose or yawning with his hand over his face
+-- looks like. It is seeded switched off for exactly that reason, and the Configuration
+-- page says so on its row. Turn it on when you have seen what it does in your own cabs,
+-- and judge the clip it leaves behind before you judge the driver.
+--
+-- Eating and drinking depend on the same second model, and on some handsets that model
+-- cannot report where it saw a thing - a limitation of the reader library, named on the
+-- phone's own camera status rather than hidden. On those handsets the two rules answer
+-- nothing at all and their rows stay empty. Fatigue, distraction, phone use and a
+-- blocked camera never needed it and carry on working everywhere.
+--
+-- do nothing on conflict again: thresholds a fleet has tuned are never rolled back by
+-- re-running this file.
+insert into event_rules (type, label, enabled, threshold, alert, hold_s, speed_min) values
+  ('dms_yawning', 'Driver yawning',     true,  20, true,  0, 10),
+  ('dms_talking', 'Talking while driving', true, 40, true, 2, 10),
+  ('dms_eating',  'Eating while driving',  true, 40, true, 1, 15),
+  ('dms_drinking','Drinking while driving', true, 40, true, 1, 15),
+  ('dms_smoking', 'Hand at the mouth',  false, 50, true,  2, 15)
+  on conflict (type) do nothing;
+
+-- A phone that is offline does not know which build of the rules its own settings copy
+-- carries, so a rule the page has never sent stays off rather than firing on a guess.
+-- That is the Config side of the same decision; nothing has to change here for it.
+
+-- The clip could never arrive, and this is the statement that fixes it.
+--
+-- An alert closes itself as soon as the driver recovers - a yawn, a head turned away, a
+-- hand at the mouth: a second or two - while its picture is still being assembled from
+-- the second of camera that follows it. The v15 update policy let an account change its
+-- own rows only while ended_at was still null, so by the time the file existed the row
+-- had closed and the phone was no longer allowed to name it. Every camera event of that
+-- shape lost its video, silently, which is the whole of why an Events table full of
+-- driver alerts had no pictures beside any of them.
+--
+-- The widening is one column deep and the trigger is what holds the line: an account may
+-- now update a row it has already closed, and on such a row nothing but clip_path may
+-- move. An open row is still free to be filled in the way it always was, because that is
+-- the phone closing its own breach.
+drop policy if exists "events update own" on events;
+create policy "events update own" on events for update to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+-- The identity columns were pinned from v15 and stay pinned exactly as they were; what
+-- is new is the second half, which pins everything else on a row that has already
+-- finished. A clip arriving late is the only thing this account may still say about an
+-- event it has closed, and the file it points at is its own folder and its own id -
+-- which the storage policy of v24 already insists on, from the other side.
+create or replace function guard_events() returns trigger language plpgsql as $$
+begin
+  if is_admin() then return new; end if;
+  if new.id          is distinct from old.id
+  or new.cid         is distinct from old.cid
+  or new.user_id     is distinct from old.user_id
+  or new.vehicle_id  is distinct from old.vehicle_id
+  or new.driver_id   is distinct from old.driver_id
+  or new.type        is distinct from old.type
+  or new.recorded_at is distinct from old.recorded_at then
+    raise exception 'an event row cannot be rewritten';
+  end if;
+  if old.ended_at is not null and (
+       new.ended_at     is distinct from old.ended_at
+    or new.value        is distinct from old.value
+    or new.details      is distinct from old.details
+    or new.lat          is distinct from old.lat
+    or new.lng          is distinct from old.lng
+    or new.speed        is distinct from old.speed
+    or new.accuracy     is distinct from old.accuracy
+    or new.altitude     is distinct from old.altitude
+    or new.heading      is distinct from old.heading
+    or new.accel        is distinct from old.accel
+    or new.battery_pct  is distinct from old.battery_pct
+    or new.charging     is distinct from old.charging
+    or new.ignition     is distinct from old.ignition
+    or new.road_limit   is distinct from old.road_limit
+    or new.vehicle_name is distinct from old.vehicle_name
+    or new.driver_name  is distinct from old.driver_name) then
+    raise exception 'a closed event may only have its video attached';
+  end if;
+  return new;
+end $$;
 
 -- ------------------------------------------------------------- admin seed ----
 -- Promote the owner account. Runs after the tables/policies exist, and is safe
