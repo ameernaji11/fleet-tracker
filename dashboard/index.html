@@ -1,5 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self' https://*.supabase.co; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://geocode.arcgis.com https://photon.komoot.io https://nominatim.openstreetmap.org https://api.bigdatacloud.net; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: https:; media-src 'self' blob: https://*.supabase.co; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://geocode.arcgis.com https://photon.komoot.io https://nominatim.openstreetmap.org https://api.bigdatacloud.net; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="referrer" content="no-referrer">
 <title>Fleet Tracker</title>
@@ -1218,15 +1218,24 @@ hKpiSet();
 const EV={harsh_braking:['Harsh braking','fa-hand','#d9534f','rd'],harsh_acceleration:['Harsh acceleration','fa-bolt','#f28c28','or'],overspeed:['Overspeed','fa-gauge-high','#2f7fe6','bl'],
  zone_enter:['Zone entered','fa-location-crosshairs','#27a46a','gr'],zone_exit:['Zone exited','fa-door-open','#0b9fb3','bl'],zone_overspeed:['Zone overspeed','fa-gauge-simple-high','#b85d00','or'],
  dms_fatigue:['Driver fatigued','fa-face-dizzy','#c0392b','rd'],dms_distraction:['Driver distracted','fa-eye-low-vision','#d97706','or'],
- dms_phone_use:['Phone in hand','fa-mobile-screen-button','#7048e8','or'],dms_cam_blocked:['Camera blocked','fa-video-slash','#495057','rd']};
+ dms_phone_use:['Phone in hand','fa-mobile-screen-button','#7048e8','or'],dms_cam_blocked:['Camera blocked','fa-video-slash','#495057','rd'],
+ dms_yawning:['Driver yawning','fa-face-tired','#8e44ad','or'],dms_talking:['Talking while driving','fa-comments','#0b9fb3','bl'],
+ dms_eating:['Eating while driving','fa-utensils','#b85d00','gy'],dms_drinking:['Drinking while driving','fa-mug-saucer','#2f7fe6','gy'],
+ dms_smoking:['Hand at the mouth','fa-smoking','#d9534f','rd']};
 const EVX=t=>EV[t]||[t||'Event','fa-triangle-exclamation','#6b7a85','gy'];
 const evIcon=t=>L.divIcon({className:'',html:`<div class="mk sm" style="background:${EVX(t)[2]}"><i class="fa-solid ${EVX(t)[1]}"></i></div>`,iconSize:[20,20],iconAnchor:[10,10]});
-const evDur=x=>x.ended_at?(new Date(x.ended_at)-new Date(x.recorded_at))/1000:null;
-function evPop(x){const E=EVX(x.type),d=evDur(x),n=(a,u)=>a!=null&&a!==''?a+u:'-',
+// A zone crossing is a moment rather than a breach that grows, and the phone writes
+// its end time one second after the instant of the fix. Rows made by an older build
+// carry none, and a duration of one second is the most that a fix taken once a second
+// can honestly say about a moment - a blank column reads as lost data instead.
+const INSTANT={zone_enter:1,zone_exit:1};
+const evEnd=x=>x.ended_at?new Date(x.ended_at):INSTANT[x.type]?new Date(new Date(x.recorded_at).getTime()+1000):null;
+const evDur=x=>{const e=evEnd(x);return e?(e-new Date(x.recorded_at))/1000:null};
+function evPop(x){const E=EVX(x.type),d=evDur(x),e=evEnd(x),n=(a,u)=>a!=null&&a!==''?a+u:'-',
  val=x.type==='harsh_braking'||x.type==='harsh_acceleration'?`<br><i class="fa-solid fa-gauge"></i> ${(+x.value||0).toFixed(1)} km/h/s`:'';
  return `<div style="min-width:240px"><b style="font-size:15px;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</b>${evClipBtn(x)}${HR}
  <i class="fa-solid fa-car"></i> <b>${esc(x.vehicle_name||'-')}</b><br><i class="fa-solid fa-id-card"></i> ${esc(x.driver_name||'-')}<br>
- <i class="fa-regular fa-clock"></i> ${new Date(x.recorded_at).toLocaleString()}${x.ended_at?'<br><i class="fa-regular fa-clock"></i> Ended '+new Date(x.ended_at).toLocaleTimeString()+' · <b>'+hms(d)+'</b>':''}<br>
+ <i class="fa-regular fa-clock"></i> ${new Date(x.recorded_at).toLocaleString()}${e?'<br><i class="fa-regular fa-clock"></i> Ended '+e.toLocaleTimeString()+' · <b>'+hms(d)+'</b>':''}<br>
  <i class="fa-solid fa-gauge-high"></i> ${Math.round(x.speed||0)} km/h${x.road_limit?' · limit '+x.road_limit+' km/h':''}${val}${x.details?'<br>'+esc(x.details):''}${HR}
  <i class="fa-solid fa-location-dot"></i> ${(+x.lat).toFixed(5)}, ${(+x.lng).toFixed(5)}<br>Accuracy ${n(x.accuracy,' m')} · Elev. ${x.altitude!=null?Math.round(x.altitude)+' m':'-'} · Dir ${x.heading!=null?Math.round(x.heading)+'°':'-'}<br>Accel ${n(x.accel,' km/h/s')} · Ignition ${x.ignition===false?'off':x.ignition?'on':'-'}<br><i class="fa-solid fa-battery-half"></i> ${x.battery_pct!=null?Math.round(x.battery_pct)+'%':'-'}${x.charging?' ⚡':''}</div>`}
 async function fetchAll(q){let a=[];for(let i=0;i<30;i++){const {data,error}=await q().range(i*1000,i*1000+999);if(error){toast(error.message);break}a=a.concat(data);if(data.length<1000)break}return a}
@@ -1269,21 +1278,65 @@ const dayOf=r=>new Date(r.recorded_at).toLocaleDateString('en-CA');
 // names nothing on its own. The path is carried in a data attribute rather than in a click
 // handler, because it is a string a handset wrote.
 const CLIPB='dms-clips';
-const evClipBtn=x=>x&&x.clip_path?` <button class="btn gh sm" data-clip="${esc(x.clip_path)}" title="Watch the seconds the driver camera recorded around this event"><i class="fa-solid fa-video"></i></button>`:'';
-async function evClip(path){const m=$('modal'),box=h=>`<div class="card" style="max-width:min(600px,100%)"><div class="dlgT"><i class="fa-solid fa-video"></i> Driver camera clip</div>${h}</div>`;
+// The row behind each button, remembered by its own id so the viewer can print what the
+// phone measured next to the picture of the moment it measured it. Every clip is named
+// after the event it belongs to, which is the id the handset invented.
+const EVROW={};
+const evClipBtn=x=>x&&x.clip_path?(EVROW[x.cid]=x,` <button class="btn gh sm" data-clip="${esc(x.clip_path)}" data-cid="${esc(x.cid||'')}" title="Watch the seconds the driver camera recorded around this event"><i class="fa-solid fa-video"></i></button>`):'';
+// A clip's name is its event's id, which means nothing to a person who has to file it.
+// The reading the phone wrote is burned into the pictures themselves, so what this adds
+// to the name is only the two things an investigator sorts by: who, and when. Spaces are
+// folded into the same underscore as the separators, because a name with both is a name
+// that sorts wrong the first time somebody searches for it in a folder of clips.
+const clipName=x=>[x&&(x.driver_name||x.vehicle_name||'driver'),
+ x?new Date(x.recorded_at).toISOString().slice(0,19).replace(/[T:]/g,'-'):'',x?EVX(x.type)[0].toLowerCase().replace(/[^a-z0-9]+/g,'-'):'']
+ .filter(Boolean).join('_').replace(/\s+/g,'_').replace(/[^A-Za-z0-9._-]/g,'')+'.mp4';
+let CLIPURL='';
+async function evClip(path,cid){const x=EVROW[cid]||{clip_path:path},E=EVX(x.type),
+ m=$('modal'),box=h=>`<div class="card" style="max-width:min(680px,100%)"><div class="dlgT"><i class="fa-solid fa-video"></i> <b style="color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</b> · driver camera clip</div>${h}</div>`;
+ // whatever was open before is over, and its bytes belong to the browser no longer
+ if(CLIPURL){URL.revokeObjectURL(CLIPURL);CLIPURL=''}
  m.innerHTML=box('<p>Loading the recording…</p>');m.classList.add('on');
  const {data,error}=await sb.storage.from(CLIPB).createSignedUrl(path,300);
- if(error||!data){m.innerHTML=box('<p>This event has no recording on the server, or your account may not open it: '+esc(error&&error.message||'no answer from the server')+'</p>');return}
+ if(error||!data){m.innerHTML=box('<p>This event has no recording on the server, or your account may not open it: '+esc(error&&error.message||'no answer from the server')+'</p>'+dlgClose());return}
+ // the bytes are pulled in once and handed to the picture element as a local object
+ // url. A signed link is a cross-origin address, and a browser refuses to rename a
+ // file fetched across one, so a download button aimed straight at it would open the
+ // video in a new tab instead of saving it - and a clip an administrator cannot carry
+ // out of this page is a clip that gets described in an email instead of watched.
+ let url='',size=0,why='';
+ try{const r=await fetch(data.signedUrl);if(!r.ok)throw new Error('the file store answered '+r.status);
+  const bl=await r.blob();size=bl.size;url=CLIPURL=URL.createObjectURL(bl)}catch(e){why=e.message||'the file could not be read'}
+ if(!url){m.innerHTML=box('<p>This recording could not be fetched: '+esc(why)+'</p>'+dlgClose());return}
  // muted so it starts by itself: a driver who has to press play first has already missed
- // the second that raised the alert, and these clips carry no sound anyway
- m.innerHTML=box(`<video src="${data.signedUrl}" controls autoplay muted playsinline preload="metadata" style="width:100%;max-height:60vh;border-radius:10px;background:#000"></video><div class="dlgB"><button class="btn gh sm" onclick="$('modal').classList.remove('on')"><i class="fa-solid fa-xmark"></i>Close</button></div>`);
+ // the second that raised the alert, and these clips carry no sound anyway. Looped,
+ // because the thing an administrator is looking for is one movement of a hand.
+ m.innerHTML=box(`<video src="${url}" controls autoplay muted loop playsinline preload="auto" style="width:100%;max-height:58vh;border-radius:10px;background:#000"></video>
+ <table style="margin-top:10px"><tr><th>Driver · vehicle</th><th>Recorded</th><th>Speed</th><th>Duration</th><th>Size</th></tr>
+ <tr><td>${esc(x.driver_name||'-')} · ${esc(x.vehicle_name||'-')}</td><td>${x.recorded_at?new Date(x.recorded_at).toLocaleString():'-'}</td>
+ <td>${x.speed!=null?Math.round(x.speed||0)+' km/h':'-'}</td><td class="nw">${x.ended_at?hms((new Date(x.ended_at)-new Date(x.recorded_at))/1000):'-'}</td>
+ <td>${(size/1024).toFixed(0)} KB</td></tr></table>
+ <p style="margin:8px 0 0">${esc(x.details||EVX(x.type)[0])}</p>
+ <p style="margin:6px 0 0;color:var(--mut);font-size:12px"><i class="fa-solid fa-circle-info"></i> What the camera measured is written across the picture itself, frame by frame, with the seconds before or after the alert beside it. The download carries the same file, so the words travel with it.</p>
+ <div class="dlgB"><a class="btn b sm" href="${url}" download="${esc(clipName(x))}" title="Save this recording to this computer"><i class="fa-solid fa-download"></i>Download</a>
+ <button class="btn gh sm" onclick="closeClip()"><i class="fa-solid fa-xmark"></i>Close</button></div>`);
 }
+function closeClip(){$('modal').classList.remove('on');if(CLIPURL){URL.revokeObjectURL(CLIPURL);CLIPURL=''}}
+const dlgClose=()=>'<div class="dlgB"><button class="btn gh sm" onclick="closeClip()"><i class="fa-solid fa-xmark"></i>Close</button></div>';
 document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('[data-clip]');
- if(b&&b.dataset.clip)evClip(b.dataset.clip)});
+ if(b&&b.dataset.clip)evClip(b.dataset.clip,b.dataset.cid)});
+// Closing the dialog any other way - the backdrop, the escape key - still has to give
+// the object url back, or every clip watched in a session keeps its bytes in memory.
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&$('modal').classList.contains('on'))closeClip()});
 function renderEvt(){
  const fx=r=>(!EVF.driver||(r.driver_name||'-')===EVF.driver)&&(!EVF.day||dayOf(r)===EVF.day),base=EVR.filter(fx),rows=base.filter(r=>!EVF.type||r.type===EVF.type),ty=cnt(rows,r=>r.type),K=Object.keys(EV);
  const tb=evTb(),ch=Object.entries(EVF).filter(x=>x[1]).map(x=>`<span class="chip chipB">${x[0]}: ${esc(x[0]==='type'?EVX(x[1])[0]:x[1])}</span>`).join(' ');
- $('evFl').innerHTML=[tb,ch].filter(Boolean).join(' ')+((tb||ch)?' <button class="btn gh sm" onclick="evReset()"><i class="fa-solid fa-rotate-left"></i>Reset filter</button>':'');
+ // an Events table with no camera icons beside it looks like a camera that recorded
+ // nothing, and the one thing an administrator has to be able to tell apart is "no
+ // alert happened" from "the handset has not brought its picture in yet"
+ const cam=rows.filter(r=>DMS[r.type]),noClip=cam.filter(r=>!r.clip_path).length,
+  cn=noClip?`<span class="chip chipO">${noClip} of ${cam.length} camera events have no recording <span class="hp" data-tip="A recording is made on the handset and travels out with that driver's own events, so it reaches the server only when his phone next has a signal - the newest alerts are often still waiting on it. It is also missing from an event raised by an older build of the app, which kept its pictures on the phone and never sent them, and from an alert fired before the lens had given a single picture. Nothing here is a reason to drop the event: the reading in its Details column stands on its own.">?</span></span>`:'';
+ $('evFl').innerHTML=[tb,ch,cn].filter(Boolean).join(' ')+((tb||ch)?' <button class="btn gh sm" onclick="evReset()"><i class="fa-solid fa-rotate-left"></i>Reset filter</button>':'');
  // the tiles count without the type filter, so every type stays clickable
  const bt=cnt(base,r=>r.type),ct=(c,i,v,l,js,on)=>tile(c,i,v,l).replace('class="card kpi ',`onclick="${js}" title="Click to show only these" class="card kpi click${on?' on':''} `);
  $('evK').innerHTML=ct('gy','fa-bell',base.length,'Total events',"EVF.type=undefined;renderEvt()",!EVF.type)+K.map(k=>ct(EV[k][3],EV[k][1],bt[k]||0,EV[k][0],`evSet('type','${k}')`,EVF.type===k)).join('');
@@ -1295,7 +1348,7 @@ function renderEvt(){
  // only the two acceleration events hold a km/h/s reading; every other row keeps
  // the speed it breached in the Speed column, so this column has to stay empty
  const acc=r=>(r.type==='harsh_braking'||r.type==='harsh_acceleration')?(+r.value).toFixed(1):'-';
- $('evT').innerHTML=`<table><tr><th>Event Start</th><th>Event End</th><th>Duration</th><th>Vehicle</th><th>Driver</th><th>Event</th><th>Speed (km/h)</th><th>Acceleration / Deceleration (km/h/s)</th><th>Details</th><th>Location</th></tr>${rows.slice(0,1000).map(r=>{const E=EVX(r.type),d=evDur(r);return `<tr><td>${new Date(r.recorded_at).toLocaleString()}</td><td>${r.ended_at?new Date(r.ended_at).toLocaleString():'-'}</td><td class="nw">${d==null?'-':hms(d)}</td><td>${esc(r.vehicle_name)}</td><td>${esc(r.driver_name)}</td><td><span class="chip" style="background:${E[2]}22;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</span>${evClipBtn(r)}</td><td>${Math.round(r.speed||0)}</td><td>${acc(r)}</td><td>${esc(r.details||'-')}</td><td><a href="#" onclick="goHist('${r.vehicle_id}','${r.recorded_at}',${r.lat},${r.lng});return false"><i class="fa-solid fa-map-location-dot"></i> ${(+r.lat).toFixed(5)}, ${(+r.lng).toFixed(5)}</a></td></tr>`}).join('')||'<tr><td colspan="10" class="empty">No events in this period.</td></tr>'}</table>`;tools($('evT'))}
+ $('evT').innerHTML=`<table><tr><th>Event Start</th><th>Event End</th><th>Duration</th><th>Vehicle</th><th>Driver</th><th>Event</th><th>Speed (km/h)</th><th>Acceleration / Deceleration (km/h/s)</th><th>Details</th><th>Location</th></tr>${rows.slice(0,1000).map(r=>{const E=EVX(r.type),d=evDur(r),en=evEnd(r);return `<tr><td>${new Date(r.recorded_at).toLocaleString()}</td><td>${en?en.toLocaleString():'-'}</td><td class="nw">${d==null?'-':hms(d)}</td><td>${esc(r.vehicle_name)}</td><td>${esc(r.driver_name)}</td><td><span class="chip" style="background:${E[2]}22;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</span>${evClipBtn(r)}</td><td>${Math.round(r.speed||0)}</td><td>${acc(r)}</td><td>${esc(r.details||'-')}</td><td><a href="#" onclick="goHist('${r.vehicle_id}','${r.recorded_at}',${r.lat},${r.lng});return false"><i class="fa-solid fa-map-location-dot"></i> ${(+r.lat).toFixed(5)}, ${(+r.lng).toFixed(5)}</a></td></tr>`}).join('')||'<tr><td colspan="10" class="empty">No events in this period.</td></tr>'}</table>`;tools($('evT'))}
 async function goHist(vid,iso,lat,lng){document.querySelector('.nb[data-t=hist]').click();$('hv').value=vid;const t=new Date(iso).getTime();$('hf')._flatpickr.setDate(new Date(t-9e5),true);$('ht')._flatpickr.setDate(new Date(t+9e5),true);await loadHist(1);mapH.setView([lat,lng],17)}
 async function loadRep(){fSave('rep');
  const F=new Date($('rp_f').value),T=new Date($('rp_t').value);
@@ -1332,22 +1385,29 @@ async function addUser(e){e.preventDefault();if(!ADMIN)return toast('Only an adm
  logAct('Created user',e.target.u.value);e.target.reset();users()}
 let RULES={},SET={},SPD=false,OV=['speed_limit','brake_limit','accel_limit','moving_interval','stopped_interval','speed_buffer','max_accel_warning','min_moving_distance'];
 const UNIT={harsh_braking:'km/h per second',harsh_acceleration:'km/h per second',overspeed:'km/h',zone_overspeed:'km/h above the zone limit',
- dms_fatigue:'% eyes shut',dms_distraction:'° head turned',dms_phone_use:'% face covered'};
+ dms_fatigue:'% eyes shut',dms_distraction:'° head turned',dms_phone_use:'% of the last second',dms_yawning:'% mouth open',
+ dms_talking:'movements a minute',dms_eating:'% of the last second',dms_drinking:'% of the last second',dms_smoking:'% of the last second'};
 // Entering and leaving a zone fire on the crossing itself: there is no measured
 // value to compare against a limit, so these two rows get no trigger box at all.
 // A blocked camera is the same: the picture going blank IS the event, so only the
 // number of seconds it takes before the alert is set here.
 const NOLIM={zone_enter:1,zone_exit:1,dms_cam_blocked:1};
-// The four rules the handset's forward camera produces. Only these read speed_min:
+// The nine rules the handset's forward camera produces. Only these read speed_min:
 // an alert about a driver's face means nothing while the vehicle is standing still,
 // and a phone left on a seat in a depot would otherwise raise Camera blocked all day.
-const DMS={dms_fatigue:1,dms_distraction:1,dms_phone_use:1,dms_cam_blocked:1};
+const DMS={dms_fatigue:1,dms_distraction:1,dms_phone_use:1,dms_cam_blocked:1,
+ dms_yawning:1,dms_talking:1,dms_eating:1,dms_drinking:1,dms_smoking:1};
 // What the one number in each camera rule's Trigger limit box actually measures,
 // because it is not the same thing twice. The phone reads the driver's face and
 // compares this every frame; Tolerance is how long it may stay over the line.
 const DMSLIM={dms_fatigue:'How shut the eyes may be, measured as the percentage of the last second spent with them closed. 40 is a driver nodding; raise it to catch only a real microsleep.',
  dms_distraction:'How far the head may turn away from the road, in degrees, before it counts as looking away. 35 is past the edge of the dashboard.',
- dms_phone_use:'How much of the lower face a hand or an object may cover before it is called a phone. This one is a shape guess: it will sometimes call a yawn or a hand to the ear a phone, so watch it for a week before you trust the count.',
+ dms_phone_use:'How much of the last second a phone may be at this driver\u2019s face or against one of his ears. The phone names the handset and says which side it is on, so a man driving on the telephone and a man reading a held-up screen are two different readings in the row. On a handset whose model cannot report where it saw a thing this falls back to how much of the lower face something covers, which is a shape guess and will sometimes call a yawn a phone.',
+ dms_yawning:'How wide the mouth may open, as a percentage of the width of this driver\u2019s own mouth. Below 14 the phone calls any open mouth talking rather than yawning, so a limit under 14 behaves like 14.',
+ dms_talking:'How many times a minute the mouth may move. This one is a rate, not a percentage: a single long open mouth is a yawn, and only a mouth that closes and opens again counts a second movement. Tolerance is how long it has to keep talking before the row is written.',
+ dms_eating:'How much of the last second something the model calls food may sit at this driver\u2019s mouth. Needs the object model; on a handset that cannot report where it saw a thing this rule stays quiet.',
+ dms_drinking:'How much of the last second a cup or a bottle may sit at this driver\u2019s mouth. Needs the object model, as eating does.',
+ dms_smoking:'How much of the last second a bare hand may sit at this driver\u2019s mouth, with nothing the model can name in it. The shipped model has no cigarette class, so this is a hand at the face rather than a cigarette seen: it also catches a scratch, a yawn covered by a hand, or a chin resting on it. It is seeded switched off \u2014 read a few of its clips before you trust the count.',
  dms_cam_blocked:'Nothing to set here: the camera stops seeing a face, or the picture stops changing, and the tolerance alone decides when that becomes an event.'};
 const WARNED={};
 const vlOf=r=>r.voice_lang&&VLANG[r.voice_lang]?r.voice_lang:(r.voice_lang==='off'||r.voice===false?'off':(SET.voice_lang&&VLANG[SET.voice_lang]?SET.voice_lang:'en'));
@@ -1363,14 +1423,21 @@ async function loadRules(){const {data}=await sb.from('event_rules').select('*')
  list.forEach(r=>RULES[r.type]=r);
  if(data&&data.length&&(!('hold_s'in data[0])||!('voice'in data[0])||!RULES.zone_overspeed)&&!WARNED.hold){WARNED.hold=1;toast('The database is missing the newest columns (tolerance, voice, geofence alerts). Run schema.sql in Supabase (SQL Editor) once to add them.')}
  if(data&&data.length&&!('voice_lang'in data[0])&&!WARNED.vl){WARNED.vl=1;toast('Per-event voice languages need the newest schema: run schema.sql in Supabase once. Until then the phone keeps the single fleet language.')}
- // v19's speed_min column and the four camera rules arrive together, but a database
+ // v19's speed_min column and the camera rules arrive together, but a database
  // that has not run this file has neither, and a box that saves into a missing column
  // looks like a broken Save button - so the column only appears once it can be kept.
  SPD=!!(data&&data.length&&'speed_min'in data[0]);
  if(data&&data.length&&!SPD&&!WARNED.spd){WARNED.spd=1;toast('The Speed column for the driver-camera rules needs the newest schema. Run schema.sql in Supabase (SQL Editor) once.')}
  if(SPD&&!RULES.dms_fatigue&&!WARNED.dms){WARNED.dms=1;toast('event_rules has no driver-camera rows yet. Run schema.sql in Supabase (SQL Editor) once to seed them.')}
+ // v25's five behaviours are ordinary rows in the same table, so a database that has
+ // not run this file simply does not offer them - and an administrator who expects a
+ // yawning report has to be told where it is, rather than left to conclude the camera
+ // cannot see a yawn. One toast, and only when the older four are already there.
+ const NEW5=['dms_yawning','dms_talking','dms_eating','dms_drinking','dms_smoking'];
+ if(SPD&&RULES.dms_fatigue&&!NEW5.every(t=>RULES[t])&&!WARNED.v25){WARNED.v25=1;
+  toast('The yawning, talking, eating, drinking and hand-at-the-mouth rules need the newest schema. Run schema.sql in Supabase (SQL Editor) once; the phone needs its new build as well.')}
  const num=(id,v,w,st)=>`<input type="number" step="${st||'any'}" min="0" id="${id}" value="${v??''}" style="width:${w||58}px">`;
- $('ruleT').innerHTML=`<table><tr><th>Event</th><th>Trigger limit</th>${SPD?'<th>Min speed (km/h) <span class="hp" data-tip="Only the four driver-camera rules read this: nothing is reported until the vehicle is going faster, because a drowsy-driver or covered-lens alert means nothing while the vehicle is parked. Every other rule stays armed at any speed.">?</span></th>':''}<th>Tolerance (seconds)</th><th>Recorded</th><th>Visual alert</th><th>Buzzer alert</th><th>Buzzer seconds</th><th>Voice alert</th></tr>${list.map(r=>`<tr><td class="nw"><b>${esc(r.label)}</b></td><td class="nw">${NOLIM[r.type]?'<small style="opacity:.5">no limit</small>':num('rt_'+r.type,r.threshold,66,'0.1')+' <small>'+(UNIT[r.type]||'')+'</small>'}${DMS[r.type]&&DMSLIM[r.type]?'<span class="hp" data-tip="'+esc(DMSLIM[r.type])+'">?</span>':''}</td>${SPD?'<td>'+(DMS[r.type]?num('rs_'+r.type,r.speed_min??0,46):'<small style="opacity:.5">—</small>')+'</td>':''}<td>${num('rh_'+r.type,r.hold_s??0)}</td><td><input type="checkbox" id="re_${r.type}" ${r.enabled?'checked':''}></td><td><input type="checkbox" id="ra_${r.type}" ${r.alert?'checked':''}></td><td class="nw"><select id="bt_${r.type}" style="width:126px" onchange="toneSync(this)">${Object.entries(TONES).map(([k,n])=>`<option value="${k}" ${(r.beep_type||'discontinuous')===k?'selected':''}>${n}</option>`).join('')}</select><button type="button" class="play" onclick="tryTone('${r.type}')" title="Play this tone"><i class="fa-solid fa-play"></i></button></td><td class="bd">${num('bd_'+r.type,r.beep_duration??5)}</td><td class="nw"><select id="vl_${r.type}" style="width:96px" onchange="syncPl(this)">${vlOpts(r)}</select><button type="button" class="play" onclick="tryVoice('${r.type}')" title="Speak this message"><i class="fa-solid fa-volume-high"></i></button></td></tr>`).join('')}</table>`;
+ $('ruleT').innerHTML=`<table><tr><th>Event</th><th>Trigger limit</th>${SPD?'<th>Min speed (km/h) <span class="hp" data-tip="Only the nine driver-camera rules read this: nothing is reported until the vehicle is going faster, because a drowsy-driver or covered-lens alert means nothing while the vehicle is parked. Every other rule stays armed at any speed.">?</span></th>':''}<th>Tolerance (seconds)</th><th>Recorded</th><th>Visual alert</th><th>Buzzer alert</th><th>Buzzer seconds</th><th>Voice alert</th></tr>${list.map(r=>`<tr><td class="nw"><b>${esc(r.label)}</b></td><td class="nw">${NOLIM[r.type]?'<small style="opacity:.5">no limit</small>':num('rt_'+r.type,r.threshold,66,'0.1')+' <small>'+(UNIT[r.type]||'')+'</small>'}${DMS[r.type]&&DMSLIM[r.type]?'<span class="hp" data-tip="'+esc(DMSLIM[r.type])+'">?</span>':''}</td>${SPD?'<td>'+(DMS[r.type]?num('rs_'+r.type,r.speed_min??0,46):'<small style="opacity:.5">—</small>')+'</td>':''}<td>${num('rh_'+r.type,r.hold_s??0)}</td><td><input type="checkbox" id="re_${r.type}" ${r.enabled?'checked':''}></td><td><input type="checkbox" id="ra_${r.type}" ${r.alert?'checked':''}></td><td class="nw"><select id="bt_${r.type}" style="width:126px" onchange="toneSync(this)">${Object.entries(TONES).map(([k,n])=>`<option value="${k}" ${(r.beep_type||'discontinuous')===k?'selected':''}>${n}</option>`).join('')}</select><button type="button" class="play" onclick="tryTone('${r.type}')" title="Play this tone"><i class="fa-solid fa-play"></i></button></td><td class="bd">${num('bd_'+r.type,r.beep_duration??5)}</td><td class="nw"><select id="vl_${r.type}" style="width:96px" onchange="syncPl(this)">${vlOpts(r)}</select><button type="button" class="play" onclick="tryVoice('${r.type}')" title="Speak this message"><i class="fa-solid fa-volume-high"></i></button></td></tr>`).join('')}</table>`;
  [...$('ruleT').querySelectorAll('select')].forEach(s=>s.id.startsWith('bt_')?toneSync(s):s.id.startsWith('vl_')&&syncPl(s))}
 async function getSet(){const {data}=await sb.from('app_settings').select('*');SET={};(data||[]).forEach(x=>SET[x.key]=x.value);plLoad();
  const e=$('offH');if(e){e.value=OFFH();e.disabled=!ADMIN}}
@@ -1474,10 +1541,10 @@ function muteTog(){MUTE=!MUTE;localStorage.mute=MUTE?'1':'0';if(MUTE)stopTone();
 // ▶ buttons here use the browser's voice so the wording can be checked.
 const VLANG={en:['English','en-US'],ar:['Arabic','ar-SA'],hi:['Hindi','hi-IN'],ur:['Urdu','ur-PK']};
 const VMSG={
- en:{overspeed:'You are over the speed limit. Please slow down.',harsh_braking:'Harsh braking detected. Keep a safe distance and brake gently.',harsh_acceleration:'Harsh acceleration detected. Please accelerate smoothly.',dms_fatigue:'You look tired. Please take a break.',dms_distraction:'Please keep your eyes on the road.',dms_phone_use:'Please do not use a phone while driving.',dms_cam_blocked:'The driver camera is covered. Keep the view clear.'},
- ar:{overspeed:'لقد تجاوزت حد السرعة. يرجى تخفيف السرعة.',harsh_braking:'تم رصد فرملة قوية. حافظ على مسافة آمنة واضغط على الفرامل بهدوء.',harsh_acceleration:'تم رصد تسارع قوي. يرجى التسارع بسلاسة.',dms_fatigue:'يبدو أنك متعب. يرجى أخذ استراحة.',dms_distraction:'رجاءً أبقِ ناظريك على الطريق.',dms_phone_use:'رجاءً لا تستخدم الهاتف أثناء القيادة.',dms_cam_blocked:'كاميرا السائق مغطاة. أبقِ الرؤية واضحة.'},
- hi:{overspeed:'आप गति सीमा से ऊपर हैं। कृपया गति कम करें।',harsh_braking:'तेज़ ब्रेक लगाया गया। सुरक्षित दूरी रखें और धीरे ब्रेक लगाएँ।',harsh_acceleration:'तेज़ रफ़्तार पकड़ी गई। कृपया धीरे-धीरे गति बढ़ाएँ।',dms_fatigue:'आप थके हुए लगते हैं। कृपया विश्राम करें।',dms_distraction:'कृपया नज़र सड़क पर रखें।',dms_phone_use:'कृपया ड्राइव करते समय फ़ोन का उपयोग न करें।',dms_cam_blocked:'ड्राइवर कैमरा ढका है। दृश्य साफ़ रखें।'},
- ur:{overspeed:'آپ رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',harsh_braking:'سخت بریک لگائی گئی۔ محفوظ فاصلہ رکھیں اور آہستہ بریک لگائیں۔',harsh_acceleration:'تیز رفتاری پکڑی گئی۔ براہ کرم آہستہ آہستہ رفتار بڑھائیں۔',dms_fatigue:'آپ تھکے ہوئے لگتے ہیں۔ براہ کرم آرام کریں۔',dms_distraction:'براہ کرم نظر سڑک پر رکھیں۔',dms_phone_use:'براہ کرم ڈرائیو کرتے وقت فون استعمال نہ کریں۔',dms_cam_blocked:'ڈرائیور کیمیر ڈھکا ہوا ہے۔ دید صاف رکھیں۔'}};
+ en:{overspeed:'You are over the speed limit. Please slow down.',harsh_braking:'Harsh braking detected. Keep a safe distance and brake gently.',harsh_acceleration:'Harsh acceleration detected. Please accelerate smoothly.',dms_fatigue:'You look tired. Please take a break.',dms_distraction:'Please keep your eyes on the road.',dms_phone_use:'Please do not use a phone while driving.',dms_cam_blocked:'The driver camera is covered. Keep the view clear.',dms_yawning:'You are yawning. Please take a break.',dms_talking:'Please keep conversations short while driving.',dms_eating:'Please do not eat while driving.',dms_drinking:'Please do not drink while driving.',dms_smoking:'Please keep your hands on the wheel.'},
+ ar:{overspeed:'لقد تجاوزت حد السرعة. يرجى تخفيف السرعة.',harsh_braking:'تم رصد فرملة قوية. حافظ على مسافة آمنة واضغط على الفرامل بهدوء.',harsh_acceleration:'تم رصد تسارع قوي. يرجى التسارع بسلاسة.',dms_fatigue:'يبدو أنك متعب. يرجى أخذ استراحة.',dms_distraction:'رجاءً أبقِ ناظريك على الطريق.',dms_phone_use:'رجاءً لا تستخدم الهاتف أثناء القيادة.',dms_cam_blocked:'كاميرا السائق مغطاة. أبقِ الرؤية واضحة.',dms_yawning:'أنت تتثاءب. يرجى أخذ استراحة.',dms_talking:'رجاءً اجعل المحادثات قصيرة أثناء القيادة.',dms_eating:'رجاءً لا تأكل أثناء القيادة.',dms_drinking:'رجاءً لا تشرب أثناء القيادة.',dms_smoking:'رجاءً أبقِ يديك على المقود.'},
+ hi:{overspeed:'आप गति सीमा से ऊपर हैं। कृपया गति कम करें।',harsh_braking:'तेज़ ब्रेक लगाया गया। सुरक्षित दूरी रखें और धीरे ब्रेक लगाएँ।',harsh_acceleration:'तेज़ रफ़्तार पकड़ी गई। कृपया धीरे-धीरे गति बढ़ाएँ।',dms_fatigue:'आप थके हुए लगते हैं। कृपया विश्राम करें।',dms_distraction:'कृपया नज़र सड़क पर रखें।',dms_phone_use:'कृपया ड्राइव करते समय फ़ोन का उपयोग न करें।',dms_cam_blocked:'ड्राइवर कैमरा ढका है। दृश्य साफ़ रखें।',dms_yawning:'आप उबासी ले रहे हैं। कृपया विश्राम करें।',dms_talking:'कृपया ड्राइव करते समय बातें छोटी रखें।',dms_eating:'कृपया ड्राइव करते समय कुछ न खाएँ।',dms_drinking:'कृपया ड्राइव करते समय कुछ न पिएँ।',dms_smoking:'कृपया अपने हाथ स्टीयरिंग पर रखें।'},
+ ur:{overspeed:'آپ رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',harsh_braking:'سخت بریک لگائی گئی۔ محفوظ فاصلہ رکھیں اور آہستہ بریک لگائیں۔',harsh_acceleration:'تیز رفتاری پکڑی گئی۔ براہ کرم آہستہ آہستہ رفتار بڑھائیں۔',dms_fatigue:'آپ تھکے ہوئے لگتے ہیں۔ براہ کرم آرام کریں۔',dms_distraction:'براہ کرم نظر سڑک پر رکھیں۔',dms_phone_use:'براہ کرم ڈرائیو کرتے وقت فون استعمال نہ کریں۔',dms_cam_blocked:'ڈرائیور کیمیر ڈھکا ہوا ہے۔ دید صاف رکھیں۔',dms_yawning:'آپ اونگھ رہے ہیں۔ براہ کرم آرام کریں۔',dms_talking:'براہ کرم ڈرائیو کرتے وقت باتیں مختصر رکھیں۔',dms_eating:'براہ کرم ڈرائیو کے دوران کھانا نہ کھائیں۔',dms_drinking:'براہ کرم ڈرائیو کے دوران کچھ نہ پئیں۔',dms_smoking:'براہ کرم اپنے ہاتھ اسٹیئرنگ پر رکھیں۔'}};
 let VOC=[];const sv=()=>{try{VOC=(window.speechSynthesis?speechSynthesis.getVoices():[])||[]}catch(e){VOC=[]}};
 sv();if(window.speechSynthesis)speechSynthesis.addEventListener('voiceschanged',sv);
 function say(lg,txt){const S=window.speechSynthesis;if(!S||!window.SpeechSynthesisUtterance)return toast('This browser cannot speak. The phone uses its own voice.');
