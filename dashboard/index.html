@@ -880,7 +880,11 @@ document.querySelectorAll('.nb[data-t]').forEach(b=>b.onclick=()=>{shrink(b.data
  document.querySelectorAll('.nb').forEach(x=>x.classList.remove('on'));b.classList.add('on');$('title').textContent=b.dataset.h;
  document.querySelectorAll('section').forEach(s=>s.classList.toggle('on',s.id===b.dataset.t));
  setTimeout(()=>{mapL?.invalidateSize();mapH?.invalidateSize()},50);
- if(b.dataset.t==='evt'){evN=0;$('evb').style.display='none';loadEvt()}if(b.dataset.t==='rep')loadRep();if(b.dataset.t==='cfg')loadCfg();if(b.dataset.t==='usr')users();if(b.dataset.t==='act')loadAct();if(b.dataset.t==='veh'||b.dataset.t==='drv'){refs();if(b.dataset.t==='veh')bbTable()}});
+ // Opening the tacho page builds its graphs the way the other two reports build
+ // theirs, so nobody lands on four empty boxes and has to press Generate. It can run
+ // here because the section is already .on (above) and refs() filled the vehicle
+ // picker at sign-in - a chart drawn into a hidden canvas sizes itself to nothing.
+ if(b.dataset.t==='evt'){evN=0;$('evb').style.display='none';loadEvt()}if(b.dataset.t==='rep')loadRep();if(b.dataset.t==='trip')loadTrip();if(b.dataset.t==='cfg')loadCfg();if(b.dataset.t==='usr')users();if(b.dataset.t==='act')loadAct();if(b.dataset.t==='veh'||b.dataset.t==='drv'){refs();if(b.dataset.t==='veh')bbTable()}});
 async function refs(){
  vehicles=(await sb.from('vehicles').select('*').order('name')).data||[];drivers=(await sb.from('drivers').select('*').order('name')).data||[];
  $('hv').innerHTML=vehicles.map(v=>`<option value="${v.id}">${esc(v.name)}</option>`).join('');
