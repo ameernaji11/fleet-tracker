@@ -1142,7 +1142,16 @@ function tripRuns(P,Vh){const out=[];let cur=[];
   cur.push([+p.lat,+p.lng])}
  if(cur.length)out.push(cur);return out}
 const arw=(b,c)=>L.divIcon({className:'arw',html:`<svg width="14" height="14" viewBox="0 0 14 14" style="transform:rotate(${Math.round(b)}deg)"><path d="M7 1L12.5 12.5L7 9.5L1.5 12.5Z" fill="${c}" stroke="#fff" stroke-width="1.2" stroke-linejoin="round"/></svg>`,iconSize:[14,14],iconAnchor:[7,7]});const shp=w=>L.divIcon({className:'',html:w==='s'?'<svg width="26" height="24" viewBox="0 0 26 24" style="display:block;filter:drop-shadow(0 1px 2px #0008)"><path d="M13 2L24.5 22H1.5Z" fill="#27a46a" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/></svg>':'<svg width="22" height="22" viewBox="0 0 22 22" style="display:block;filter:drop-shadow(0 1px 2px #0008)"><rect x="2" y="2" width="18" height="18" rx="2" fill="#d9534f" stroke="#fff" stroke-width="2.5"/></svg>',iconSize:w==='s'?[26,24]:[22,22],iconAnchor:w==='s'?[13,15]:[11,11],popupAnchor:[0,-10]});
-const evMk=x=>L.marker([x.lat,x.lng],{icon:evIcon(x.type),zIndexOffset:900}).bindPopup(()=>evPop(x),{minWidth:240});
+// An event has nowhere to stand when it carries no fix, and Leaflet answers a null
+// coordinate with a null latlng that throws as soon as the map is told about it - which
+// took the whole of Historical Tracking down with it, trip list included, because the
+// throw happened on the way to drawing the first marker. This is not a shape a handset
+// can be trusted not to produce: a camera alert raised before the watcher had a fix of
+// its own is written with no lat at all, and events.lat is nullable for exactly that
+// reason. Such an event keeps its row, its count, its place in the trip details and its
+// line in the print-out. It simply is not on the map, because it does not know where it
+// happened.
+const evMk=x=>okXY(x)?L.marker([x.lat,x.lng],{icon:evIcon(x.type),zIndexOffset:900}).bindPopup(()=>evPop(x),{minWidth:240}):null;
 function geoFill(pop,p){geoOne(gk(p)).then(nm=>{const el=pop.getElement&&pop.getElement();const s=el&&el.querySelector('.gname');if(!s)return;
  s.textContent=nm||'Place name not found';
  // an admin can rename the spot from wherever he is looking at it
@@ -1173,20 +1182,24 @@ function drawTrip(T,Vh){const P=T.pts,g=T.ly,fm=+Vh.fuel_moving||0,fi=+Vh.fuel_i
  const a=P[0],z=P.at(-1);
  L.marker([a.lat,a.lng],{icon:shp('s'),zIndexOffset:1500}).addTo(g).bindPopup(()=>tPop(T,'s')).on('popupopen',e=>geoFill(e.popup,a));
  if(P.length>1)L.marker([z.lat,z.lng],{icon:shp('e'),zIndexOffset:1400}).addTo(g).bindPopup(()=>tPop(T,'e')).on('popupopen',e=>geoFill(e.popup,z));
- T.evs.forEach(x=>evMk(x).addTo(g))}
+ T.evs.forEach(x=>evMk(x)?.addTo(g))}
 // `keep` is set when Historical Tracking is opened by clicking an event: that
 // fifteen-minute window is a jump to a moment, not a criteria anybody chose, so it
 // must not become what the page opens with tomorrow.
 async function loadHist(keep){if(!keep)fSave('hist');pbStop();
  const vid=$('hv').value,hf=new Date($('hf').value).toISOString(),ht=new Date($('ht').value).toISOString();
- const data=ded((await fetchAll(()=>sb.from('positions').select('*').eq('vehicle_id',vid).gte('recorded_at',hf).lte('recorded_at',ht).order('recorded_at'))).filter(okFix));
+ // okXY, not just okFix: a fix at null island is not a place, and plotting one drew a
+ // line out to the Gulf of Guinea and back, inflated the trip's own distance by the same
+ // thousands of kilometres, and made the map frame the whole planet instead of the route.
+ // The print-out already dropped these; now the map, the tiles and the trip list agree.
+ const data=ded((await fetchAll(()=>sb.from('positions').select('*').eq('vehicle_id',vid).gte('recorded_at',hf).lte('recorded_at',ht).order('recorded_at'))).filter(x=>okFix(x)&&okXY(x)));
  if(hLayer)hLayer.remove();TRIPS.forEach(t=>t.ly.remove());TRIPS=[];TSEL=-1;HEVS=[];hData=data;
  if(!data.length){$('hstat').innerHTML='';hSide();return toast('No data in this period.')}
  HEVS=(await fetchAll(()=>sb.from('events').select('*').eq('vehicle_id',vid).gte('recorded_at',hf).lte('recorded_at',ht).order('recorded_at'))).filter(x=>EV[x.type]&&okFix(x));
  const Vh=vehicles.find(x=>x.id===vid)||{};
  TRIPS=splitTrips(data,Vh).map((pts,i)=>({n:i+1,pts,col:TCOL[i%TCOL.length],on:true,st:tStats(pts,Vh),ly:L.layerGroup(),evs:[]}));
  hLayer=L.layerGroup().addTo(mapH);
- HEVS.forEach(x=>{const t=tms(x),T=TRIPS.find(T=>t>=T.st.s-6e4&&t<=T.st.e+6e4);if(T)T.evs.push(x);else evMk(x).addTo(hLayer)});
+ HEVS.forEach(x=>{const t=tms(x),T=TRIPS.find(T=>t>=T.st.s-6e4&&t<=T.st.e+6e4);if(T)T.evs.push(x);else evMk(x)?.addTo(hLayer)});
  TRIPS.forEach(T=>{drawTrip(T,Vh);T.ly.addTo(mapH)});
  if(!+Vh.fuel_moving&&!+Vh.fuel_idle)toast('Set the fuel rates on the Vehicles page to see fuel figures');
  hSide();hKpis();hFit()}
@@ -1230,7 +1243,7 @@ async function tPrint(){const T=TRIPS[TSEL];if(!T)return;const a=T.pts[0],z=T.pt
  // route stopped short of where the trip ended. The final fix is kept explicitly.
  const PS=RN.map(r=>{const s=r.filter((_,i)=>i%k===0);if(s[s.length-1]!==r[r.length-1])s.push(r[r.length-1]);return s});
  const FL=PS.flat();
- const MAP=JSON.stringify({u:B[0],o:{attribution:B[1],maxZoom:B[2],...B[3]},pts:FL,runs:PS,col:T.col,evs:T.evs.map(x=>[+x.lat,+x.lng]).filter(x=>Math.abs(x[0])<=90&&Math.abs(x[1])<=180)});
+ const MAP=JSON.stringify({u:B[0],o:{attribution:B[1],maxZoom:B[2],...B[3]},pts:FL,runs:PS,col:T.col,evs:T.evs.filter(okXY).map(x=>[+x.lat,+x.lng]).filter(x=>Math.abs(x[0])<=90&&Math.abs(x[1])<=180)});
  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Trip ${T.n} - ${esc(a.vehicle_name||'')}</title><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"><\/script><style>*{print-color-adjust:exact;-webkit-print-color-adjust:exact}body{font:14px system-ui,sans-serif;margin:28px;color:#222}h2{margin:0 0 4px}h3{margin:22px 0 6px}small{color:#666}table{border-collapse:collapse;width:100%;margin-top:14px}td,th{border:1px solid #ccc;padding:6px 9px;text-align:left}td:first-child{background:#f5f5f5;font-weight:600;width:38%}th{background:#eee}.rt{margin-top:16px;break-inside:avoid;page-break-inside:avoid}#pm{height:430px;width:100%;border:1px solid #ccc;border-radius:10px;background:#f7fafc}.lg{font-size:12px;color:#444;margin:6px 0 0}</style></head><body>
  <h2>Trip ${T.n} details</h2><small>Fleet Tracker · Generated: ${new Date().toLocaleString()}</small>
  <div class="rt"><h3>Route map</h3><div id="pm"></div><p class="lg"><b style="color:${T.col}">&#9644;</b> driven route &nbsp;·&nbsp; <span style="color:#27a46a">&#9679;</span> start ${esc(ls||gk(a))} &nbsp;·&nbsp; <span style="color:#d9534f">&#9679;</span> end ${esc(le||gk(z))}${T.evs.length?' &nbsp;·&nbsp; <span style="color:#f28c28">&#9679;</span> '+T.evs.length+' event(s)':''}</p></div>
@@ -1439,8 +1452,11 @@ function renderEvt(){
  chart('c2','bar',days,K.map(k=>({label:EV[k][0],backgroundColor:EV[k][2],data:days.map(d=>rows.filter(r=>r.type===k&&dayOf(r)===d).length)})),{t:'Events per Day',s:1,click:(e,el)=>el.length&&evSet('day',days[el[0].index])});
  const dr=Object.entries(cnt(rows,r=>r.driver_name)).sort((a,b)=>b[1]-a[1]).slice(0,8).map(x=>x[0]);
  chart('c3','bar',dr,K.map(k=>({label:EV[k][0],backgroundColor:EV[k][2],data:dr.map(n=>rows.filter(r=>(r.driver_name||'-')===n&&r.type===k).length)})),{t:'Violator Drivers',s:1,h:1,click:(e,el)=>{if(!el.length)return;EVF.driver=dr[el[0].index];EVF.type=K[el[0].datasetIndex];renderEvt()}});
- $('evT').innerHTML=`<table><tr><th>Event Start</th><th>Event End</th><th>Duration</th><th>Vehicle</th><th>Driver</th><th>Event</th><th>Clip <span class="hp" data-tip="The few seconds the driver camera recorded around this event, in its own column so the answers line up one under the next however long the event is named. A video button opens the recording. Uploading means the handset has the picture and has not finished sending it - it travels with that driver's own events, so a phone out of signal holds it until the next bar appears. No video means the file never arrived: an app closed mid-encode, a phone that went away before it finished, a clip the retention window took over. Off is a setting rather than a shortage - that rule's Recording switch is off on the Configuration page. A dash is an event this camera does not raise. None of these is a reason to doubt the event: everything it measured is already in this row, and the clip is only the picture of it.">?</span></th><th>Speed (km/h)</th><th>Details</th><th>Location</th></tr>${rows.slice(0,1000).map(r=>{const E=EVX(r.type),d=evDur(r),en=evEnd(r);return `<tr><td>${new Date(r.recorded_at).toLocaleString()}</td><td>${en?en.toLocaleString():'-'}</td><td class="nw">${d==null?'-':hms(d)}</td><td>${esc(r.vehicle_name)}</td><td>${esc(r.driver_name)}</td><td><span class="chip" style="background:${E[2]}22;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</span></td><td class="taC">${evClipCell(r).trim()||'<small style="opacity:.5">—</small>'}</td><td>${Math.round(r.speed||0)}</td><td>${esc(r.details||'-')}</td><td><a href="#" onclick="goHist('${r.vehicle_id}','${r.recorded_at}',${r.lat},${r.lng});return false"><i class="fa-solid fa-map-location-dot"></i> ${(+r.lat).toFixed(5)}, ${(+r.lng).toFixed(5)}</a></td></tr>`}).join('')||'<tr><td colspan="10" class="empty">No events in this period.</td></tr>'}</table>`;tools($('evT'))}
-async function goHist(vid,iso,lat,lng){document.querySelector('.nb[data-t=hist]').click();$('hv').value=vid;const t=new Date(iso).getTime();$('hf')._flatpickr.setDate(new Date(t-9e5),true);$('ht')._flatpickr.setDate(new Date(t+9e5),true);await loadHist(1);mapH.setView([lat,lng],17)}
+ $('evT').innerHTML=`<table><tr><th>Event Start</th><th>Event End</th><th>Duration</th><th>Vehicle</th><th>Driver</th><th>Event</th><th>Clip <span class="hp" data-tip="The few seconds the driver camera recorded around this event, in its own column so the answers line up one under the next however long the event is named. A video button opens the recording. Uploading means the handset has the picture and has not finished sending it - it travels with that driver's own events, so a phone out of signal holds it until the next bar appears. No video means the file never arrived: an app closed mid-encode, a phone that went away before it finished, a clip the retention window took over. Off is a setting rather than a shortage - that rule's Recording switch is off on the Configuration page. A dash is an event this camera does not raise. None of these is a reason to doubt the event: everything it measured is already in this row, and the clip is only the picture of it.">?</span></th><th>Speed (km/h)</th><th>Details</th><th>Location</th></tr>${rows.slice(0,1000).map(r=>{const E=EVX(r.type),d=evDur(r),en=evEnd(r);return `<tr><td>${new Date(r.recorded_at).toLocaleString()}</td><td>${en?en.toLocaleString():'-'}</td><td class="nw">${d==null?'-':hms(d)}</td><td>${esc(r.vehicle_name)}</td><td>${esc(r.driver_name)}</td><td><span class="chip" style="background:${E[2]}22;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</span></td><td class="taC">${evClipCell(r).trim()||'<small style="opacity:.5">—</small>'}</td><td>${Math.round(r.speed||0)}</td><td>${esc(r.details||'-')}</td><td><a href="#" onclick="goHist('${r.vehicle_id}','${r.recorded_at}',${r.lat},${r.lng});return false"><i class="fa-solid fa-map-location-dot"></i> ${okXY(r)?(+r.lat).toFixed(5)+', '+(+r.lng).toFixed(5):'No fix'}</a></td></tr>`}).join('')||'<tr><td colspan="10" class="empty">No events in this period.</td></tr>'}</table>`;tools($('evT'))}
+async function goHist(vid,iso,lat,lng){document.querySelector('.nb[data-t=hist]').click();$('hv').value=vid;const t=new Date(iso).getTime();$('hf')._flatpickr.setDate(new Date(t-9e5),true);$('ht')._flatpickr.setDate(new Date(t+9e5),true);await loadHist(1);
+ // an event with no fix of its own cannot be jumped to; frame the period instead of
+ // handing Leaflet a null coordinate, which used to throw the same crash the row came from
+ if(okXY({lat,lng}))mapH.setView([lat,lng],17);else hFit()}
 async function loadRep(){fSave('rep');
  const F=new Date($('rp_f').value),T=new Date($('rp_t').value);
  if(isNaN(F)||isNaN(T))return toast('Set a valid From and To period first');
@@ -1668,8 +1684,10 @@ const ALR={},EVSEEN=new Set();let EVMAX=null;
 function alertEv(x){const R=RULES[x.type]||{},n=EVX(x.type)[0];
  if(R.alert!==false){toast('⚠ '+n+': '+(x.vehicle_name||'')+' / '+(x.driver_name||''));
   const u=x.user_id,re=()=>{if(markers[u]&&last[u])markers[u].setIcon(icon(last[u]))};ALR[u]=Date.now()+60000;re();setTimeout(re,60500);
-  const m=L.marker([x.lat,x.lng],{icon:L.divIcon({className:'',html:'<div class="pulse"></div>',iconSize:[44,44],iconAnchor:[22,22]}),zIndexOffset:1000}).addTo(mapL).bindPopup(()=>evPop(x),{minWidth:240});
-  if($('live').classList.contains('on'))m.openPopup();setTimeout(()=>m.remove(),60000)}
+  // the pulse needs a place to pulse, and a camera event whose handset had no fix when
+  // it fired has none; the toast above and the buzzer below are that event's due either way
+  if(okXY(x)){const m=L.marker([x.lat,x.lng],{icon:L.divIcon({className:'',html:'<div class="pulse"></div>',iconSize:[44,44],iconAnchor:[22,22]}),zIndexOffset:1000}).addTo(mapL).bindPopup(()=>evPop(x),{minWidth:240});
+   if($('live').classList.contains('on'))m.openPopup();setTimeout(()=>m.remove(),60000)}}
  if(R.beep!==false)beep(R)}
 function onEv(x){if(!x||x.id==null||EVSEEN.has(x.id))return;EVSEEN.add(x.id);if(EVMAX==null||+x.id>+EVMAX)EVMAX=x.id;alertEv(x);
  if(!$('evt').classList.contains('on')){evN++;$('evb').textContent=evN;$('evb').style.display='inline-block'}}
