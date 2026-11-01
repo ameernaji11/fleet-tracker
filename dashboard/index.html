@@ -997,7 +997,7 @@ async function link(id){const role=$('r_'+id).value;if(id===UID&&role!=='admin')
 // ---- activity log (admin only). The action list below is what both this
 // dashboard and the driver phone write, so the filter offers every kind of
 // entry even when the current period happens to contain none of it.
-const ACTS=['Signed in','Signed out','Session time','Opened dashboard','Opened app','Opened dashboard from app','Allowed permissions','Switched vehicle','Changed own password','Reset password','Unlocked user','Added vehicle','Edited vehicle','Deleted vehicle','Added driver','Edited driver','Deleted driver','Created user','Saved user access','Saved configuration','Reset vehicles to fleet defaults','Exported report','Printed trip','Started trip','Ended trip'];
+const ACTS=['Signed in','Signed out','Session time','Opened dashboard','Opened app','Opened dashboard from app','Allowed permissions','Switched vehicle','Changed own password','Reset password','Unlocked user','Added vehicle','Edited vehicle','Deleted vehicle','Added driver','Edited driver','Deleted driver','Created user','Saved user access','Saved configuration','Reset vehicles to fleet defaults','Exported report','Printed trip','Started trip','Started trip automatically','Ended trip automatically','Ended trip'];
 let ACT=[],ACTU=null,ACF='';
 async function loadAct(){if(!ADMIN)return;fSave('act');
  if(!ACTU){const {data}=await sb.from('profiles').select('id,email').order('email');
@@ -1249,7 +1249,7 @@ const EV={harsh_braking:['Harsh braking','fa-hand','#d9534f','rd'],harsh_acceler
  dms_phone_use:['Phone in hand','fa-mobile-screen-button','#7048e8','or'],dms_cam_blocked:['Camera blocked','fa-video-slash','#495057','rd'],
  dms_yawning:['Driver yawning','fa-face-tired','#8e44ad','or'],dms_talking:['Talking while driving','fa-comments','#0b9fb3','bl'],
  dms_eating:['Eating while driving','fa-utensils','#b85d00','gy'],dms_drinking:['Drinking while driving','fa-mug-saucer','#2f7fe6','gy'],
- dms_smoking:['Hand at the mouth','fa-smoking','#d9534f','rd']};
+ dms_smoking:['Smoking','fa-smoking','#d9534f','rd']};
 const EVX=t=>EV[t]||[t||'Event','fa-triangle-exclamation','#6b7a85','gy'];
 const evIcon=t=>L.divIcon({className:'',html:`<div class="mk sm" style="background:${EVX(t)[2]}"><i class="fa-solid ${EVX(t)[1]}"></i></div>`,iconSize:[20,20],iconAnchor:[10,10]});
 // A zone crossing is a moment rather than a breach that grows, and the phone writes
@@ -1311,6 +1311,24 @@ const CLIPB='dms-clips';
 // after the event it belongs to, which is the id the handset invented.
 const EVROW={};
 const evClipBtn=x=>x&&x.clip_path?(EVROW[x.cid]=x,` <button class="btn gh sm" data-clip="${esc(x.clip_path)}" data-cid="${esc(x.cid||'')}" title="Watch the seconds the driver camera recorded around this event"><i class="fa-solid fa-video"></i></button>`):'';
+// The clip column has to answer three questions, and it used to answer only one: a
+// button when a film was on the server, and a bare dash otherwise, which left the
+// administrator guessing whether the camera had recorded nothing, had recorded and not
+// yet sent it, or had been told not to record at all. So say which of the three it is,
+// from the two things this page does know: the Recording switch of that rule, and how
+// long ago the alert happened. The handset writes its picture a second or two after the
+// alert and sends it with the row it belongs to, retrying for as long as the file is
+// still on it, so quarter of an hour is long past any honest upload - and a phone that
+// was only slow has filled this cell by now.
+const CLIPWAIT=15*60e3;
+function evClipCell(r){
+ const b=evClipBtn(r);if(b)return b;
+ if(!DMS[r.type])return '';
+ if(RULES[r.type]&&RULES[r.type].clip===false)return `<span class="chip" style="background:var(--gyl);color:var(--gy)"><i class="fa-solid fa-video-slash"></i> Off</span>`;
+ if(Date.now()-new Date(r.recorded_at).getTime()<=CLIPWAIT)
+  return `<span class="chip chipO"><i class="fa-solid fa-hourglass-half"></i> Uploading</span>`;
+ return `<span class="chip" style="background:var(--rdl);color:var(--rd)"><i class="fa-solid fa-triangle-exclamation"></i> No video</span>`;
+}
 // A clip's name is its event's id, which means nothing to a person who has to file it.
 // The reading the phone wrote is burned into the pictures themselves, so what this adds
 // to the name is only the two things an investigator sorts by: who, and when. Spaces are
@@ -1320,8 +1338,19 @@ const clipName=x=>[x&&(x.driver_name||x.vehicle_name||'driver'),
  x?new Date(x.recorded_at).toISOString().slice(0,19).replace(/[T:]/g,'-'):'',x?EVX(x.type)[0].toLowerCase().replace(/[^a-z0-9]+/g,'-'):'']
  .filter(Boolean).join('_').replace(/\s+/g,'_').replace(/[^A-Za-z0-9._-]/g,'')+'.mp4';
 let CLIPURL='';
+// The reading the phone measured belongs beside the picture, not on top of it. This
+// dialog used to carry a five-column table, the event's own sentence and a paragraph
+// about where the words are written, and all of that pushed the film past the bottom
+// of the window, so the thing he came to watch had to be scrolled to. One line now,
+// and one press puts even that away when the picture is all he wants.
+const clipRead=()=>localStorage.clipRead!=='0';
+function clipReadSet(on){localStorage.clipRead=on?'1':'0';
+ const r=$('clpR'),b=$('clpT');if(!r||!b)return;
+ r.classList.toggle('hide',!on);
+ b.innerHTML='<i class="fa-solid fa-'+(on?'eye-slash':'eye')+'"></i>'+(on?'Hide the reading':'Show the reading');
+ b.title=on?'Leave nothing on screen but the recording and its buttons':'Driver, vehicle, the moment, speed, length and size'}
 async function evClip(path,cid){const x=EVROW[cid]||{clip_path:path},E=EVX(x.type),
- m=$('modal'),box=h=>`<div class="card" style="max-width:min(680px,100%)"><div class="dlgT"><i class="fa-solid fa-video"></i> <b style="color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</b> · driver camera clip</div>${h}</div>`;
+ m=$('modal'),box=h=>`<div class="card" style="width:min(880px,100%)"><div class="dlgT" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span><i class="fa-solid fa-video"></i> <b style="color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</b> · driver camera clip</span><button class="btn gh sm" id="clpT" style="margin-left:auto" onclick="clipReadSet(!clipRead())"></button></div>${h}</div>`;
  // whatever was open before is over, and its bytes belong to the browser no longer
  if(CLIPURL){URL.revokeObjectURL(CLIPURL);CLIPURL=''}
  m.innerHTML=box('<p>Loading the recording…</p>');m.classList.add('on');
@@ -1339,16 +1368,14 @@ async function evClip(path,cid){const x=EVROW[cid]||{clip_path:path},E=EVX(x.typ
  // muted so it starts by itself: a driver who has to press play first has already missed
  // the second that raised the alert, and these clips carry no sound anyway. Looped,
  // because the thing an administrator is looking for is one movement of a hand.
- m.innerHTML=box(`<video src="${url}" controls autoplay muted loop playsinline preload="auto" style="width:100%;max-height:58vh;border-radius:10px;background:#000"></video>
- <table style="margin-top:10px"><tr><th>Driver · vehicle</th><th>Recorded</th><th>Speed</th><th>Duration</th><th>Size</th></tr>
- <tr><td>${esc(x.driver_name||'-')} · ${esc(x.vehicle_name||'-')}</td><td>${x.recorded_at?new Date(x.recorded_at).toLocaleString():'-'}</td>
- <td>${x.speed!=null?Math.round(x.speed||0)+' km/h':'-'}</td><td class="nw">${x.ended_at?hms((new Date(x.ended_at)-new Date(x.recorded_at))/1000):'-'}</td>
- <td>${(size/1024).toFixed(0)} KB</td></tr></table>
- <p style="margin:8px 0 0">${esc(x.details||EVX(x.type)[0])}</p>
- <p style="margin:6px 0 0;color:var(--mut);font-size:12px"><i class="fa-solid fa-circle-info"></i> What the camera measured is written across the picture itself, frame by frame, with the seconds before or after the alert beside it. The download carries the same file, so the words travel with it.</p>
+ m.innerHTML=box(`<video src="${url}" controls autoplay muted loop playsinline preload="auto" style="width:100%;max-height:56vh;border-radius:10px;background:#000"></video>
+ <div id="clpR" style="margin-top:8px;font-size:13px">
+ <b>${esc(x.driver_name||'-')}</b> · ${esc(x.vehicle_name||'-')} · ${x.recorded_at?new Date(x.recorded_at).toLocaleString():'-'} · ${x.speed!=null?Math.round(x.speed||0)+' km/h':'-'} · ${x.ended_at?hms((new Date(x.ended_at)-new Date(x.recorded_at))/1000):'-'} · ${(size/1024).toFixed(0)} KB
+ <div style="margin-top:3px">${esc(x.details||EVX(x.type)[0])}</div>
+ <div style="margin-top:3px;color:var(--mut);font-size:12px"><i class="fa-solid fa-circle-info"></i> The small line along the bottom of the picture is written into the file itself, so the download carries it too.</div></div>
  <div class="dlgB"><a class="btn b sm" href="${url}" download="${esc(clipName(x))}" title="Save this recording to this computer"><i class="fa-solid fa-download"></i>Download</a>
  <button class="btn gh sm" onclick="closeClip()"><i class="fa-solid fa-xmark"></i>Close</button></div>`);
-}
+ clipReadSet(clipRead())}
 function closeClip(){$('modal').classList.remove('on');if(CLIPURL){URL.revokeObjectURL(CLIPURL);CLIPURL=''}}
 const dlgClose=()=>'<div class="dlgB"><button class="btn gh sm" onclick="closeClip()"><i class="fa-solid fa-xmark"></i>Close</button></div>';
 document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('[data-clip]');
@@ -1363,11 +1390,16 @@ function renderEvt(){
  // nothing, and the one thing an administrator has to be able to tell apart is "no
  // alert happened" from "the handset has not brought its picture in yet". A rule whose
  // own Recording switch is off is a third thing again, and it is not a shortage: its
- // rows are counted out of this before it is ever said.
+ // rows are counted out of this before it is ever said. The two numbers here split the
+ // remainder the same way the Clip column of each row does, so the summary and the rows
+ // can never disagree about how many films are simply still on their way.
  const cam=rows.filter(r=>DMS[r.type]),film=cam.filter(r=>!(RULES[r.type]&&RULES[r.type].clip===false)),
-  noClip=film.filter(r=>!r.clip_path).length,
-  cn=noClip?`<span class="chip chipO">${noClip} of ${film.length} camera events have no recording <span class="hp" data-tip="A recording is made on the handset and travels out with that driver's own events, so it reaches the server only when his phone next has a signal - the newest alerts are often still waiting on it. It is also missing from an event raised by an older build of the app, which kept its pictures on the phone and never sent them, and from an alert fired before the lens had given a single picture. Nothing here is a reason to drop the event: the reading in its Details column stands on its own.">?</span></span>`:'';
- $('evFl').innerHTML=[tb,ch,cn].filter(Boolean).join(' ')+((tb||ch)?' <button class="btn gh sm" onclick="evReset()"><i class="fa-solid fa-rotate-left"></i>Reset filter</button>':'');
+  ago=r=>Date.now()-new Date(r.recorded_at).getTime(),
+  noClip=film.filter(r=>!r.clip_path&&ago(r)>CLIPWAIT).length,
+  waitClip=film.filter(r=>!r.clip_path&&ago(r)<=CLIPWAIT).length,
+  cn=noClip?`<span class="chip chipO">${noClip} of ${film.length} camera events have no recording <span class="hp" data-tip="A recording is made on the handset and travels out with that driver's own events, so it reaches the server only when his phone next has a signal - and a phone that stayed out of signal past a quarter of an hour is a phone this page has stopped counting as still uploading. It is also missing from an event raised by an older build of the app, which kept its pictures on the phone and never sent them, and from an alert fired before the lens had given a single picture. Nothing here is a reason to drop the event: the reading in its Details column stands on its own.">?</span></span>`:'',
+  cw=waitClip?`<span class="chip chipB"><i class="fa-solid fa-hourglass-half"></i> ${waitClip} recording${waitClip==1?'':'s'} still on the handset</span>`:'';
+ $('evFl').innerHTML=[tb,ch,cw,cn].filter(Boolean).join(' ')+((tb||ch)?' <button class="btn gh sm" onclick="evReset()"><i class="fa-solid fa-rotate-left"></i>Reset filter</button>':'');
  // the tiles count without the type filter, so every type stays clickable
  const bt=cnt(base,r=>r.type),ct=(c,i,v,l,js,on)=>tile(c,i,v,l).replace('class="card kpi ',`onclick="${js}" title="Click to show only these" class="card kpi click${on?' on':''} `);
  $('evK').innerHTML=ct('gy','fa-bell',base.length,'Total events',"EVF.type=undefined;renderEvt()",!EVF.type)+K.map(k=>ct(EV[k][3],EV[k][1],bt[k]||0,EV[k][0],`evSet('type','${k}')`,EVF.type===k)).join('');
@@ -1376,7 +1408,7 @@ function renderEvt(){
  chart('c2','bar',days,K.map(k=>({label:EV[k][0],backgroundColor:EV[k][2],data:days.map(d=>rows.filter(r=>r.type===k&&dayOf(r)===d).length)})),{t:'Events per Day',s:1,click:(e,el)=>el.length&&evSet('day',days[el[0].index])});
  const dr=Object.entries(cnt(rows,r=>r.driver_name)).sort((a,b)=>b[1]-a[1]).slice(0,8).map(x=>x[0]);
  chart('c3','bar',dr,K.map(k=>({label:EV[k][0],backgroundColor:EV[k][2],data:dr.map(n=>rows.filter(r=>(r.driver_name||'-')===n&&r.type===k).length)})),{t:'Violator Drivers',s:1,h:1,click:(e,el)=>{if(!el.length)return;EVF.driver=dr[el[0].index];EVF.type=K[el[0].datasetIndex];renderEvt()}});
- $('evT').innerHTML=`<table><tr><th>Event Start</th><th>Event End</th><th>Duration</th><th>Vehicle</th><th>Driver</th><th>Event</th><th>Clip <span class="hp" data-tip="Opens the few seconds the driver camera recorded around this event. Its own column, so the buttons line up one under the next however long the event is named. No button means that row has no film: the event is not one the camera raises, its Recording switch is off on the Configuration page, or the handset has not brought the picture in yet. None of those is a reason to doubt the event - everything it measured is already in this row, and the clip is only the picture of it.">?</span></th><th>Speed (km/h)</th><th>Details</th><th>Location</th></tr>${rows.slice(0,1000).map(r=>{const E=EVX(r.type),d=evDur(r),en=evEnd(r);return `<tr><td>${new Date(r.recorded_at).toLocaleString()}</td><td>${en?en.toLocaleString():'-'}</td><td class="nw">${d==null?'-':hms(d)}</td><td>${esc(r.vehicle_name)}</td><td>${esc(r.driver_name)}</td><td><span class="chip" style="background:${E[2]}22;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</span></td><td class="taC">${evClipBtn(r).trim()||'<small style="opacity:.5">—</small>'}</td><td>${Math.round(r.speed||0)}</td><td>${esc(r.details||'-')}</td><td><a href="#" onclick="goHist('${r.vehicle_id}','${r.recorded_at}',${r.lat},${r.lng});return false"><i class="fa-solid fa-map-location-dot"></i> ${(+r.lat).toFixed(5)}, ${(+r.lng).toFixed(5)}</a></td></tr>`}).join('')||'<tr><td colspan="10" class="empty">No events in this period.</td></tr>'}</table>`;tools($('evT'))}
+ $('evT').innerHTML=`<table><tr><th>Event Start</th><th>Event End</th><th>Duration</th><th>Vehicle</th><th>Driver</th><th>Event</th><th>Clip <span class="hp" data-tip="The few seconds the driver camera recorded around this event, in its own column so the answers line up one under the next however long the event is named. A video button opens the recording. Uploading means the handset has the picture and has not finished sending it - it travels with that driver's own events, so a phone out of signal holds it until the next bar appears. No video means the file never arrived: an app closed mid-encode, a phone that went away before it finished, a clip the retention window took over. Off is a setting rather than a shortage - that rule's Recording switch is off on the Configuration page. A dash is an event this camera does not raise. None of these is a reason to doubt the event: everything it measured is already in this row, and the clip is only the picture of it.">?</span></th><th>Speed (km/h)</th><th>Details</th><th>Location</th></tr>${rows.slice(0,1000).map(r=>{const E=EVX(r.type),d=evDur(r),en=evEnd(r);return `<tr><td>${new Date(r.recorded_at).toLocaleString()}</td><td>${en?en.toLocaleString():'-'}</td><td class="nw">${d==null?'-':hms(d)}</td><td>${esc(r.vehicle_name)}</td><td>${esc(r.driver_name)}</td><td><span class="chip" style="background:${E[2]}22;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</span></td><td class="taC">${evClipCell(r).trim()||'<small style="opacity:.5">—</small>'}</td><td>${Math.round(r.speed||0)}</td><td>${esc(r.details||'-')}</td><td><a href="#" onclick="goHist('${r.vehicle_id}','${r.recorded_at}',${r.lat},${r.lng});return false"><i class="fa-solid fa-map-location-dot"></i> ${(+r.lat).toFixed(5)}, ${(+r.lng).toFixed(5)}</a></td></tr>`}).join('')||'<tr><td colspan="10" class="empty">No events in this period.</td></tr>'}</table>`;tools($('evT'))}
 async function goHist(vid,iso,lat,lng){document.querySelector('.nb[data-t=hist]').click();$('hv').value=vid;const t=new Date(iso).getTime();$('hf')._flatpickr.setDate(new Date(t-9e5),true);$('ht')._flatpickr.setDate(new Date(t+9e5),true);await loadHist(1);mapH.setView([lat,lng],17)}
 async function loadRep(){fSave('rep');
  const F=new Date($('rp_f').value),T=new Date($('rp_t').value);
@@ -1435,7 +1467,7 @@ const DMSLIM={dms_fatigue:'How shut the eyes may be, measured as the percentage 
  dms_talking:'How many times a minute the mouth may move. This one is a rate, not a percentage: a single long open mouth is a yawn, and only a mouth that closes and opens again counts a second movement. Tolerance is how long it has to keep talking before the row is written.',
  dms_eating:'How much of the last second something the model calls food may sit at this driver\u2019s mouth. Needs the object model; on a handset that cannot report where it saw a thing this rule stays quiet.',
  dms_drinking:'How much of the last second a cup or a bottle may sit at this driver\u2019s mouth. Needs the object model, as eating does.',
- dms_smoking:'How much of the last second a bare hand may sit at this driver\u2019s mouth, with nothing the model can name in it. The shipped model has no cigarette class, so this is a hand at the face rather than a cigarette seen: it also catches a scratch, a yawn covered by a hand, or a chin resting on it. It is seeded switched off \u2014 read a few of its clips before you trust the count.',
+ dms_smoking:'How much of the last second a bare hand may sit at this driver\u2019s mouth, with nothing the model can name in it. The rule is called Smoking, but the shipped model has no cigarette class: what it sees is a hand at the face, not a cigarette, so a scratch, a yawn covered by a hand, or a chin resting on it all count too. It is seeded switched off \u2014 read a few of its clips before you trust the count.',
  dms_cam_blocked:'Nothing to set here: the camera stops seeing a face, or the picture stops changing, and the tolerance alone decides when that becomes an event.'};
 const WARNED={};
 const vlOf=r=>r.voice_lang&&VLANG[r.voice_lang]?r.voice_lang:(r.voice_lang==='off'||r.voice===false?'off':(SET.voice_lang&&VLANG[SET.voice_lang]?SET.voice_lang:'en'));
@@ -1467,7 +1499,7 @@ async function loadRules(){const {data}=await sb.from('event_rules').select('*')
  // cannot see a yawn. One toast, and only when the older four are already there.
  const NEW5=['dms_yawning','dms_talking','dms_eating','dms_drinking','dms_smoking'];
  if(SPD&&RULES.dms_fatigue&&!NEW5.every(t=>RULES[t])&&!WARNED.v25){WARNED.v25=1;
-  toast('The yawning, talking, eating, drinking and hand-at-the-mouth rules need the newest schema. Run schema.sql in Supabase (SQL Editor) once; the phone needs its new build as well.')}
+  toast('The yawning, talking, eating, drinking and smoking rules need the newest schema. Run schema.sql in Supabase (SQL Editor) once; the phone needs its new build as well.')}
  const num=(id,v,w,st)=>`<input type="number" step="${st||'any'}" min="0" id="${id}" value="${v??''}" style="width:${w||58}px">`;
  $('ruleT').innerHTML=`<table><tr><th>Event</th><th>Trigger limit</th>${SPD?'<th>Min speed (km/h) <span class="hp" data-tip="Only the nine driver-camera rules read this: nothing is reported until the vehicle is going faster, because a drowsy-driver or covered-lens alert means nothing while the vehicle is parked. Every other rule stays armed at any speed.">?</span></th>':''}<th>Tolerance (seconds)</th><th>Recorded</th>${CLIPCOL?'<th>Recording <span class="hp" data-tip="Keep a few seconds of the forward camera with each event of this type, so the alert can be watched afterwards. It is a driver-camera switch: only the nine rules that read the cab have a lens to record with, and every other row ignores it. Off still warns the driver, still saves the reading, the place and the duration, and still counts in every report - only the film is not made.">?</span></th>':''}<th>Visual alert</th><th>Buzzer alert</th><th>Buzzer seconds</th><th>Voice alert</th></tr>${list.map(r=>`<tr><td class="nw"><b>${esc(r.label)}</b></td><td class="nw">${NOLIM[r.type]?'<small style="opacity:.5">no limit</small>':num('rt_'+r.type,r.threshold,66,'0.1')+' <small>'+(UNIT[r.type]||'')+'</small>'}${DMS[r.type]&&DMSLIM[r.type]?'<span class="hp" data-tip="'+esc(DMSLIM[r.type])+'">?</span>':''}</td>${SPD?'<td>'+(DMS[r.type]?num('rs_'+r.type,r.speed_min??0,46):'<small style="opacity:.5">—</small>')+'</td>':''}<td>${num('rh_'+r.type,r.hold_s??0)}</td><td><input type="checkbox" id="re_${r.type}" ${r.enabled?'checked':''}></td>${CLIPCOL?'<td>'+(DMS[r.type]?'<input type="checkbox" id="rc_'+r.type+'" title="Record a few seconds of camera with this event"'+(r.clip!==false?' checked':'')+'>':'<small style="opacity:.5">—</small>')+'</td>':''}<td><input type="checkbox" id="ra_${r.type}" ${r.alert?'checked':''}></td><td class="nw"><select id="bt_${r.type}" style="width:126px" onchange="toneSync(this)">${Object.entries(TONES).map(([k,n])=>`<option value="${k}" ${(r.beep_type||'discontinuous')===k?'selected':''}>${n}</option>`).join('')}</select><button type="button" class="play" onclick="tryTone('${r.type}')" title="Play this tone"><i class="fa-solid fa-play"></i></button></td><td class="bd">${num('bd_'+r.type,r.beep_duration??5)}</td><td class="nw"><select id="vl_${r.type}" style="width:96px" onchange="syncPl(this)">${vlOpts(r)}</select><button type="button" class="play" onclick="tryVoice('${r.type}')" title="Speak this message"><i class="fa-solid fa-volume-high"></i></button></td></tr>`).join('')}</table>`;
  [...$('ruleT').querySelectorAll('select')].forEach(s=>s.id.startsWith('bt_')?toneSync(s):s.id.startsWith('vl_')&&syncPl(s))}
