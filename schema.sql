@@ -78,6 +78,12 @@
 --   the picture is not finished until after the breach has. guard_events() holds the
 --   line — on a closed row nothing but clip_path may move.
 --
+-- New in v26 (the Recording switch on each camera rule) -- adds:
+--   event_rules.clip (true). The nine driver-camera rows of the Configuration page each
+--   get their own switch for keeping a few seconds of picture with the event; off means
+--   the alert, the row and the report all still happen and no film is made. Default true
+--   is what every camera rule did before the switch existed. Vehicle rules ignore it.
+--
 -- The "admin seed" block makes ameer@fleettrack.com role=admin, so the separate
 -- Admin.sql saved query in Supabase is no longer needed — delete it once this
 -- file has run and you have confirmed: select email, role from profiles;
@@ -1165,8 +1171,31 @@ begin
   return new;
 end $$;
 
+-- ------------------------------------------- v26 a recording per rule, chosen ----
+-- Every camera event this fleet has ever raised came with a few seconds of picture,
+-- because there was no way to say otherwise. A film of a driver's own face is the one
+-- thing in this system that cannot be un-seen afterwards, and a fleet that watches the
+-- cab on a motorway and not in a school run wants that decision made rule by rule and
+-- vehicle by vehicle, not once for the whole project. So the nine camera rows of the
+-- Configuration page each get a Recording switch, and this is the column it writes.
+--
+-- It changes what a phone keeps, nothing else. A rule with the switch off still warns
+-- the driver, still writes its row with its reading and its duration, and still appears
+-- in every report; only the file is not made, and the Events table then shows the row
+-- with no clip icon beside it rather than a row that says "video missing".
+--
+-- Default true, and that is deliberate: it is what every one of these rules did before
+-- the switch existed, so a fleet that runs this file notices no change until an
+-- administrator asks for one. Vehicle rules (speed, braking, zones) have no use for the
+-- column - the driver camera is the only thing on this system that has a lens - so for
+-- them it simply sits at true and is never read.
+alter table event_rules add column if not exists clip boolean not null default true;
+comment on column event_rules.clip is
+  'Driver-camera rules only: keep a few seconds of picture with the event. Vehicle rules ignore it.';
+
 -- ------------------------------------------------------------- admin seed ----
 -- Promote the owner account. Runs after the tables/policies exist, and is safe
+
 -- to re-run. If the profile does not exist yet (nobody has signed in with this
 -- address), it reports that instead of failing, and the next run of this file
 -- picks it up. Do NOT put a real password or token here — only this update.
@@ -1496,4 +1525,28 @@ end $$;
 --   icon. An older dashboard simply never draws the icon; an older phone leaves the alerts on the handset, which is
 --   exactly the behaviour v23 shipped with. Nothing is lost by running it early, and nothing is gained by running
 --   it twice: the bucket insert is do-nothing and every policy is dropped and rebuilt.
+--
+-- v25, on top of the above (five more things the camera can see, and the clip that never arrived):
+--   five event_rules rows                                             -> dms_yawning, dms_talking, dms_eating,
+--        dms_drinking, dms_smoking. Seeded do-nothing, so thresholds a fleet tuned are never rolled back.
+--        dms_smoking is seeded OFF: the shipped model sees a bare hand at the mouth, not a cigarette.
+--   events insert policy                                              -> fifteen types instead of ten. Without this
+--        the five new alerts were refused by the database and the phone threw the refusal away, which is what made a
+--        vehicle full of warnings show two event types in the dashboard.
+--   "events update own" policy + guard_events()                       -> a phone may name the video of an event it
+--        has already closed, and on a closed row nothing but clip_path may move. This is the fix for the clip: a
+--        camera breach lasts a second or two and its picture is not finished until after that, so the old policy
+--        refused the write for every alert of that shape.
+--   Publish the phone that sends the five types before running this file, or after - both orders work, and the
+--   after-order is simply the situation this version exists to end.
+--
+-- v26, on top of the above (a recording per rule, chosen by the fleet):
+--   event_rules.clip (true)                                           -> the Recording switch each of the nine
+--        driver-camera rows of the Configuration page gets. Off means the driver is still warned, the row is still
+--        written with its reading, duration and place, and no seconds of film are made for it. Default true is
+--        exactly what every camera rule did before the switch, so running this file changes nothing until somebody
+--        ticks a box. Vehicle rules hold the column and never read it: the driver camera is the only lens here.
+--   Run this file before publishing the phone build that reads the switch and the dashboard build that draws it.
+--   An older phone records for every camera rule, which is the behaviour this column has until then; an older
+--   dashboard simply has no box to tick and its save does not send the word.
 -- ============================================================================
