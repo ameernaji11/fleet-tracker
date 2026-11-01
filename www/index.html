@@ -206,7 +206,7 @@ function credKnown(){try{const c=JSON.parse(localStorage.offl||'null');
 // status code and a plain message ("Invalid login credentials"); anything that
 // looks like a broken pipe does not, so the two are told apart here.
 function noNet(e){try{if(!e||e.statusCode||e.code)return false;
- return /failed to fetch|fetch failed|networkerror|network request failed|load failed|err_\w+|did not answer|timed out|timeout/i
+ return /failed to fetch|fetch failed|networkerror|network request failed|load failed|err_\w+|did not answer|timed out|timeout|no network/i
   .test(String(e.message||e))}catch(x){return false}}
 // used when the server could not be reached: the same local check the no-signal
 // path uses, so nobody waits for a "Failed to fetch" that never resolves
@@ -227,7 +227,12 @@ async function localEnter(){const c=await credCheck($('pw').value);
 // local count ages out on the same quiet window, using the last setup this phone
 // downloaded, because it is only ever a convenience and never the fleet's record.
 const LOCK_AT=5;let OFFFAIL=+(localStorage.offfail||0);
-const lockCall=(f,e)=>sb.rpc(f,{p_email:e}).then(({data,error})=>!error&&data&&data[0]||null).catch(()=>null);
+// Both halves of the lockout answer are asked with a deadline. They are pure
+// bookkeeping - a try counted, a lock named - and a request that hangs on a phone that
+// claims a signal used to stop the driver from ever getting in or out. Answering nothing
+// after 6 seconds lets the sign-in continue on the server's own verdict instead.
+const lockCall=(f,e)=>Promise.race([sb.rpc(f,{p_email:e}).then(({data,error})=>!error&&data&&data[0]||null).catch(()=>null),
+ new Promise(r=>setTimeout(()=>r(null),6000))]);
 const mins=m=>m<=1?'1 minute':Math.round(m)+' minutes';
 const lockMsg=m=>m==null?'locked until the administrator unlocks it.'
  :'locked, and it opens again by itself in '+mins(m)+'.';
@@ -255,13 +260,20 @@ async function signIn(){
    if(!c)soft(credKnown()?offFail()
     :'No internet, and this phone has not signed in as '+($('em').value.trim()||'that user')+' before. Sign in once with a signal, then it can let you in offline.');
    offClear();await init(1,{id:c.i,email:c.e});return}
-  const g=await lockCall('login_gate',em);
-  if(g&&g.locked)soft('Your account is '+lockMsg(g.wait_min));
+  // The lock question goes out with the password instead of in front of it. Awaiting
+  // one and then the other put a whole round trip in front of every sign-in, on a page
+  // that is already waiting for the server to grind out a password hash. The lock still
+  // wins: a session handed back for a locked account is thrown away here, the same way
+  // the opening check throws it away.
+  const g=lockCall('login_gate',em);
   let r;try{r=await Promise.race([sb.auth.signInWithPassword({email:em,password:$('pw').value}),
    new Promise((_,rej)=>{setTimeout(()=>rej(new Error('The server did not answer in time')),8e3)})])}
   // a late answer from a request that already timed out must not be read as a
   // second sign-in
   catch(e){r={error:e}}
+  const gd=await g;
+  if(gd&&gd.locked){if(r&&!r.error&&r.data&&r.data.session)try{await sb.auth.signOut()}catch(e){}
+   soft('Your account is '+lockMsg(gd.wait_min))}
   if(r.error&&noNet(r.error)){await localEnter();return}
   if(r.error){const m=r.error.message||String(r.error);
    if(/invalid login credentials/i.test(m)){const x=await lockCall('login_fail',em);
@@ -270,9 +282,17 @@ async function signIn(){
      +(x.reset_min?' It starts again from nothing after '+mins(x.reset_min)+' without a wrong one.':''))}
    if(/too many requests|rate limit/i.test(m))soft('Too many attempts just now. Wait a minute, then try again.');
    throw r.error}
-  await lockCall('login_ok',em);offClear();
+  // counting the good try is bookkeeping the driver has no reason to watch
+  lockCall('login_ok',em);offClear();
   want?localStorage.user=$('em').value.trim():localStorage.removeItem('user');
-  await credSave($('pw').value);await init(1)}
+  // init comes first, for two reasons. It is what gives the app the user's id, and the
+  // offline copy used to be made before it - when me was still null - so the very first
+  // sign-in stored nothing and the next dead-spot trip had no credential to open with.
+  // It also keeps a 120 000-round key derivation off the spinner: the driver is looking
+  // at his app while the phone makes the copy.
+  const pwv=$('pw').value;
+  await init(1);
+  credSave(pwv)}
  catch(e){$('err').textContent=(e.soft?'':'Error: ')+(e.message||e)}
  b.disabled=false;b.innerHTML='<i class="fa-solid fa-right-to-bracket"></i>Sign in'}
 async function signOut(){sessStop();await logAct('Signed out','Phone');
@@ -330,38 +350,58 @@ addEventListener('pagehide',sessStop);
 // warned. The session may be unreadable offline, so the last identity the phone proved
 // is kept as a fallback and the app re-checks it the moment the network is back.
 function cachedWho(){try{const c=JSON.parse(localStorage.cfg||'null');return c&&c.who&&c.who.id?c.who:null}catch(e){return null}}
+// supabase-js reads the sign-in from the phone's own storage, unless it has gone past
+// its hour and has to ask the server for a new one - and that is the call that can spin
+// for half a minute on a network that is only pretending to be there. The opening screen
+// is not allowed to be held up by it: past the deadline the identity this phone already
+// proved is used, which is what no signal already does, and the answer that arrives late
+// is still taken up by the re-check below.
+function askSession(ms){return new Promise(res=>{const t=setTimeout(()=>res(null),ms);
+ try{sb.auth.getSession().then(r=>{clearTimeout(t);res(r.data&&r.data.session)},()=>{clearTimeout(t);res(null)})}
+ catch(e){clearTimeout(t);res(null)}})}
 async function init(fresh,who){
  if(!sb)return;
- let s=null;
+ let s=null,stale=false;
  // With no signal there is nothing to ask: the identity this phone already proved is
  // used straight away. Waiting for a server the handset cannot reach is what made
  // signing in take so long offline. `who` is a password this phone checked itself.
  if(navigator.onLine){if(who)s={user:who,offline:true};
-  else{try{const r=await sb.auth.getSession();s=r.data&&r.data.session}catch(e){}}}
+  else{s=await askSession(4000);if(!s){const w=cachedWho();if(w){s={user:w,offline:true};stale=true}}}
+ }
  else{const w=who||cachedWho();if(w)s={user:w,offline:true}}
  if(!s)return;me=s.user;OFFL=!!s.offline;
- // the two things the administrator can do to an account have to be noticed here as
+ // a session that was only delayed, not missing: ask once more in the background and,
+ // when it answers, the phone is not offline any more and the queue can go up
+ if(stale)setTimeout(async()=>{try{const r=await sb.auth.getSession();const x=r&&r.data&&r.data.session;
+  if(x&&x.user&&x.user.id===me.id&&INAPP){me=x.user;OFFL=false;netUi();outUi();if(PEND&&!fl)flush()}}catch(e){}},9000);
+ // The two things the administrator can do to an account have to be noticed here as
  // well: a lock set while this phone was already signed in ends the session on the
  // spot, and a password they typed for the driver has to be replaced before the app
  // carries on. With no signal neither can be asked.
- if(!OFFL)try{let {data:a}=await sb.from('profiles').select('locked_at,locked_until,must_change').eq('id',me.id).single();
-  // a database that has not run v21 has no expiry column, and refusing the whole read
-  // would leave this phone riding through a lock; ask for the older two instead
-  if(!a)a=(await sb.from('profiles').select('locked_at,must_change').eq('id',me.id).single()).data;
-  // the sign-in function is the one that knows a lockout's own minute has come, because
-  // it reads the server's clock and not this handset's: a phone whose time is wrong by
-  // an hour would otherwise bounce a driver who had already waited his lock out
-  const g=me.email?await lockCall('login_gate',me.email):null;
+ // Both questions now go out at the same time as the queue and the settings open,
+ // instead of in front of them: the three of them are one after another on the only
+ // path the driver waits on, and none of them needs the answer to the others.
+ let chk=null;
+ const gate=OFFL?Promise.resolve(false):(async()=>{
+  try{let {data:a}=await sb.from('profiles').select('locked_at,locked_until,must_change').eq('id',me.id).single();
+   // a database that has not run v21 has no expiry column, and refusing the whole read
+   // would leave this phone riding through a lock; ask for the older two instead
+   if(!a)a=(await sb.from('profiles').select('locked_at,must_change').eq('id',me.id).single()).data;
+   // the sign-in function is the one that knows a lockout's own minute has come, because
+   // it reads the server's clock and not this handset's: a phone whose time is wrong by
+   // an hour would otherwise bounce a driver who had already waited his lock out
+   const g=me.email?await lockCall('login_gate',me.email):null;
+   chk={a,g};return g?g.locked:lockOn(a)}catch(e){return false}})();
+ await Promise.all([gate,outInit(),loadRules()]);
+ if(await gate){
   // the lock is not named on the sign-in screen for simply opening the app - that
   // sentence belongs to the moment the driver presses Sign in - and the phone loses
   // its offline credential with it, so a lock cannot be signed around with no signal
-  if(g?g.locked:lockOn(a)){await sb.auth.signOut();localStorage.removeItem('offl');
-   // the sign-in is gone, so this phone has no identity any more - which is also what
-   // tells the opening screen to stop waiting and show the form
-   me=null;OFFL=false;show('lg');$('err').textContent='';return}
-  if(a&&a.must_change)pwUi(1)}catch(e){}
- await outInit();
- await loadRules();
+  await sb.auth.signOut();localStorage.removeItem('offl');
+  // the sign-in is gone, so this phone has no identity any more - which is also what
+  // tells the opening screen to stop waiting and show the form
+  me=null;OFFL=false;show('lg');$('err').textContent='';return}
+ if(chk&&chk.a&&chk.a.must_change)pwUi(1);
  // a phone Android restarted while a trip was running has already raised warnings of
  // its own: hear about them from the first moment, not only after Start is pressed
  dmsListen();
@@ -397,7 +437,7 @@ async function outInit(){
 addEventListener('online',async()=>{netUi();lgHint();banner('<i class="fa-solid fa-cloud-arrow-up"></i> Back online: sending '+(PEND||0)+' saved records',5000);flush();bbAnswer();
  // an app that opened with no signal may be running on the phone's own copy of the
  // sign-in: the server has to accept it again before anything can be uploaded
- if(OFFL){let s=null;try{const r=await sb.auth.getSession();s=r.data&&r.data.session}catch(e){}
+ if(OFFL){const s=await askSession(4000);
   if(s&&s.user){me=s.user;OFFL=false;$('err').textContent='';outUi()}
   else $('err').textContent='Signal is back. The trip and every record are safe on this phone until you sign in again.'}
  maybeResume()});
@@ -407,6 +447,13 @@ function lgHint(){const h=$('offh');if(h)h.classList.toggle('hide',navigator.onL
 // a queue that stops being written to still has to drain: the trip callback only
 // fires while the vehicle is moving
 setInterval(()=>{if(!document.hidden&&PEND&&!fl)flush()},60000);
+// The third net for a film that missed its own event. A clip is finished a second or two
+// after the alert that asked for it, so it normally rides out on the row it belongs to or
+// on the update that closes it; this is for the ones neither of them reached - an app
+// killed mid-encode, a trip that ended before the queue got there, a phone that was out of
+// signal when both of those records went. Until now it only ran when the driver brought
+// the app back to the front, which is not a thing that happens during a shift.
+setInterval(()=>{if(!document.hidden&&watcher&&(dmsOn()||CAMW))clipSweep()},5*60000);
 const pmOpen=()=>!$('pm').classList.contains('hide');
 // The sign-in this phone already holds is asked about while the Permissions card is still
 // on screen on a first run, and the map cannot be built behind a page that is not shown -
@@ -801,8 +848,10 @@ async function dmsDrain(){if(!dmsHas())return;let items=null;
  const v=asg?.vehicles||{},d=asg?.drivers||{};
  for(const it of items){if(!it||!it.p)continue;const p=it.p;
   // a closing update carries only what changed: guard_events pins the identity
-  // columns, so sending them at all is a write the database refuses
-  if(it.op==='upd'&&it.id){outAdd({t:'upd',id:it.id,p});continue}
+  // columns, so sending them at all is a write the database refuses. `dms` says whose
+  // close this is, because the clip that belongs to it is on this phone under the same
+  // id - and the payload of a close has no type in it for clipFor to recognise.
+  if(it.op==='upd'&&it.id){outAdd({t:'upd',id:it.id,p,dms:1});continue}
   if(!p.cid||!p.type||!p.recorded_at)continue;
   // the service wrote this row knowing only the ids the page handed over when the trip
   // began; whoever is signed in now is what the events table must be filed against
@@ -946,7 +995,15 @@ function pickV(){PICK=$('pk').value;localStorage.pick=PICK;if(watcher){stop();wa
 // copied into localStorage every time it is read successfully, because a driver in a
 // basement, a tunnel or a dead spot still has to be warned with the limits he was
 // given. Without that copy the app would open with no rules at all and record nothing.
-function cfgSave(a,r,t,g){try{localStorage.cfg=JSON.stringify({a,r,t,g,who:{id:me.id,email:me.email},at:Date.now()})}catch(e){}}
+function cfgSave(a,r,t,g){try{const old=JSON.parse(localStorage.cfg||'null');
+ // A geofence query that came back broken is not a fleet with no zones, and the empty
+ // list this used to write made it one: the next app start read the saved copy, drew
+ // nothing, and drove through every zone of the fleet producing no entered, no exited
+ // and no zone-overspeed, with no error on the screen to say so. A failed read keeps
+ // the shapes already on the phone; only a query that answered - even with nothing in
+ // it - is allowed to say the fleet has no zones.
+ const zs=g==null?((old&&old.g)||[]):g;
+ try{localStorage.cfg=JSON.stringify({a,r,t,g:zs,who:{id:me.id,email:me.email},at:Date.now()})}catch(e){}}catch(e){}}
 function cfgRead(){try{const c=JSON.parse(localStorage.cfg||'null');return c&&c.a&&c.r&&c.t?c:null}catch(e){return null}}
 function applyCfg(a,r,t,g){
  if(a){ASGS=a.filter(x=>x.vehicle_id);if(!ASGS.some(x=>x.vehicle_id===PICK))PICK=ASGS[0]?.vehicle_id||null;asg=ASGS.find(x=>x.vehicle_id===PICK)||ASGS[0]||null;pickUi()}
@@ -966,10 +1023,18 @@ function applyCfg(a,r,t,g){
  // the offline wrong-try count ages out on the fleet's own window, and the sign-in
  // screen has to read it out of storage because nothing is downloaded at that moment
  try{localStorage.lwin=String(Math.max(1,Math.round(S.login_window_m||15)))}catch(e){}
- // the zones drawn on the dashboard map, ready for the point-in-polygon test
- ZONES=(g||[]).map(x=>({id:x.id,name:x.name,color:x.color,speed_limit:x.speed_limit,
+ // the zones drawn on the dashboard map, ready for the point-in-polygon test.
+ // g===null means the query never answered, which is not the same as a fleet with no
+ // geofences: overwriting the shapes with an empty list here would leave the driver
+ // crossing every zone of the fleet in silence, because the point-in-polygon test has
+ // nothing left to test against. Keep what the phone already has until it is replaced
+ // by an answer.
+ if(g!=null){ZONES=g.map(x=>({id:x.id,name:x.name,color:x.color,speed_limit:x.speed_limit,
   enter:x.enter!==false,exit:x.exit!==false,overspeed:x.overspeed!==false,
   pts:((x.shape||{}).pts||[]).map(p=>[+p[0],+p[1]]).filter(p=>p.length===2)})).filter(x=>x.pts.length>2);
+  // a zone that has gone from the fleet must not stay marked as still surrounding the
+  // vehicle, or its re-arrival would be read as a continuous stay and never alert again
+  Object.keys(INZ).forEach(k=>{if(!ZONES.some(z=>String(z.id)===String(k)))delete INZ[k]})}
  zDraw();
  (r||[]).forEach(x=>{RUL[x.type]=x;if('voice'in x)x.voice=x.voice!==false;ON[x.type]=x.enabled;const h=Math.max(0,+x.hold_s||0);
   if(x.type==='overspeed'){LIM.speed=v.speed_limit||x.threshold;LIM.buf=Math.max(0,+v.speed_buffer||0);HOLD.overspeed=h}
@@ -996,12 +1061,22 @@ function applyCfg(a,r,t,g){
 // a failed query answers, it never throws: PostgREST can reject, and offline the
 // fetch itself rejects, and neither may take the trip down with it
 const q=p=>p?Promise.resolve(p).then(x=>({data:x.data,error:x.error}),()=>({data:null,error:{message:'no network'}})):{data:null,error:null};
+// The same, with a deadline, for the four reads the opening screen waits on. A phone
+// that claims a signal it does not have can leave a request unanswered for half a
+// minute, and that is how the wait screen became the sign-in screen: past the deadline
+// the cached setup is used, which is exactly what a rejected read already does. A late
+// answer is thrown away and the next five-minute poll picks it up.
+const qw=(p,ms)=>new Promise(res=>{const t=setTimeout(()=>res({data:null,error:{message:'The server did not answer in time'}}),ms);
+ q(p).then(x=>{clearTimeout(t);res(x)})});
 const AQL=u=>q(u.select('vehicle_id,driver_id,vehicles(name,type,speed_limit,moving_interval,stopped_interval,brake_limit,accel_limit,speed_buffer,max_accel_warning,min_moving_distance),drivers(name)').eq('user_id',me.id));
 async function loadRules(){
  const off=!navigator.onLine;
  const [a,r,t,g]=await Promise.all([
-  AQL(sb.from('assignments')),q(sb.from('event_rules').select('*')),q(sb.from('app_settings').select('*')),q(sb.from('geofences').select('*').eq('enabled',true).order('name'))]);
- if(a.data&&r.data&&t.data){applyCfg(a.data,r.data,t.data,g.data||[]);cfgSave(a.data,r.data,t.data,g.data||[]);netUi();return 1}
+  qw(AQL(sb.from('assignments')),9000),qw(q(sb.from('event_rules').select('*')),9000),qw(q(sb.from('app_settings').select('*')),9000),qw(q(sb.from('geofences').select('*').eq('enabled',true).order('name')),9000)]);
+ // g.data is passed as it came back: null when the geofence query failed, so both
+ // applyCfg and cfgSave keep the zones already on the phone instead of replacing them
+ // with an empty list. See the note in each.
+ if(a.data&&r.data&&t.data){applyCfg(a.data,r.data,t.data,g.data);cfgSave(a.data,r.data,t.data,g.data);netUi();return 1}
  // nothing arrived: fall back to the last setup the phone did manage to read
  const c=cfgRead();
  if(c){applyCfg(c.a,c.r,c.t,c.g);netUi();return 1}
@@ -1117,7 +1192,9 @@ async function outSend(r){const v=r.v;
  // a close the server refuses must not hold the whole queue behind it
  // the row is found by the name the phone gave it, because that is the only id it
  // knows while it is offline; a refused close must not hold the queue behind it
- await clipFor(v.id,v.p);
+ // a camera close has no type in its payload, so it says for itself that the picture
+ // of the breach is waiting on this phone under the same id
+ if(v.dms)await clipFor(v.id,v.p);
  const {error}=await q(sb.from('events').update(v.p).eq('cid',v.id));return {ok:true,error:error&&error.message&&('Event end not saved: '+error.message)}}
 async function flush(){if(fl||!me)return;fl=true;
  try{let after=0,rounds=0,stop=false,why='';
@@ -1133,8 +1210,18 @@ async function flush(){if(fl||!me)return;fl=true;
      if(!ok){stop=true;why=error&&error.message||'send failed';break}
      run.forEach(outDel);SENT+=run.length;localStorage.sent=SENT;outUi()}
     else{const r=b[i++];const {ok,error}=await outSend(r);
-     if(r.v.t==='ev'&&!ok){stop=true;why=error&&error.message||'send failed';break}
-     outDel(r);if(error)$('err').textContent=why=String(error);outUi()}}
+     // Two very different failures, and the old code treated them the same way - which
+     // is the bug that hid whole days of records. A request that never reached the
+     // server has told us nothing, so the record waits and the queue keeps its order.
+     // A record the server *refused* is a different thing: it is refused for a reason
+     // that will not change by asking again - an event type this database does not
+     // know, rights that do not reach the row, a column that has not been added yet.
+     // That one used to stop the flush at itself and be kept at the head of the queue
+     // forever, so one rejected alert silently blocked every record behind it: the
+     // vehicle showed two of its nine camera events and none of its zone crossings,
+     // and nothing on the phone said why. A refused record is thrown away, out loud.
+     if(!ok&&(!navigator.onLine||noNet(error))){stop=true;why='offline';break}
+     outDel(r);if(error)$('err').textContent=why='A record was refused by the server and dropped: '+(error.message||error);outUi()}}
    }
   OFFL=!navigator.onLine;netUi(why)}
  finally{fl=false;outUi()}}
