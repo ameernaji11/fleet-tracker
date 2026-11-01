@@ -57,6 +57,11 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
     private volatile boolean resumed = true;
     private volatile boolean pageVisible = true;
     private volatile boolean wantBox;
+    // Which of the page's two buttons last asked for the lens: Start trip, or the driver's
+    // own camera view. It decides whether frames are judged, so it is kept here rather than
+    // only passed on: Android's permission prompt can come back minutes after the call that
+    // asked for it, and the answer has to carry the same instruction.
+    private volatile boolean wantTrip;
 
     @Override
     public void load() {
@@ -90,7 +95,8 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
     /**
      * Open the lens and start judging frames. The service reads its orders from disk
      * when it wakes, so the page must call configure first - which is the order the
-     * driver app uses on every trip.
+     * driver app uses on every trip. `trip` says whether this open is a trip or only the
+     * driver's own watch: a watch shows him the lens and files nothing.
      */
     @PluginMethod
     public void start(PluginCall call) {
@@ -98,15 +104,17 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
             // A new trip opens the box the way the dashboard has it set; the driver's own
             // button then changes it for the rest of that trip.
             wantBox = Config.load(getContext()).preview;
+            wantTrip = call.getBoolean("trip", false);
             if (getPermissionState(CAMERA) != PermissionState.GRANTED) {
                 requestPermissionForAlias(CAMERA, call, "cameraResult");
                 return;
             }
-            launch();
+            launch(wantTrip);
             JSObject r = new JSObject();
             r.put("granted", true);
             r.put("running", DmsService.get() != null);
             r.put("preview", wantBox);
+            r.put("trip", wantTrip);
             call.resolve(r);
         });
     }
@@ -116,7 +124,7 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
     private void cameraResult(PluginCall call) {
         safe(call, () -> {
             boolean granted = getPermissionState(CAMERA) == PermissionState.GRANTED;
-            if (granted) launch();
+            if (granted) launch(wantTrip);
             JSObject r = new JSObject();
             r.put("granted", granted);
             call.resolve(r);
@@ -128,6 +136,7 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
     public void stop(PluginCall call) {
         safe(call, () -> {
             wantBox = false;
+            wantTrip = false;
             DmsService s = DmsService.get();
             if (s == null) {
                 // nothing holds the camera, but the flag that tells Android to bring the
@@ -264,6 +273,7 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
     public void clear(PluginCall call) {
         safe(call, () -> {
             wantBox = false;
+            wantTrip = false;
             DmsService s = DmsService.get();
             if (s != null) s.clearAll();
             else new Outbox(getContext()).clear();
@@ -392,10 +402,11 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
 
     // ---- the service
 
-    private void launch() {
+    private void launch(boolean tripping) {
         Context ctx = getContext();
         Intent i = new Intent(ctx, DmsService.class);
         i.setAction(DmsService.ACTION_START);
+        i.putExtra(DmsService.EXTRA_TRIP, tripping);
         try {
             // The page starts a trip from its own button, so this happens while the app
             // is on screen - the only moment Android lets a camera service begin. From

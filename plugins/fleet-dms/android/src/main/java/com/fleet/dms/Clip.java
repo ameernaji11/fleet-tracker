@@ -611,10 +611,11 @@ class Clip {
             if (i == at && made != null) return made;
             unpack(c.frames.get(i), w, h, argb);
             img.setPixels(argb, 0, w, 0, 0, w, h);
-            String[] all = new String[c.lines.length + 1];
-            all[0] = offset(c, i);
-            System.arraycopy(c.lines, 0, all, 1, c.lines.length);
-            draw(all);
+            // one line, and this is the half of it that changes with every picture: the
+            // rule and its reading come from the alert and never move
+            String off = offset(c, i);
+            String one = off.isEmpty() ? words(c.lines) : off + " · " + words(c.lines);
+            draw(one);
             // The words were painted onto the picture, not into this array, and it is the
             // array the encoder is handed: reading the drawn result back is the only thing
             // that puts a caption in the file at all. Without it every clip leaves the phone
@@ -641,38 +642,39 @@ class Clip {
             return String.format(Locale.US, "%.1f s %s the alert", Math.abs(s), s < 0 ? "before" : "after");
         }
 
-        private void draw(String[] lines) {
-            // one size for all of them, shrunk until the longest fits the picture: a
-            // driver's name in a script this handset cannot measure wide must not run
-            // off the edge of the file an administrator will later have to read
-            float size = Math.max(9f, h / 17f);
+        /** The clip's own words, spelled out once along the bottom of every picture. */
+        private static String words(String[] lines) {
+            StringBuilder sb = new StringBuilder();
+            for (String s : lines) {
+                if (s == null || s.isEmpty()) continue;
+                if (sb.length() > 0) sb.append(" · ");
+                sb.append(s);
+            }
+            return sb.toString();
+        }
+
+        private void draw(String line) {
+            if (line == null || line.isEmpty()) return;
+            // A third of the height the old caption used, so the band takes about a tenth
+            // of the picture instead of half of it, and shrunk again until the words fit
+            // the width: a reading cut off at the edge of the file is worse than one the
+            // administrator has to lean in to read. Cut to 120 characters first - a
+            // sentence long enough to need measuring twice is one that needs shortening.
+            if (line.length() > 120) line = line.substring(0, 120);
+            float size = Math.max(8f, h / 22f);
             ink.setTextSize(size);
-            float widest = 1;
-            // measured at the size it is about to be drawn at, and cut to 120
-            // characters first - a name long enough to need measuring twice is a name
-            // that needs shortening, not a name that needs a smaller picture
-            for (String s : lines) if (s != null && !s.isEmpty())
-                widest = Math.max(widest, ink.measureText(s, 0, Math.min(s.length(), 120)));
+            float widest = ink.measureText(line, 0, line.length());
             float room = w - 12f;
             if (widest > room) {
                 size = Math.max(6f, size * room / widest);
                 ink.setTextSize(size);
             }
-            float lineH = size * 1.35f;
-            int n = 0;
-            for (String s : lines) if (s != null && !s.isEmpty()) n++;
-            float bandH = n * lineH + size * 0.7f;
-            float top = h - bandH - 4f;
+            float bandH = size * 1.35f + size * 0.5f;
+            float top = h - bandH - 2f;
             cv.drawRect(2f, top, w - 2f, h - 2f, back);
-            float y = top + size;
-            for (String s : lines) {
-                if (s == null || s.isEmpty()) continue;
-                // drawn exactly as far as it was measured: a word cut by a shrinking
-                // that never saw its tail would run off the edge all the same
-                if (s.length() > 120) s = s.substring(0, 120);
-                cv.drawText(s, 6f, Math.min(y, h - 5f), ink);
-                y += lineH;
-            }
+            // drawn exactly as far as it was measured: a word cut by a shrinking that
+            // never saw its tail would run off the edge all the same
+            cv.drawText(line, 6f, Math.min(top + size, h - 5f), ink);
         }
 
         void close() {

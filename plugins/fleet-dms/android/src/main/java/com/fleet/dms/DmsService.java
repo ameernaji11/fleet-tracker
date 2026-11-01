@@ -51,6 +51,9 @@ public class DmsService extends Service implements LifecycleOwner {
 
     public static final String ACTION_START = "com.fleet.dms.START";
     public static final String ACTION_STOP = "com.fleet.dms.STOP";
+    // Which of the page's two reasons for opening the lens this start is: a trip, or the
+    // driver's own watch. See tripWanted.
+    public static final String EXTRA_TRIP = "com.fleet.dms.TRIP";
 
     private static final int NOTICE_TRIP = 1;
     // What the lens is asked for. Small on purpose: the face is measured from ratios
@@ -122,6 +125,10 @@ public class DmsService extends Service implements LifecycleOwner {
     private int[] pix;
     private byte[] brow;
     private boolean cameraOn;
+    // Whether the lens is open for a trip or only for the driver's own watch. A trip
+    // judges every frame and turns what it sees into a warning, a row and a clip; a watch
+    // is a mirror held up to a man who may be parked in his own yard, and files nothing.
+    private volatile boolean judged;
     // Set in onDestroy, before anything is put down. Every thread but this one is
     // stopped by it, because it is the answer the frame callback gives on its way in.
     private volatile boolean dead;
@@ -198,7 +205,11 @@ public class DmsService extends Service implements LifecycleOwner {
             stopSelf();
             return START_NOT_STICKY;
         }
-        trip(true);
+        // The page has two reasons to ask for the lens: a trip, whose frames are judged
+        // and turned into warnings, rows and clips, and the driver's own watch, which is
+        // only a picture for him. Android's restart carries neither, so the last
+        // instruction on disk decides it.
+        hold(intent != null ? intent.getBooleanExtra(EXTRA_TRIP, false) : tripWanted(this));
         // Android may hand back a null intent when it has had to restart this service
         // after a kill. Whether it should be running again is then the page's own last
         // instruction, which is what the trip flag on disk records.
@@ -305,17 +316,19 @@ public class DmsService extends Service implements LifecycleOwner {
 
     // ---- what the page asks for
 
-    /** The trip has begun: take the wake lock, open the lens and start judging frames. */
-    void trip(boolean yes) {
-        tripSet(this, yes);
+    /**
+     * Take the lens for the page: the wake lock, the camera and the notice. `tripping`
+     * is which of the page's two buttons asked for it - the trip's own start, or the
+     * driver's watch - and only a trip has its frames judged.
+     */
+    void hold(boolean tripping) {
+        judged = tripping;
+        tripSet(this, tripping);
         if (dead) return;
-        if (!yes) {
-            stopSelf();
-            return;
-        }
         if (wake != null && !wake.isHeld()) wake.acquire();
         if (cfg.on && !cameraOn) openCamera();
-        foreground(cfg.on ? "Watching the driver" : "Driver monitoring is switched off");
+        foreground(!cfg.on ? "Driver monitoring is switched off"
+                : tripping ? "Watching the driver" : "Driver camera open, no trip running");
     }
 
     void applyNewConfig(Config next) {
@@ -385,7 +398,7 @@ public class DmsService extends Service implements LifecycleOwner {
         JSONObject j = new JSONObject();
         try {
             j.put("running", true).put("camera", cameraOn)
-                    .put("on", cfg.on).put("model", reader.ready())
+                    .put("on", cfg.on).put("trip", judged).put("model", reader.ready())
                     .put("objects", reader.seeing())
                     .put("objectError", str(reader.objectError()))
                     .put("reason", reason).put("error", str(reader.error()))
@@ -570,13 +583,16 @@ public class DmsService extends Service implements LifecycleOwner {
             lastFrame = now;
             Bitmap b = upright(proxy);
             if (b == null) return;
-            FaceReader.Reading r = reader.read(b, now);
-            // The picture is put in the ring before it is judged, so the frame that
-            // raises an alert is inside its own clip rather than one frame past the
-            // last copy of it. An administrator watching a "head turned 40 degrees"
-            // film has to see the head turned in it.
+            // The picture goes into the ring before it is judged, so the frame that
+            // raises an alert is inside its own clip rather than one frame past the last
+            // copy of it. An administrator watching a "head turned 40 degrees" film has
+            // to see the head turned in it.
             clip.push(b, now * 1000L, cfg.preFrames());
-            rules.frame(r, kmh, cfg);
+            // A watch that is not a trip stops here: the ring stays full, so the first
+            // alert of a trip started a second later still has its seconds before it in
+            // the file, but nothing is measured, warned about or filed against a driver
+            // who has not started a trip.
+            if (judged) rules.frame(reader.read(b, now), kmh, cfg);
             Host h = host;
             // the driver decides whether he wants to see himself; the dashboard only
             // decides what that choice is when the trip begins
@@ -817,8 +833,11 @@ public class DmsService extends Service implements LifecycleOwner {
         }
     }
 
-    // the trip flag is what lets a service Android restarted by itself know whether it
-    // should be running at all: the page sets it by starting, and clears it by stopping
+    // The page's last instruction, kept on disk because Android can restart this service
+    // after killing it and the restart carries no intent: it says whether a trip asked for
+    // the lens, which is the only thing that decides whether a resurrected service judges
+    // frames or a driver who never started anything gets warned anyway. Starting a trip
+    // sets it, ending one sets it back, and the driver's own watch never sets it at all.
     static boolean tripWanted(Context c) {
         return c.getSharedPreferences(Config.PREFS, Context.MODE_PRIVATE).getBoolean("trip", false);
     }

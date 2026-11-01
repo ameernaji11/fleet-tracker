@@ -237,7 +237,7 @@ class Alerts {
         if (type.equals(TALK)) return "Talking while driving";
         if (type.equals(EAT)) return "Eating while driving";
         if (type.equals(DRINK)) return "Drinking while driving";
-        if (type.equals(SMOKE)) return "Hand at the mouth";
+        if (type.equals(SMOKE)) return "Smoking";
         return "Camera blocked";
     }
 

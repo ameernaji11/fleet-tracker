@@ -198,17 +198,6 @@ class Rules {
     private final DmsService svc;
     private final Map<String, Br> open = new HashMap<>();
     private final long[] lastNotice = new long[ORDER.length];
-    // The speed of the last frame, kept so that the line burned across a clip can say
-    // how fast the vehicle was going when the limit was broken. The rule that needs it
-    // is called once per frame per rule, so it is taken from the frame rather than
-    // passed down through nine arguments.
-    private double lastKmh;
-    // The clock face of the clip caption, with the day in front of the time: a file that
-    // leaves this phone is watched beside another day's alerts, and "08:41:07" alone
-    // cannot say which day it belongs to. Local time, because the driver and the man
-    // who reads the clip an hour later both live in the same timezone as the phone.
-    private static final java.text.SimpleDateFormat CLOCK =
-            new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.US);
 
     // The eyes: the last second of closure, which is how the page defines this threshold.
     private final Win shutWin = new Win();
@@ -255,7 +244,6 @@ class Rules {
     /** One measured frame, at the speed the vehicle was going when it was taken. */
     void frame(FaceReader.Reading r, double kmh, Config cfg) {
         long now = r.at;
-        lastKmh = kmh;
         if (r.face) {
             lastCover = r.cover;
             lastCoverAt = now;
@@ -602,28 +590,20 @@ class Rules {
     }
 
     /**
-     * The four lines burned across the clip of this alert.
+     * The one line burned across the clip of this alert.
      *
-     * Short on purpose, and said again rather than copied from the row: the picture is
-     * 320 pixels wide, and a sentence that fits a database column does not fit a film
-     * of a man's face. The seconds the clip itself counts are left to the clip, which
-     * is the only thing here that knows which picture is which.
+     * One line because the picture is what an administrator came to look at: four of
+     * them at the old size covered nearly half of a frame only 320 pixels wide. Short
+     * on purpose too, and said again rather than copied from the row - a sentence that
+     * fits a database column does not fit a film of a man's face. Nothing is lost: the
+     * driver, the vehicle and the moment are the name the file is stored under and the
+     * reading the dashboard prints beside it, and the seconds from the alert are the
+     * clip's own, because it is the only thing here that knows which picture is which.
      */
     private String[] caption(String type, Config.Rule r, Br b) {
-        Config cfg = svc.cfg();
         String line = measured(type, b.peak, b.why, b);
         if (!type.equals(Alerts.BLOCKED)) line += " · limit " + limitText(type, r);
-        String when = CLOCK.format(new java.util.Date(b.start));
-        String who = join(cfg.driverName, cfg.vehicleName);
-        return new String[]{Alerts.title(type), line,
-                when + " · " + Math.round(lastKmh) + " km/h", who};
-    }
-
-    private static String join(String a, String b) {
-        String x = a == null ? "" : a.trim(), y = b == null ? "" : b.trim();
-        if (x.isEmpty()) return y;
-        if (y.isEmpty()) return x;
-        return x + " · " + y;
+        return new String[]{Alerts.title(type) + " · " + line};
     }
 
     /** The whole line of the row: the reading, the limit, the tolerance and the length. */
