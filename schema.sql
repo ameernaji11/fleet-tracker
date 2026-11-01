@@ -1328,8 +1328,18 @@ $$;
 -- Both questions are about the account that asks them, so a handset that is not signed in
 -- has nothing to ask; and since the seat cannot be written any other way, the row is
 -- readable and nothing more.
-revoke execute on function device_take(text,text,boolean) from public;
-revoke execute on function device_give(text) from public;
+-- The revoke has to name anon as well as public. Supabase hands EXECUTE on a new function
+-- to anon, authenticated and service_role as separate grants, and pulling the pseudo-role
+-- public leaves the anon one standing - which was proved on the live project, where a bare
+-- POST to rpc/device_give with nothing but the anon key in the headers returned 204 and
+-- rpc/device_take returned 200. No seat moved, because both functions ask auth.uid() and
+-- an anonymous caller has none, so nothing here is a hole a driver can be pushed out of:
+-- it is a door left open on a room that turns out to be locked from the inside. The anon
+-- key ships inside every handset, and a future version of either function that stops
+-- asking who is calling would then be reachable by anyone who has the app, so the grant
+-- goes. The dashboard's Release button does not use these two - it deletes the row under
+-- "claim admin release" - so signing anon out of them costs nothing.
+revoke all on function device_take(text,text,boolean), device_give(text) from public, anon;
 grant execute on function device_take(text,text,boolean) to authenticated;
 grant execute on function device_give(text) to authenticated;
 
@@ -1710,6 +1720,13 @@ end $$;
 --        two minutes (five while a trip runs), and otherwise stamps the attempt and says who is sitting in the
 --        seat. Granted to authenticated only.
 --   device_give(p_did)                  -> sign-out emptying the seat, and only ever the handset in it.
+--        -> Re-run the three revoke/grant lines above if this project already ran v28: Supabase grants a new
+--        function to anon, authenticated and service_role separately, so the original "revoke from public" left
+--        the anon key that ships inside every handset able to call both. Proved on the live project on
+--        2026-11-01 - a bare POST to rpc/device_give answered 204 and rpc/device_take 200 with no sign-in at
+--        all. Neither one moved a seat, because both ask auth.uid() and an anonymous caller has none, so this
+--        is a door closed for what might come later rather than a hole that exists now; it costs nothing to fix
+--        and nothing to re-run.
 --   Run this file BEFORE publishing the phone build that claims a seat. Until then no handset writes here, so
 --   every driver gets in on every phone as before and the Users page shows no phone for anybody - which is the
 --   honest state of a project that has the table but not the handsets. Publish the dashboard build after the
