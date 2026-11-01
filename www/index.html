@@ -244,6 +244,105 @@ function offFail(){offAge();OFFFAIL++;localStorage.offfail=String(OFFFAIL);local
  return OFFFAIL>=LOCK_AT?'This phone has been shut after '+LOCK_AT+' wrong passwords. Connect to the internet and sign in once, or ask the administrator to unlock the account.'
  :'Wrong password. '+(LOCK_AT-OFFFAIL>1?LOCK_AT-OFFFAIL+' attempts left':'One attempt left')+' before this phone stops letting you in without a signal.'
  +' It starts again from nothing after '+mins(offWin())+' without a wrong one.'}
+// ---- one account, one handset. A driver signed in twice puts two streams of positions on
+// the same vehicle and a trip that reads as though the cab was in two places, so the account
+// has one seat: a handset names itself into it, keeps naming itself every half minute, and
+// the seat only comes free when it stops. The phone arriving second is refused and told whose
+// seat it wanted; the phone sitting in it is never moved, only informed that somebody tried.
+// Two minutes of silence is a dead battery rather than a second handset, so a driver moving
+// to a spare phone waits two minutes instead of hunting for somebody in an office - and while
+// that phone is on a trip the wait is five, because Android puts a backgrounded page to sleep
+// for less than that on plenty of handsets, and a seat handed over mid-shift records the road
+// twice, which is the whole thing this exists to stop.
+//
+// With no signal there is nothing to ask, so the driver carries on working: a dead spot must
+// not stop a trip, which is the same bargain this phone already makes about signing in. The
+// seat is proved again the moment the network returns, and a phone that cannot prove it then
+// stands down instead of adding its records to another handset's.
+const CLMS=30000;
+let DID='',DMODEL='',CLAM=0,CLT=0,CLDOWN=false,CLTRY=+(localStorage.cltry||0);
+// The name this install answers to. Android's per-app device number is the same one after an
+// app update and a different one after the phone is wiped, which is the right life for a seat:
+// this handset, this install. A handset that will not give one up - or a browser used to try
+// the app out - keeps a random one of its own instead, and a phone that cannot keep even that
+// asks nothing at all rather than locking its driver out of his own account.
+async function didGet(){if(DID)return DID;
+ try{if(window.CapPlugins&&CapPlugins.Device&&CapPlugins.Device.getId){
+  const i=await CapPlugins.Device.getId(),n=CapPlugins.Device.getInfo?await CapPlugins.Device.getInfo():{};
+  DID=String((i&&i.uuid)||'');DMODEL=String((n&&n.model)||(n&&n.name)||'')}}catch(e){DID=''}
+ if(!DID){try{DID=localStorage.did||'';
+  if(!DID){DID='p-'+Math.random().toString(36).slice(2,10)+Date.now().toString(36);localStorage.did=DID}}
+ catch(e){DID=''}}
+ return DID}
+// What a refused handset is told. It names the phone holding the seat and says what to do
+// about it, because the driver being stood outside is the one who can go and close the other.
+function claimWhy(d){const mins=d.tripping?5:2;
+ return 'Your account is already running on '+(d.model||'another phone')+
+  (d.tripping&&d.trip_since?', and is on a trip there since '+new Date(d.trip_since).toLocaleTimeString('en-GB'):'')+
+  '. Sign out or close the app on that phone, then try here again. It frees itself about '+mins+
+  ' minutes after that phone stops answering, and if that phone is lost or broken your administrator can release the account.'}
+// Asking for the seat: null means carry on, a row back means a different handset holds it.
+// The ask is given four seconds and no more, because a network that is only pretending to be
+// there must not be allowed to hold up a driver setting off - the same reason the sign-in
+// screen races its own deadline. A project that has not run v28 answers with an error, and an
+// error is not evidence about a second phone.
+async function claimAsk(tripping){
+ if(!me||!sb||CLDOWN||!navigator.onLine)return null;
+ if(!await didGet())return null;
+ let r=null;
+ try{r=await Promise.race([sb.rpc('device_take',{p_did:DID,p_model:DMODEL||'another phone',p_trip:!!tripping}),
+  new Promise(res=>{setTimeout(()=>res(null),4000)})])}catch(e){return null}
+ if(!r||r.error||!r.data)return null;
+ const d=Array.isArray(r.data)?r.data[0]:r.data;
+ if(!d||typeof d.ok!=='boolean')return null;
+ if(d.ok){CLAM=1;
+  // only the phone sitting in the seat is told about an attempt; the one that made it has
+  // its own answer, and it is not allowed to notify itself
+  const at=+new Date(d.tried_at||0);
+  if(at>CLTRY){CLTRY=at;try{localStorage.cltry=String(at)}catch(e){}claimTell(d)}
+  return null}
+ CLAM=2;return d}
+// The driver whose seat somebody reached for hears about it and is otherwise left alone: his
+// trip, his records and his session carry on untouched, since the phone that asked is the one
+// that gets refused. Behind the screen the same notice is posted, because a trip is watched
+// from the lock screen as often as from the app.
+function claimTell(d){const who=esc(d.tried_model||'another phone');
+ banner('<i class="fa-solid fa-mobile-screen-button"></i> Another phone is trying to use your account: '+who+
+  '. Your trip and records here carry on - close the app there if it was not you.',12000);
+ if(document.hidden)try{CapPlugins.LN.schedule({notifications:[{id:Date.now()%2147483647,
+   title:'Fleet Tracker: another phone is using your account',
+   body:'This phone keeps working. Close the app on '+who+' if it was not you.',channelId:'fleet.quiet'}]})}catch(e){}
+ logAct('Another phone tried to use this account',who)}
+// Standing down: this phone can no longer prove the account is its own, so it stops doing the
+// things that would put a second set of records on the vehicle - the trip, either watcher, the
+// camera and whatever it still holds of his - and hands the sign-in screen back with the reason
+// written on it. Only a phone that actually asked and was actually refused gets here.
+async function claimOut(d){if(CLDOWN)return;CLDOWN=true;const msg=claimWhy(d);
+ try{
+  clearInterval(CLT);CLT=0;
+  // the trip this handset was recording is closed and sent first, so the vehicle keeps the
+  // shift it drove rather than ending with the phone that lost it
+  if(watcher||SRT||tripRead()){try{await stop(1)}catch(e){}}
+  await senOff();
+  try{if(dmsHas()){await CapPlugins.Dms.stop();await dmsDrain();await CapPlugins.Dms.clear()}}catch(e){}
+  await logAct('Account now running on another phone',msg.slice(0,140));
+  try{await sb.auth.signOut()}catch(e){}
+  try{localStorage.removeItem('offl')}catch(e){}
+  me=null;OFFL=false;CLAM=2;show('lg');$('err').textContent=msg}
+ finally{CLDOWN=false}}
+// The keeping part, from the half-minute timer, from the phone coming back to the screen, and
+// from the moment it hears from the network again. A refusal at any of these is the seat having
+// gone - the page slept too long, or a spare handset took it over - so this is where a phone
+// that was already working steps down rather than carries on recording twice.
+function claimGo(tripping){claimAsk(tripping).then(d=>{if(d)claimOut(d)})}
+// Standing up from the seat at sign-out, so the next handset - this driver's own tomorrow
+// morning, or a spare this afternoon - never has to wait out the two minutes first. Only this
+// phone's own claim can be given up: the function deletes the row when the name in it matches,
+// which is what stops a refused handset pushing the one sitting in the seat out of it.
+async function claimGive(){clearInterval(CLT);CLT=0;
+ if(CLAM!==1||!DID||!sb)return;
+ try{await sb.rpc('device_give',{p_did:DID})}catch(e){}
+ CLAM=0}
 async function signIn(){
  if(!sb)return;const want=$('rem').checked;if(want!==REM){REM=want;localStorage.rem=want?'1':'0';sb=mk(REM)}
  const b=$('sib');b.disabled=true;b.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i>Signing in...';$('err').textContent='';
@@ -299,6 +398,9 @@ async function signOut(){sessStop();await logAct('Signed out','Phone');
  // the phone stops listening for a vehicle that moves: his session, and the watcher that
  // comes with it, end here
  await senOff();
+ // and he stands up from the seat at the same time, so the next handset is not left outside
+ // for the two minutes it would otherwise have to wait
+ await claimGive();
  // the watch ends with his session, and the warnings and pictures this phone kept of
  // him are deleted rather than left for the next driver of the same handset
  try{if(dmsHas()){await CapPlugins.Dms.stop();await dmsDrain();await CapPlugins.Dms.clear()}}catch(e){}
@@ -344,6 +446,9 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){sessStop()
  // and push whatever the phone saved in the meantime - including the warnings the
  // driver camera raised while this page was frozen
  toneEnd();outUi();if(PEND)flush();maybeResume();dmsDrain();
+ // a page that was behind another app may have slept past its own seat: proved again from
+ // the front of the screen, before anything else this phone does for this driver
+ claimGo(!!(watcher||SRT));
  // the pictures the camera kept for an event that went out without one, and the clips
  // the fleet's retention window has just passed over - both only ever about this driver's
  // own folder, which is the only one these rights reach
@@ -404,6 +509,14 @@ async function init(fresh,who){
   // the sign-in is gone, so this phone has no identity any more - which is also what
   // tells the opening screen to stop waiting and show the form
   me=null;OFFL=false;show('lg');$('err').textContent='';return}
+ // The seat is asked for before this handset is allowed to behave as this driver, so the
+ // phone that arrives second never reaches the trip button at all. This is the one place
+ // both doors come through - a pressed Sign in and a phone reopening his own app - so a
+ // second handset is refused at either, and the notice about it belongs to the first one.
+ const cd=await claimAsk(!!tripRead());
+ if(cd){await logAct('Second phone refused',(cd.model||'another phone')+' holds this account');
+  await sb.auth.signOut();try{localStorage.removeItem('offl')}catch(e){}
+  me=null;OFFL=false;CLAM=2;show('lg');$('err').textContent=claimWhy(cd);return}
  if(chk&&chk.a&&chk.a.must_change)pwUi(1);
  // a phone Android restarted while a trip was running has already raised warnings of
  // its own: hear about them from the first moment, not only after Start is pressed
@@ -429,6 +542,10 @@ async function init(fresh,who){
  // a driver keeps this app open for a whole shift, so touch the session every
  // 10 minutes — getSession() is what makes supabase-js refresh it early.
  setInterval(()=>{if(!document.hidden)sb.auth.getSession().catch(()=>{})},10*60*1000);
+ // and this handset names itself as the one holding the account. The timer keeps running
+ // behind another app, because a driver who takes a call or a message mid-shift has not
+ // given his seat up - only a phone that is really gone stops answering it.
+ clearInterval(CLT);CLT=setInterval(()=>{claimGo(!!(watcher||SRT))},CLMS);
  // Android can hand back the same page after killing the process while a trip was
  // running, and it can hand back a fresh one; either way the driver must not have to
  // notice, and must not have to press Start again
@@ -446,6 +563,9 @@ addEventListener('online',async()=>{netUi();lgHint();banner('<i class="fa-solid 
  if(OFFL){const s=await askSession(4000);
   if(s&&s.user){me=s.user;OFFL=false;$('err').textContent='';outUi()}
   else $('err').textContent='Signal is back. The trip and every record are safe on this phone until you sign in again.'}
+ // the seat is proved again on the same path: a phone that drove through a dead spot where
+ // another handset took the account over must find that out here, not two hours later
+ claimGo(!!(watcher||SRT));
  maybeResume()});
 addEventListener('offline',()=>{netUi();lgHint();banner('<i class="fa-solid fa-wifi"></i> No internet: keeping records on the phone',5000)});
 // the login screen says out loud what it can do without a signal
@@ -1463,6 +1583,13 @@ async function showLast(){if(!asg?.vehicle_id)return;
 async function start(quiet,auto){
  if(!asg?.vehicle_id){$('err').textContent='No vehicle linked to this user. Ask your admin.';return}
  if(watcher||SRT)return;
+ // A trip is exactly the thing two handsets on one account must never record at the same
+ // time, so the seat is proved here - in front of all three doors a trip comes in through:
+ // the driver's press, the speed sentry's own start, and a phone picking up a trip Android
+ // left open. With no signal, or on a project that has not run v28, he sets off anyway: a
+ // dead spot is not a second phone, and a driver stopped from tracking is the worse failure.
+ const cd=await claimAsk(1);
+ if(cd){await claimOut(cd);return}
  // one watcher per app: the sentry that watches for the vehicle starting has to hand its
  // place over before the trip's own callback can take it
  await senOff();
@@ -1533,6 +1660,9 @@ async function stop(auto){SGEN++;stopTone();clearInterval(batT);clearInterval(cf
  // the trip's watcher is gone, so the one that waits for the next start takes its place -
  // including after this very callback ended a trip nobody had pressed a button for
  STILLAT=0;senOn();
+ // the seat goes back to its two-minute wait the moment the trip does, instead of holding a
+ // spare handset outside for three minutes longer than it has to
+ claimGo(false);
  $('go').classList.remove('hide');$('stp').classList.add('hide');const c=$('stc');c.textContent='Parking';c.style.background='var(--bll)';c.style.color='var(--bl)';$('sp').textContent='0'}
 async function openDash(){const {data:{session}}=await sb.auth.getSession();if(!session)return;
  logAct('Opened dashboard from app',(asg?.vehicles?.name||''));
