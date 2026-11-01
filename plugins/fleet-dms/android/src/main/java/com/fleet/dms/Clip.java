@@ -2,6 +2,9 @@ package com.fleet.dms;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Paint;
+import android.graphics.Typeface;
 import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaCodecList;
@@ -15,6 +18,7 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -26,6 +30,14 @@ import java.util.concurrent.Executors;
  * nothing written. When a rule fires, the ring is handed over and the seconds after
  * the alert are added to it as the camera keeps feeding. Only then is an encoder
  * started, and what it does is plain: pictures in, one MP4 out.
+ *
+ * What the alert said is written into the pictures themselves on the way through, so
+ * an administrator watching a clip sees the driver's own reading, the speed and the
+ * seconds before or after the moment it happened, over the picture it belongs to. A
+ * clip that can be watched beside a row but not carried away from it - sent on a
+ * messenger, printed into an incident file, kept after the account that made it is
+ * deleted - is a clip that will be described in an email instead of watched, and the
+ * description will be wrong.
  *
  * The file is named after the event it belongs to, which is the client id the phone
  * gives the row in the database. Nothing uploads it in this build - the clip phase
@@ -39,6 +51,15 @@ class Clip {
     // A handset that is never driven again should not fill itself with clips nobody
     // will watch, whatever the retention days say.
     private static final int MAX_FILES = 400;
+    /**
+     * How many alerts can be gathering their seconds at the same time. Four covers the
+     * worst the rules do in practice - a driver who raises a phone over a mouth that is
+     * already talking, which the frame now refuses to count twice but which the older
+     * build did fire together - and it is a cap on memory rather than on attention:
+     * every one of these is a few hundred kilobytes of pictures on a phone that is
+     * already holding a model and a camera open.
+     */
+    private static final int MAX_RUNS = 4;
 
     private final File dir;
     private final ArrayDeque<byte[]> ring = new ArrayDeque<>();
@@ -48,7 +69,14 @@ class Clip {
     private int fw, fh, fps = 5;
     private final int colour;
     private final boolean semi;
-    private Capture run;
+    private final List<Capture> runs = new ArrayList<>();
+    // Counted so the page can say "the camera refused to film three of your alerts"
+    // rather than leave an administrator looking for a video that was never made.
+    private int dropped;
+    // The last clip this refused to write, with the clip's own name on the front of it,
+    // because the only thing worse than a missing video is a missing video nobody can
+    // trace back to the alert it was meant to belong to.
+    private volatile String lastError = "";
 
     /** A clip being assembled: the pictures taken before the alert, and the ones after. */
     private static class Capture {
@@ -59,12 +87,19 @@ class Clip {
         final int w, h;
         final List<byte[]> frames = new ArrayList<>();
         final List<Long> us = new ArrayList<>();
+        // What is written across every picture of this clip, and which of the frames is
+        // the one the alert was raised on: the offset printed beside the words is
+        // measured from it, so a viewer can see how long before the warning the driver
+        // did the thing the row says he did.
+        final String[] lines;
+        int alertAt;
         long endUs;
 
-        Capture(String cid, int w, int h) {
+        Capture(String cid, int w, int h, String[] lines) {
             this.cid = cid;
             this.w = w;
             this.h = h;
+            this.lines = lines;
         }
     }
 
@@ -112,14 +147,18 @@ class Clip {
     void push(Bitmap bmp, long us, int keepFrames) {
         byte[] yuv = toYuv(bmp);
         if (yuv == null) return;
-        Capture done = null;
+        List<Capture> done = null;
         synchronized (this) {
             if (!ring.isEmpty() && ring.peekLast().length != yuv.length) {
                 // the camera changed size mid-trip, and a clip cannot be made of two
-                // sizes, so both the ring and anything being gathered start again
+                // sizes. What each clip has already gathered is its own old size and
+                // encodes on its own, so this is the end of them rather than their loss
+                if (!runs.isEmpty()) {
+                    done = new ArrayList<>(runs);
+                    runs.clear();
+                }
                 ring.clear();
                 ringUs.clear();
-                run = null;
             }
             ring.addLast(yuv);
             ringUs.addLast(us);
@@ -127,36 +166,52 @@ class Clip {
                 ring.removeFirst();
                 ringUs.removeFirst();
             }
-            if (run != null) {
-                run.frames.add(yuv);
-                run.us.add(us);
-                if (us >= run.endUs) {
-                    done = run;
-                    run = null;
+            for (Iterator<Capture> it = runs.iterator(); it.hasNext(); ) {
+                Capture c = it.next();
+                c.frames.add(yuv);
+                c.us.add(us);
+                if (us >= c.endUs) {
+                    it.remove();
+                    if (done == null) done = new ArrayList<>(1);
+                    done.add(c);
                 }
             }
         }
         if (done != null) {
-            // a lambda may only take a variable it can rely on not changing, and `done`
-            // has just been assigned inside the lock, so it is handed over under a name
-            // that will not be touched again
-            final Capture finished = done;
-            enc.execute(() -> write(finished));
+            for (Capture finished : done) {
+                // a lambda may only take a variable it can rely on not changing, so each
+                // one is handed over under its own name rather than round the loop
+                enc.execute(() -> write(finished));
+            }
         }
     }
 
     /**
      * Start gathering around an alert: `before` pictures come out of the ring, then
-     * `afterSeconds` more are added as the camera keeps feeding. An alert while one is
-     * already being gathered is dropped rather than starting a second encoder on a
-     * handset that is already reading a face.
+     * `afterSeconds` more are added as the camera keeps feeding.
+     *
+     * A fourth alert while three are already being gathered is the one an administrator
+     * wants to see - four rules firing inside one second of each other is one driver
+     * doing one thing - so the oldest is closed with the seconds it has rather than the
+     * newest being refused. Both are written; neither is thrown away.
      */
-    void begin(String cid, int before, double afterSeconds) {
-        Capture built = null;
+    void begin(String cid, int before, double afterSeconds, String[] lines) {
+        Capture built;
         boolean straight = false;
+        List<Capture> done = null;
         synchronized (this) {
-            if (run != null || ring.isEmpty() || before <= 0 || fw < 2) return;
-            built = new Capture(cid, fw, fh);
+            if (ring.isEmpty() || before <= 0 || fw < 2) {
+                // nothing was ever in the ring: a trip that has not had a single frame
+                // of camera yet, which is a rule firing before the lens has answered
+                dropped++;
+                return;
+            }
+            while (runs.size() >= MAX_RUNS) {
+                Capture old = runs.remove(0);
+                if (done == null) done = new ArrayList<>(1);
+                done.add(old);
+            }
+            built = new Capture(cid, fw, fh, lines);
             // a ring has no index, and the two of them are always the same length, so
             // the oldest pictures are stepped over together and the rest copied in order
             Iterator<byte[]> fs = ring.iterator();
@@ -169,26 +224,37 @@ class Clip {
                 built.frames.add(fs.next());
                 built.us.add(ts.next());
             }
+            // the frame that raised the alert is the one after these: the rules are
+            // asked before the picture is put in the ring, so it is not in it yet
+            built.alertAt = built.frames.size();
             built.endUs = built.us.get(built.us.size() - 1) + (long) (Math.max(0, afterSeconds) * 1000000);
-            if (afterSeconds > 0) run = built;
+            if (afterSeconds > 0) runs.add(built);
             else straight = true;
         }
+        if (done != null) for (Capture old : done) enc.execute(() -> write(old));
         // "nothing after the alert" is a choice the page can make; the ring alone is
         // then the whole clip and there is no point waiting for frames to arrive
-        if (straight) {
-            final Capture one = built;
-            enc.execute(() -> write(one));
-        }
+        if (straight) enc.execute(() -> write(built));
+    }
+
+    /** How many alerts this trip asked for a picture of and could not be given one. */
+    int dropped() {
+        return dropped;
+    }
+
+    /** The last clip this refused to write, named by the event it was meant to belong to. */
+    String lastError() {
+        return lastError;
     }
 
     /** Write whatever has been gathered so far. Used when the trip ends mid-clip. */
     void finish() {
-        Capture c;
+        List<Capture> all;
         synchronized (this) {
-            c = run;
-            run = null;
+            all = new ArrayList<>(runs);
+            runs.clear();
         }
-        if (c != null && !c.frames.isEmpty()) enc.execute(() -> write(c));
+        for (Capture c : all) if (!c.frames.isEmpty()) enc.execute(() -> write(c));
     }
 
     void close() {
@@ -289,6 +355,7 @@ class Clip {
         MediaMuxer mx = null;
         int track = -1;
         boolean eos = false;
+        Captioner cap = null;
         try {
             mc = MediaCodec.createEncoderByType(MIME);
             MediaFormat f = MediaFormat.createVideoFormat(MIME, fw, fh);
@@ -303,6 +370,10 @@ class Clip {
             boolean inputDone = false;
             int i = 0, guard = 0;
             long t0 = c.us.get(0);
+            // the words this clip carries, written across every picture of it on the way
+            // through the encoder - see Captioner for why it is the picture and not the
+            // row that has to say them
+            if (c.lines != null && c.lines.length > 0) cap = new Captioner(fw, fh);
             while (!eos && guard++ < 20000) {
                 if (!inputDone) {
                     int in = mc.dequeueInputBuffer(10000);
@@ -311,9 +382,13 @@ class Clip {
                         if (buf == null) {
                             inputDone = true;
                         } else if (i < c.frames.size()) {
+                            // the ring's own bytes when there is nothing to write across
+                            // them, and the same picture with the reading on it when there
+                            // is: the encoder is fed one or the other, never both
+                            byte[] frame = cap == null ? c.frames.get(i) : cap.burn(c, i);
                             buf.clear();
-                            buf.put(c.frames.get(i));
-                            mc.queueInputBuffer(in, 0, c.frames.get(i).length, c.us.get(i) - t0, 0);
+                            buf.put(frame);
+                            mc.queueInputBuffer(in, 0, frame.length, c.us.get(i) - t0, 0);
                             i++;
                         } else {
                             mc.queueInputBuffer(in, 0, 0, i > 0 ? c.us.get(i - 1) - t0 : 0,
@@ -356,7 +431,11 @@ class Clip {
             // an encoder that refuses costs this event its picture; the event itself
             // is already in the queue and the trip carries on
             if (tmp.exists()) tmp.delete();
+            // named rather than swallowed, because a fleet whose camera has quietly
+            // stopped making pictures has no other way of finding that out
+            lastError = c.cid + ": " + (t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage());
         } finally {
+            if (cap != null) cap.close();
             if (mx != null) {
                 try {
                     mx.stop();
@@ -382,11 +461,19 @@ class Clip {
                 }
             }
         }
-        if (tmp.exists() && tmp.length() > 1024) tmp.renameTo(to);
-        else if (tmp.exists()) tmp.delete();
+        if (tmp.exists() && tmp.length() > 1024) {
+            //noinspection ResultOfMethodCallIgnored
+            tmp.renameTo(to);
+        } else if (tmp.exists()) {
+            //noinspection ResultOfMethodCallIgnored
+            tmp.delete();
+            // an encoder that produced less than a kilobyte wrote no picture at all,
+            // and a clip that never existed is the one thing a silent pipeline loses
+            lastError = c.cid + ": the encoder wrote nothing";
+        }
     }
 
-    // ---- picture to YUV
+    // ---- picture to YUV, and back
 
     /**
      * One picture ready for the encoder: a plane of brightness and a colour plane at
@@ -397,23 +484,32 @@ class Clip {
     private byte[] toYuv(Bitmap b) {
         int w0 = b.getWidth() & ~1, h0 = b.getHeight() & ~1;
         if (w0 < 16 || h0 < 16) return null;
-        int size = w0 * h0 * 3 / 2;
         fw = w0;
         fh = h0;
         int[] px = new int[w0 * h0];
         b.getPixels(px, 0, w0, 0, 0, w0, h0);
-        byte[] yuv = new byte[size];
-        int plane = fw * fh, cs = fw / 2, ch = fh / 2;
-        for (int y = 0; y < fh; y++) {
-            int row = y * fw, srow = y * w0;
-            for (int x = 0; x < fw; x++) {
+        return pack(px, w0, w0, h0);
+    }
+
+    /**
+     * The same conversion from pixels that are already in hand. Split off because the
+     * caption has its own copy of a picture - the ring's bytes turned back into colour,
+     * written across, and turned back again - and must never touch the size the camera
+     * thread is working to.
+     */
+    private byte[] pack(int[] px, int sw, int w, int h) {
+        byte[] yuv = new byte[w * h * 3 / 2];
+        int plane = w * h, cs = w / 2, ch = h / 2;
+        for (int y = 0; y < h; y++) {
+            int row = y * w, srow = y * sw;
+            for (int x = 0; x < w; x++) {
                 int c = px[srow + x];
                 yuv[row + x] = (byte) (16 + ((66 * ((c >> 16) & 255) + 129 * ((c >> 8) & 255)
                         + 25 * (c & 255) + 128) >> 8));
             }
         }
         for (int cy = 0; cy < ch; cy++) {
-            int srow = (cy * 2) * w0;
+            int srow = (cy * 2) * sw;
             for (int cx = 0; cx < cs; cx++) {
                 int c = px[srow + cx * 2];
                 int r = (c >> 16) & 255, g = (c >> 8) & 255, bl = c & 255;
@@ -431,6 +527,142 @@ class Clip {
             }
         }
         return yuv;
+    }
+
+    /** The encoder's own bytes back as colours, in the same order this phone asked for. */
+    private void unpack(byte[] yuv, int w, int h, int[] out) {
+        int plane = w * h, cs = w / 2, ch = h / 2;
+        for (int y = 0; y < h; y++) {
+            int row = y * w, cy = y >> 1, crow = cy * cs;
+            int semiRow = plane + cy * w;
+            for (int x = 0; x < w; x++) {
+                int yy = (yuv[row + x] & 255) - 16;
+                if (yy < 0) yy = 0;
+                int c = x >> 1, u, v;
+                if (semi) {
+                    v = (yuv[semiRow + c * 2] & 255) - 128;
+                    u = (yuv[semiRow + c * 2 + 1] & 255) - 128;
+                } else {
+                    u = (yuv[plane + crow + c] & 255) - 128;
+                    v = (yuv[plane + ch * cs + crow + c] & 255) - 128;
+                }
+                out[row + x] = 0xFF000000
+                        | clip8((1186 * yy + 1620 * v) >> 10) << 16
+                        | clip8((1186 * yy - 405 * u - 813 * v) >> 10) << 8
+                        | clip8((1186 * yy + 2018 * u) >> 10);
+            }
+        }
+    }
+
+    private static int clip8(int x) {
+        return x < 0 ? 0 : x > 255 ? 255 : x;
+    }
+
+    /**
+     * The words an alert leaves behind, written into the pictures of its own clip.
+     *
+     * A recording that only makes sense beside its row in a dashboard is a recording
+     * that gets described in an email instead of watched. Writing the reading, the
+     * speed, the driver's name and the seconds before or after the warning across the
+     * frames themselves is what lets one of these files be sent to the person who
+     * investigates an incident and still say what it is a picture of - and it is done
+     * here, in the encoder's own thread, because that is the one moment the picture is
+     * already in colour and nobody is waiting on the frame.
+     */
+    private final class Captioner {
+        private final int w, h;
+        private final int[] argb;
+        private final Bitmap img;
+        private final Canvas cv;
+        private final Paint back = new Paint();
+        private final Paint ink = new Paint();
+        private byte[] made;
+        private int at = -1;
+
+        Captioner(int w, int h) {
+            this.w = w;
+            this.h = h;
+            this.argb = new int[w * h];
+            this.img = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+            this.cv = new Canvas(img);
+            back.setColor(0x8C000000);
+            back.setStyle(Paint.Style.FILL);
+            ink.setColor(0xFFFFFFFF);
+            ink.setAntiAlias(true);
+            ink.setTypeface(Typeface.create(Typeface.SANS_SERIF, Typeface.BOLD));
+            ink.setShadowLayer(2f, 0f, 1f, 0xE0000000);
+        }
+
+        /** The picture of frame `i`, with this clip's words across its bottom. */
+        byte[] burn(Capture c, int i) {
+            // an input buffer that was not ready the first time asks for the same frame
+            // again, and a second round of conversion would only draw the same words
+            if (i == at && made != null) return made;
+            unpack(c.frames.get(i), w, h, argb);
+            img.setPixels(argb, 0, w, 0, 0, w, h);
+            String[] all = new String[c.lines.length + 1];
+            all[0] = offset(c, i);
+            System.arraycopy(c.lines, 0, all, 1, c.lines.length);
+            draw(all);
+            made = pack(argb, w, w, h);
+            at = i;
+            return made;
+        }
+
+        /** How far this picture stands from the frame the alert was raised on. */
+        private String offset(Capture c, int i) {
+            int n = c.us.size();
+            if (n == 0) return "";
+            // the alert frame is the one the rules saw, which is not in the ring yet
+            // when the clip starts: until it arrives, its moment is a step ahead
+            long gap = n > 1 ? (c.us.get(n - 1) - c.us.get(0)) / (n - 1) : 200000L;
+            long alertUs = c.alertAt < n ? c.us.get(c.alertAt) : c.us.get(n - 1) + gap;
+            double s = (c.us.get(i) - alertUs) / 1000000.0;
+            if (Math.abs(s) < 0.15) return "the moment the alert was raised";
+            return String.format(Locale.US, "%.1f s %s the alert", Math.abs(s), s < 0 ? "before" : "after");
+        }
+
+        private void draw(String[] lines) {
+            // one size for all of them, shrunk until the longest fits the picture: a
+            // driver's name in a script this handset cannot measure wide must not run
+            // off the edge of the file an administrator will later have to read
+            float size = Math.max(9f, h / 17f);
+            ink.setTextSize(size);
+            float widest = 1;
+            // measured at the size it is about to be drawn at, and cut to 120
+            // characters first - a name long enough to need measuring twice is a name
+            // that needs shortening, not a name that needs a smaller picture
+            for (String s : lines) if (s != null && !s.isEmpty())
+                widest = Math.max(widest, ink.measureText(s, 0, Math.min(s.length(), 120)));
+            float room = w - 12f;
+            if (widest > room) {
+                size = Math.max(6f, size * room / widest);
+                ink.setTextSize(size);
+            }
+            float lineH = size * 1.35f;
+            int n = 0;
+            for (String s : lines) if (s != null && !s.isEmpty()) n++;
+            float bandH = n * lineH + size * 0.7f;
+            float top = h - bandH - 4f;
+            cv.drawRect(2f, top, w - 2f, h - 2f, back);
+            float y = top + size;
+            for (String s : lines) {
+                if (s == null || s.isEmpty()) continue;
+                // drawn exactly as far as it was measured: a word cut by a shrinking
+                // that never saw its tail would run off the edge all the same
+                if (s.length() > 120) s = s.substring(0, 120);
+                cv.drawText(s, 6f, Math.min(y, h - 5f), ink);
+                y += lineH;
+            }
+        }
+
+        void close() {
+            try {
+                img.recycle();
+            } catch (Throwable ignore) {
+                // a picture the graphics already took back has nowhere left to leak
+            }
+        }
     }
 
     // ---- housekeeping
@@ -473,7 +705,9 @@ class Clip {
         synchronized (this) {
             ring.clear();
             ringUs.clear();
-            run = null;
+            runs.clear();
         }
+        dropped = 0;
+        lastError = "";
     }
 }

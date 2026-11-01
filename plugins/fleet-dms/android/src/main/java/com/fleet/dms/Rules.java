@@ -8,7 +8,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * The four rules of the Configuration page, applied to what the camera just saw.
+ * The nine rules of the Configuration page, applied to what the camera just saw.
  *
  * Each one works the way the vehicle's own rules already work on this phone, so an
  * administrator who has set a tolerance time for overspeed is setting the same thing
@@ -17,13 +17,20 @@ import java.util.UUID;
  * with an end time and a duration when it stops. The reading kept with the row is the
  * worst of the breach, which is what a report should sort on.
  *
- * Nothing here decides what the numbers mean. FaceReader measures the face; this class
- * only asks how long each of them stayed out of bounds, and whether the vehicle was
- * going fast enough for the answer to matter at all.
+ * Nothing here decides what the numbers mean. FaceReader measures the face and names
+ * what is in the driver's hand; this class only asks three things of each of them -
+ * whether it is out of bounds, how long it stayed that way, and which of the nine it
+ * belongs to. That last one matters because four of the nine are the same square
+ * centimetre of a driver: a hand at the mouth is a cigarette, a sandwich or a phone,
+ * an open mouth is a yawn or somebody talking, and a lens that shows nothing is a
+ * covered camera or a driver who has leant forward. Each frame therefore picks one
+ * reading and refuses the others, in the order below, which is why a driver eating a
+ * sandwich is recorded as eating and not as smoking.
  */
 class Rules {
 
-    static final String[] ORDER = {Alerts.FATIGUE, Alerts.DISTRACTED, Alerts.PHONE, Alerts.BLOCKED};
+    static final String[] ORDER = {Alerts.FATIGUE, Alerts.DISTRACTED, Alerts.PHONE, Alerts.YAWN,
+            Alerts.TALK, Alerts.EAT, Alerts.DRINK, Alerts.SMOKE, Alerts.BLOCKED};
     // One minute between the sound for the same rule, exactly as the page does it: a
     // driver who is still turning his head must not be buzzed once a second.
     private static final long REPEAT_MS = 60000;
@@ -41,6 +48,52 @@ class Rules {
     // the window that survives that flicker; it is not long enough to let a driver
     // who really has recovered keep an event open.
     private static final long GAP_MS = 1200;
+    // The last second, which is what every "how much of the time" reading in this file
+    // is measured over. One second is also the shortest thing a five-times-a-second
+    // camera can answer about with any confidence: five pictures, and a fifth of them
+    // is the smallest share of the time the page can be told.
+    private static final long WIN_MS = 1000;
+    // Talking is a rate rather than a share, and two seconds is the shortest stretch
+    // over which "he is moving his mouth again and again" can be told from "he opened
+    // it once": a rate needs more than one movement in it to be a rate at all.
+    private static final long TALK_WIN = 2000;
+    // The number of samples kept for each rule: eight seconds of a five-times-a-second
+    // camera, two and a half of a fifteen-times-a-second one, and more than enough for
+    // the longest window asked of it above.
+    private static final int CAP = 40;
+
+    /**
+     * The mouth's opening, as a percentage of the width of the mouth, at which the page
+     * stops calling it somebody talking and starts calling it a yawn.
+     *
+     * Both rules read the same measurement and they must not both answer for one frame,
+     * or a long conversation writes two events about the same second. This split is
+     * fixed rather than settable because it is not a threshold of tolerance - nobody
+     * argues about how wide a yawn is - and because the two rules' own thresholds are
+     * both meant to sit this side of it and would otherwise have to chase each other.
+     */
+    private static final double MOUTH_WIDE = 14;
+    /**
+     * The least opening that is a mouth moving at all, and half that for the level it
+     * has to fall back to before the next opening counts as another one. The two
+     * numbers are deliberately different: a measurement that wobbles across a single
+     * level would count a hundred movements a minute out of one long open mouth.
+     */
+    private static final double MOUTH_PART = 3;
+    /** The share of the strip over the lips that has to be this driver's own skin. */
+    private static final double LIP_SKIN = 50;
+
+    /** Where the phone is, as this frame saw it. {@link #AT_NONE} when it did not see one. */
+    private static final int AT_NONE = 0, AT_FRONT = 1, AT_EAR_L = 2, AT_EAR_R = 3;
+    /**
+     * In the picture a front lens gives - rotated upright, as this app always hands it
+     * over, and never mirrored, because mirroring is something a preview display does
+     * and not something an analysis frame is - the driver's left side is on the right
+     * of the picture. It is worth naming once, in the one place, because getting it the
+     * other way round would tell an administrator that a man driving with a phone on
+     * his right ear had it on his left.
+     */
+    private static final boolean IMAGE_RIGHT_IS_DRIVERS_LEFT = true;
 
     /** The open breach of one rule, and the id its row and its clip will share. */
     private static class Br {
@@ -52,18 +105,110 @@ class Rules {
         double peak;
         int why;
         boolean row;
+        // which side of his head the phone was on while this breach ran, counted frame
+        // by frame so the answer is the driver's own rather than the last picture's
+        int front, earL, earR;
+    }
+
+    /**
+     * The last few seconds of one measurement, kept so that a rule can be asked "how
+     * much of the time" and "how often" rather than "what did the last picture say".
+     *
+     * The samples older than the window are passed over when they are read rather than
+     * swept out when they age, because the only writer is one frame at a time on one
+     * thread and a sweep would be a second thing to get wrong. A phone that stalls for
+     * a second therefore answers nothing at all for that second rather than a false
+     * amount - the same answer the eye rule has always given.
+     */
+    private static class Win {
+        private final long[] t = new long[CAP];
+        private final double[] v = new double[CAP];
+        private final boolean[] f = new boolean[CAP];
+        private int p, n;
+
+        void add(long now, double value, boolean flag) {
+            t[p] = now;
+            v[p] = value;
+            f[p] = flag;
+            p = (p + 1) % CAP;
+            if (n < CAP) n++;
+        }
+
+        void clear() {
+            p = 0;
+            n = 0;
+        }
+
+        /** The oldest sample still held, or -1 when nothing has been put in yet. */
+        private int oldest() {
+            return n == 0 ? -1 : (p - n + CAP) % CAP;
+        }
+
+        double duty(long now, long ms) {
+            int first = oldest();
+            if (first < 0) return 0;
+            int seen = 0, hit = 0;
+            for (int i = 0; i < n; i++) {
+                int j = (first + i) % CAP;
+                if (now - t[j] > ms) continue;
+                seen++;
+                if (f[j]) hit++;
+            }
+            return seen == 0 ? 0 : (double) hit / seen;
+        }
+
+        double peak(long now, long ms) {
+            int first = oldest();
+            if (first < 0) return 0;
+            double best = 0;
+            for (int i = 0; i < n; i++) {
+                int j = (first + i) % CAP;
+                if (now - t[j] > ms) continue;
+                if (v[j] > best) best = v[j];
+            }
+            return best;
+        }
+
+        /** How many times the flag came up inside the window, once per movement. */
+        int edges(long now, long ms) {
+            int first = oldest();
+            if (first < 0) return 0;
+            int k = 0;
+            boolean was = false, have = false;
+            for (int i = 0; i < n; i++) {
+                int j = (first + i) % CAP;
+                if (now - t[j] > ms) continue;
+                if (f[j] && (!have || !was)) k++;
+                was = f[j];
+                have = true;
+            }
+            return k;
+        }
     }
 
     private final DmsService svc;
     private final Map<String, Br> open = new HashMap<>();
     private final long[] lastNotice = new long[ORDER.length];
+    // The speed of the last frame, kept so that the line burned across a clip can say
+    // how fast the vehicle was going when the limit was broken. The rule that needs it
+    // is called once per frame per rule, so it is taken from the frame rather than
+    // passed down through nine arguments.
+    private double lastKmh;
+    // The clock face of the clip caption. Local time, because the driver and the man
+    // who reads the clip an hour later both live in the same timezone as the phone.
+    private static final java.text.SimpleDateFormat CLOCK =
+            new java.text.SimpleDateFormat("HH:mm:ss", Locale.US);
 
-    // the last second of eye closure, which is how the page defines this threshold
-    private final long[] sT = new long[40];
-    private final boolean[] sS = new boolean[40];
-    private int sp, sn;
+    // The eyes: the last second of closure, which is how the page defines this threshold.
+    private final Win shutWin = new Win();
+    // The mouth: its opening above this driver's rest, and whether it is open at all
+    // right now with the level to fall back to before the next movement counts.
+    private final Win mouthWin = new Win();
+    private boolean mouthOpen;
+    // The four that need to know where a thing is rather than how open a mouth is.
+    private final Win phoneWin = new Win(), foodWin = new Win(), drinkWin = new Win(), handWin = new Win();
     private double lastCover;
-    private long lastCoverAt;
+    private long lastCoverAt, lastPhoneAt;
 
     Rules(DmsService s) {
         svc = s;
@@ -72,22 +217,67 @@ class Rules {
     /** Trip start and end: an unfinished breach belongs to the trip that ended. */
     void reset() {
         open.clear();
-        sp = 0;
-        sn = 0;
         lastCover = 0;
         lastCoverAt = 0;
+        lastPhoneAt = 0;
+        mouthOpen = false;
+        shutWin.clear();
+        mouthWin.clear();
+        phoneWin.clear();
+        foodWin.clear();
+        drinkWin.clear();
+        handWin.clear();
         for (int i = 0; i < lastNotice.length; i++) lastNotice[i] = 0;
+    }
+
+    /**
+     * Whether any rule the page has switched on needs to know what the driver is
+     * holding. The phone is included although it has a colour answer: a named phone at
+     * an ear says far more than a patch of skin-coloured pixels below a nose, and the
+     * second model costs about eight milliseconds of a five-times-a-second camera.
+     */
+    static boolean needsObjects(Config cfg) {
+        return cfg.rule(Alerts.PHONE).on || cfg.rule(Alerts.EAT).on
+                || cfg.rule(Alerts.DRINK).on || cfg.rule(Alerts.SMOKE).on;
     }
 
     /** One measured frame, at the speed the vehicle was going when it was taken. */
     void frame(FaceReader.Reading r, double kmh, Config cfg) {
         long now = r.at;
+        lastKmh = kmh;
         if (r.face) {
             lastCover = r.cover;
             lastCoverAt = now;
         }
-        pushShut(r.face && r.shut, now);
-        double perclos = perclos(now);
+        shutWin.add(now, 0, r.face && r.shut);
+        double perclos = 100 * shutWin.duty(now, WIN_MS);
+
+        // The mouth, once, for the three rules that read it. Everything about it is a
+        // percentage of the width of this driver's own mouth, so it means the same at
+        // any distance from the lens.
+        double mouth = 100 * r.parted;
+        if (r.face) {
+            if (!mouthOpen && mouth >= MOUTH_PART) mouthOpen = true;
+            else if (mouthOpen && mouth < MOUTH_PART / 2) mouthOpen = false;
+        } else mouthOpen = false;
+        mouthWin.add(now, r.face ? mouth : 0, mouthOpen);
+        double movements = 60000.0 * mouthWin.edges(now, TALK_WIN) / TALK_WIN;
+
+        // The three things a hand can hold up to a face, decided here once so that the
+        // rules below cannot each claim the same frame for themselves.
+        int where = r.face ? phoneWhere(r) : AT_NONE;
+        if (where != AT_NONE) lastPhoneAt = now;
+        boolean food = r.face && r.seeing && atMouth(r.food, r);
+        boolean drink = r.face && r.seeing && atMouth(r.drink, r);
+        // A hand at the mouth that is not holding anything the model can name, over a
+        // mouth that is not open wide enough to be talking or yawning. The last of the
+        // four and the one that is left over on purpose.
+        boolean hand = r.face && r.seeing && !food && !drink && where == AT_NONE
+                && mouth < MOUTH_WIDE && 100 * r.lipSkin >= LIP_SKIN;
+        phoneWin.add(now, 0, where != AT_NONE);
+        foodWin.add(now, 0, food);
+        drinkWin.add(now, 0, drink);
+        handWin.add(now, 0, hand);
 
         for (String type : ORDER) {
             Config.Rule rule = cfg.rule(type);
@@ -100,16 +290,90 @@ class Rules {
                 bad = rule.armed(kmh) && r.face && Math.abs(r.yaw) >= rule.threshold;
                 val = Math.abs(r.yaw);
             } else if (type.equals(Alerts.PHONE)) {
-                bad = rule.armed(kmh) && r.face && r.cover * 100 >= rule.threshold;
-                val = r.cover * 100;
+                if (r.seeing) {
+                    // a phone at an ear does not cover the face at all, so the thing
+                    // that can be counted here is how much of the last second it was up
+                    val = 100 * phoneWin.duty(now, WIN_MS);
+                    bad = rule.armed(kmh) && r.face && val >= rule.threshold;
+                } else {
+                    // no model: the colour of the lower face is all there is, and it is
+                    // what this rule did before the camera was asked to name anything
+                    val = r.cover * 100;
+                    bad = rule.armed(kmh) && r.face && val >= rule.threshold;
+                }
+            } else if (type.equals(Alerts.YAWN)) {
+                // the split keeps a conversation out of this rule however the page is
+                // set, because both rules read the same measurement of the same mouth
+                val = mouth;
+                bad = rule.armed(kmh) && r.face && mouth >= MOUTH_WIDE && mouth >= rule.threshold;
+            } else if (type.equals(Alerts.TALK)) {
+                // every movement of this stretch has to be below the yawn level, which
+                // is what stops one long open mouth reading as a fast talker
+                val = movements;
+                bad = rule.armed(kmh) && r.face && mouthOpen && mouthWin.peak(now, TALK_WIN) < MOUTH_WIDE
+                        && val >= rule.threshold;
+            } else if (type.equals(Alerts.EAT)) {
+                val = 100 * foodWin.duty(now, WIN_MS);
+                bad = rule.armed(kmh) && val >= rule.threshold;
+            } else if (type.equals(Alerts.DRINK)) {
+                val = 100 * drinkWin.duty(now, WIN_MS);
+                bad = rule.armed(kmh) && val >= rule.threshold;
+            } else if (type.equals(Alerts.SMOKE)) {
+                val = 100 * handWin.duty(now, WIN_MS);
+                bad = rule.armed(kmh) && val >= rule.threshold;
             } else {
-                boolean hiddenByObject = now - lastCoverAt < COVER_FRESH_MS && lastCover * 100 >= COVER_OWN;
-                bad = rule.armed(kmh) && r.blocked && !hiddenByObject;
+                boolean hidden = fresh(now, lastCoverAt, COVER_FRESH_MS) && lastCover * 100 >= COVER_OWN;
+                // a phone raised to an ear sits over the lens for the same reason a
+                // hand does, and a driver on the telephone is not a driver who has
+                // put his hand over the camera
+                bad = rule.armed(kmh) && r.blocked && !hidden && !fresh(now, lastPhoneAt, COVER_FRESH_MS);
                 val = 0;
             }
-            if (bad) breach(type, rule, now, val, r.why);
+            if (bad) breach(type, rule, now, val, r.why, where);
             else recover(type, rule, now);
         }
+    }
+
+    /** True when this frame is recent enough for its reading still to be believed. */
+    private static boolean fresh(long now, long at, long ms) {
+        return at != 0 && now - at < ms;
+    }
+
+    // ---- where the thing in the driver's hand is
+
+    /**
+     * Whether the phone the model named is against this driver rather than lying on the
+     * seat beside him, and which side of his head it is on if so.
+     *
+     * Every distance is a multiple of the width of his own face, which is the only unit
+     * two handsets two feet apart and six inches apart agree on. The bands are the ones
+     * a face gives: an ear is further out than the outer corner of the eye and about at
+     * the height of it, and a phone held up to read is anywhere across the face between
+     * the eyes and a little below the chin.
+     */
+    private static int phoneWhere(FaceReader.Reading r) {
+        if (!r.seeing || r.phone == null || r.faceW < 6) return AT_NONE;
+        FaceReader.Box b = r.phone;
+        if (b.w > r.faceW * 1.8 || b.h > r.faceW * 2.6) return AT_NONE;
+        double dx = (b.cx - r.faceCx) / r.faceW, ax = Math.abs(dx);
+        if (ax >= 0.62 && ax <= 1.15 && b.cy >= r.eyeCy - 0.40 * r.faceW
+                && b.cy <= r.eyeCy + 0.55 * r.faceW) {
+            boolean onPictureRight = dx > 0;
+            if (onPictureRight == IMAGE_RIGHT_IS_DRIVERS_LEFT) return AT_EAR_L;
+            return AT_EAR_R;
+        }
+        if (ax <= 0.62 && b.cy >= r.eyeCy - 0.25 * r.faceW && b.cy <= r.mouthCy + 0.80 * r.faceW)
+            return AT_FRONT;
+        return AT_NONE;
+    }
+
+    /** Whether the thing the model named is at this driver's mouth rather than by the wheel. */
+    private static boolean atMouth(FaceReader.Box b, FaceReader.Reading r) {
+        if (b == null || r.faceW < 6) return false;
+        if (b.w > r.faceW * 1.8 || b.h > r.faceW * 2.6) return false;
+        double dx = Math.abs(b.cx - r.mouthCx) / r.faceW;
+        return dx <= 0.75 && b.cy >= r.noseCy - 0.20 * r.faceW
+                && b.cy <= r.mouthCy + 0.45 * r.faceW;
     }
 
     /** True while a breach of any rule is being watched, which is what the page paints. */
@@ -119,7 +383,7 @@ class Rules {
 
     // ---- the breach machine
 
-    private void breach(String type, Config.Rule rule, long now, double val, int why) {
+    private void breach(String type, Config.Rule rule, long now, double val, int why, int where) {
         Br b = open.get(type);
         if (b == null) {
             b = new Br();
@@ -128,19 +392,28 @@ class Rules {
             b.peak = val;
             b.why = why;
             open.put(type, b);
-            int i = idx(type);
+        }
+        int i = idx(type);
+        // counted rather than remembered from the last picture: a driver on the
+        // telephone moves the handset about his ear, and the row has to say the side
+        // it was on for most of the breach, not the side it happened to be at the
+        // instant the tolerance ran out
+        if (where == AT_FRONT) b.front++;
+        else if (where == AT_EAR_L) b.earL++;
+        else if (where == AT_EAR_R) b.earR++;
+        if (val > b.peak) {
+            b.peak = val;
+            b.why = why;
+        }
+        if (b.start == now) {
             // the warning is for the moment the limit was broken, not the moment the
             // row was written, and a breach of the same rule one minute later is quiet
             if (now - lastNotice[i] >= REPEAT_MS) {
                 lastNotice[i] = now;
-                svc.announced(type, shortText(type, rule, b.peak, b.why), b.peak, rule);
+                svc.announced(type, shortText(type, rule, b.peak, b.why, b), val, rule);
             }
             if (rule.holdS <= 0) write(type, rule, b, now);
             return;
-        }
-        if (val > b.peak) {
-            b.peak = val;
-            b.why = why;
         }
         // The time spent back inside the limit is never added to the breach: a frame
         // that returns from a quiet stretch only starts counting again from itself.
@@ -175,7 +448,7 @@ class Rules {
         b.cid = UUID.randomUUID().toString();
         JSONObject p = svc.row(type, b.cid, b.start, value(type, b.peak),
                 fullText(type, rule, b, now, false));
-        svc.clip().begin(b.cid, cfg.preFrames(), cfg.postS);
+        svc.clip().begin(b.cid, cfg.preFrames(), cfg.postS, caption(type, rule, b));
         JSONObject item = new JSONObject();
         try {
             item.put("op", "ev").put("cid", b.cid).put("clip", b.cid + ".mp4").put("p", p);
@@ -215,6 +488,7 @@ class Rules {
     /** The number the Events table prints. A blocked lens has no reading to sort on. */
     private static Double value(String type, double peak) {
         if (type.equals(Alerts.BLOCKED)) return null;
+        if (type.equals(Alerts.TALK)) return (double) Math.round(peak);
         return Math.round(peak * 10) / 10.0;
     }
 
@@ -251,51 +525,84 @@ class Rules {
         sb.append(s);
     }
 
-    /** The warning the driver hears, and the first half of the line kept in the row. */
-    private static String shortText(String type, Config.Rule r, double peak, int why) {
-        if (type.equals(Alerts.FATIGUE))
-            return "Eyes shut " + pct(peak) + " of the last second against a " + pct(r.threshold) + " limit";
+    /** Which ear the phone was on, counted over the whole breach rather than the last frame. */
+    private static String phoneSide(Br b) {
+        if (b.earL > b.earR && b.earL > b.front) return "at his left ear, on a call";
+        if (b.earR > b.earL && b.earR > b.front) return "at his right ear, on a call";
+        if (b.front >= Math.max(b.earL, b.earR) && b.front > 0) return "in front of his face, being read";
+        // a breach that ran on the colour of his lower face alone: the phone is over
+        // his features, which is all the picture can say without the second model
+        return "in front of his face";
+    }
+
+    /** What was measured, said once for the warning, the row and the clip alike. */
+    private static String measured(String type, double peak, int why, Br b) {
+        if (type.equals(Alerts.FATIGUE)) return "Eyes shut " + pct(peak) + " of the last second";
         if (type.equals(Alerts.DISTRACTED))
-            return "Head turned " + deg(peak) + " degrees off the road against a " + deg(r.threshold) + " degree limit";
-        if (type.equals(Alerts.PHONE))
-            return "Something in front of the face: " + pct(peak) + " of the lower face against a "
-                    + pct(r.threshold) + " limit";
+            return "Head turned " + deg(peak) + " degrees off the road";
+        if (type.equals(Alerts.PHONE)) return "Phone " + phoneSide(b) + " " + pct(peak) + " of the last second";
+        if (type.equals(Alerts.YAWN))
+            return "Mouth open " + pct(peak) + " of the width of his mouth";
+        if (type.equals(Alerts.TALK)) return "Mouth moving " + deg(peak) + " times a minute";
+        if (type.equals(Alerts.EAT)) return "Food at the mouth " + pct(peak) + " of the last second";
+        if (type.equals(Alerts.DRINK)) return "A cup or bottle at the mouth " + pct(peak) + " of the last second";
+        if (type.equals(Alerts.SMOKE)) return "A hand at the mouth " + pct(peak) + " of the last second";
         return "Driver camera: " + blockedWhy(why);
+    }
+
+    /** The limit it was measured against, in the words a sentence wants. */
+    private static String against(String type, Config.Rule r) {
+        if (type.equals(Alerts.DISTRACTED)) return "a " + deg(r.threshold) + " degree limit";
+        if (type.equals(Alerts.TALK)) return "a " + deg(r.threshold) + " movements a minute limit";
+        return "a " + pct(r.threshold) + " limit";
+    }
+
+    /** The same limit in the few words a line across a picture can carry. */
+    private static String limitText(String type, Config.Rule r) {
+        if (type.equals(Alerts.DISTRACTED)) return deg(r.threshold) + " degrees";
+        if (type.equals(Alerts.TALK)) return deg(r.threshold) + " a minute";
+        return pct(r.threshold);
+    }
+
+    /** The warning the driver hears, and the first half of the line kept in the row. */
+    private static String shortText(String type, Config.Rule r, double peak, int why, Br b) {
+        String m = measured(type, peak, why, b);
+        if (type.equals(Alerts.BLOCKED)) return m;
+        return m + " against " + against(type, r);
+    }
+
+    /**
+     * The four lines burned across the clip of this alert.
+     *
+     * Short on purpose, and said again rather than copied from the row: the picture is
+     * 320 pixels wide, and a sentence that fits a database column does not fit a film
+     * of a man's face. The seconds the clip itself counts are left to the clip, which
+     * is the only thing here that knows which picture is which.
+     */
+    private String[] caption(String type, Config.Rule r, Br b) {
+        Config cfg = svc.cfg();
+        String line = measured(type, b.peak, b.why, b);
+        if (!type.equals(Alerts.BLOCKED)) line += " · limit " + limitText(type, r);
+        String when = CLOCK.format(new java.util.Date(b.start));
+        String who = join(cfg.driverName, cfg.vehicleName);
+        return new String[]{Alerts.title(type), line,
+                when + " · " + Math.round(lastKmh) + " km/h", who};
+    }
+
+    private static String join(String a, String b) {
+        String x = a == null ? "" : a.trim(), y = b == null ? "" : b.trim();
+        if (x.isEmpty()) return y;
+        if (y.isEmpty()) return x;
+        return x + " · " + y;
     }
 
     /** The whole line of the row: the reading, the limit, the tolerance and the length. */
     private static String fullText(String type, Config.Rule r, Br b, long now, boolean closed) {
-        String head = shortText(type, r, b.peak, b.why);
+        String head = shortText(type, r, b.peak, b.why, b);
         long held = Math.max(0, now - b.start);
-        if (type.equals(Alerts.BLOCKED)) head = "Driver camera: " + blockedWhy(b.why);
         String tail = r.holdS > 0 ? " · tolerance " + deg(r.holdS) + " s" : "";
         if (closed) return head + " · lasted " + hms(held) + tail;
         return head + " · held " + secs(held) + tail;
-    }
-
-    // ---- the last second of eye closure
-
-    private void pushShut(boolean shut, long now) {
-        sT[sp] = now;
-        sS[sp] = shut;
-        sp = (sp + 1) % sT.length;
-        if (sn < sT.length) sn++;
-    }
-
-    /**
-     * The percentage of the last second the eyes were shut - the number the page puts
-     * its fatigue limit on. Samples older than a second are skipped when they are
-     * looked at rather than swept out, so a phone that stalls for a moment answers no
-     * closure at all rather than a false one.
-     */
-    double perclos(long now) {
-        int n = 0, s = 0;
-        for (int i = 0; i < sn; i++) {
-            if (now - sT[i] > 1000) continue;
-            n++;
-            if (sS[i]) s++;
-        }
-        return n == 0 ? 0 : 100.0 * s / n;
     }
 
     private static int idx(String type) {

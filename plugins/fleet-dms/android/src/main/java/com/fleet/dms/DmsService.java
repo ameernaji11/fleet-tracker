@@ -162,6 +162,9 @@ public class DmsService extends Service implements LifecycleOwner {
         clip.age(cfg.keepD);
         reader = new FaceReader(this);
         rules = new Rules(this);
+        // the second model is only worth eight milliseconds of a frame if some rule the
+        // driver's page has switched on needs to know what he is holding
+        reader.wantObjects(Rules.needsObjects(cfg));
         analysis = Executors.newSingleThreadExecutor();
         // A Service is not an activity, so nothing drives its lifecycle for it and CameraX
         // would never be told to open. These two events are the whole of what it needs, and
@@ -302,6 +305,7 @@ public class DmsService extends Service implements LifecycleOwner {
         cfg = next;
         if (dead) return;
         alerts.setMessages(next.msgs);
+        reader.wantObjects(Rules.needsObjects(next));
         clip.setRate(next.fps);
         clip.age(next.keepD);
         if (next.on && !cameraOn) openCamera();
@@ -365,12 +369,18 @@ public class DmsService extends Service implements LifecycleOwner {
         try {
             j.put("running", true).put("camera", cameraOn)
                     .put("on", cfg.on).put("model", reader.ready())
+                    .put("objects", reader.seeing())
+                    .put("objectError", str(reader.objectError()))
                     .put("reason", reason).put("error", str(reader.error()))
                     .put("kmh", Math.round(kmh)).put("queued", outbox.size())
                     .put("breaching", rules.active())
                     .put("notices", alerts.blocked())
                     .put("preview", cfg.preview)
-                    .put("clips", clip.count()).put("clipBytes", clip.bytes());
+                    .put("clips", clip.count()).put("clipBytes", clip.bytes())
+                    // the two numbers that turn "there is no video" from a mystery into a
+                    // sentence the driver can read: how many alerts were refused a
+                    // picture, and what the encoder said about the last one
+                    .put("clipDropped", clip.dropped()).put("clipError", str(clip.lastError()));
         } catch (Exception ignore) {
             // JSONObject only throws on a null key, and none of these are null
         }

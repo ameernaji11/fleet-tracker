@@ -229,7 +229,7 @@ class Alerts {
     }
 
     /** The headline of the notice. The body already says what was measured. */
-    private String title(String type) {
+    static String title(String type) {
         if (type.equals(FATIGUE)) return "Driver fatigued";
         if (type.equals(DISTRACTED)) return "Driver distracted";
         if (type.equals(PHONE)) return "Phone in hand";

@@ -123,8 +123,9 @@ class FaceReader {
     private boolean tried, odTried;
     // Whether the frame is worth asking a second model about. The service answers this
     // from the rules the page has switched on, so a fleet that watches only the eyes
-    // never pays for naming what is in a hand.
-    private boolean wantObjects = true;
+    // never pays for naming what is in a hand. Written on the page's thread and read on
+    // the camera's, which is why it is the one field here that is volatile.
+    private volatile boolean wantObjects = true;
 
     private int[] px, prev;
     private int pw, ph;
