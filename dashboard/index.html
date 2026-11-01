@@ -304,7 +304,7 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <section id="drv"><div class="card"><div class="csh"><i class="fa-solid fa-id-card"></i><div><b>Drivers</b><small>A driver is named on the positions and events a phone uploads, so keep the phone number and licence details current.</small></div></div><form class="fgrid mt10" onsubmit="add(event,'drivers',['name','phone','employee_id','license_no','license_expiry','nationality','notes'])"><div class="field"><label>Driver name *</label><input name="name" required></div>
 <div class="field"><label>Phone</label><input name="phone"></div><div class="field"><label>Employee ID</label><input name="employee_id"></div><div class="field"><label>Licence number</label><input name="license_no"></div>
 <div class="field"><label>Licence expiry</label><input name="license_expiry" type="text"></div><div class="field"><label>Nationality</label><input name="nationality"></div><div class="field"><label>Notes</label><input name="notes"></div><button class="btn g"><i class="fa-solid fa-plus"></i>Add driver</button></form></div><div class="tw" id="drvT"></div></section>
-<section id="usr"><div class="card info"><i class="fa-solid fa-circle-info"></i><div><b>Vehicles + Drivers</b> decide what this login is stamped with and which data a normal user can see — tick as many as the login needs, then press Save. <b>Role:</b> Admin sees and manages everything; User sees only what is ticked here. <b>Status:</b> five wrong passwords on the sign-in screen lock that login out of both apps — Unlock clears it. <b>Reset</b> gives a login a new temporary password, which they must replace at their next sign-in.</div></div><div class="card"><div class="csh"><i class="fa-solid fa-user-plus"></i><div><b>New login</b><small>Signs in on both the dashboard and the phone with the username and password you set here.</small></div></div><form class="fgrid mt10" onsubmit="addUser(event)"><div class="field"><label>Username (or email)</label><input name="u" required></div><div class="field"><label>Password (min 6)</label><input name="p" type="text" minlength="6" required></div><button class="btn g"><i class="fa-solid fa-user-plus"></i>Create user</button></form></div>
+<section id="usr"><div class="card info"><i class="fa-solid fa-circle-info"></i><div><b>Vehicles + Drivers</b> decide what this login is stamped with and which data a normal user can see — tick as many as the login needs, then press Save. <b>Role:</b> Admin sees and manages everything; User sees only what is ticked here. <b>Status:</b> five wrong passwords on the sign-in screen lock that login out of both apps — Unlock clears it. <b>Reset</b> gives a login a new temporary password, which they must replace at their next sign-in. <b>Phone:</b> a login works on one handset at a time, and the one the driver is using names itself in that column. A second handset signing in as the same login is refused while the first keeps answering, and the first is only told that somebody tried — nothing about his trip changes. Two minutes of silence frees the account by itself, so <b>Release</b> is only for a handset that is lost, broken or left somewhere.</div></div><div class="card"><div class="csh"><i class="fa-solid fa-user-plus"></i><div><b>New login</b><small>Signs in on both the dashboard and the phone with the username and password you set here.</small></div></div><form class="fgrid mt10" onsubmit="addUser(event)"><div class="field"><label>Username (or email)</label><input name="u" required></div><div class="field"><label>Password (min 6)</label><input name="p" type="text" minlength="6" required></div><button class="btn g"><i class="fa-solid fa-user-plus"></i>Create user</button></form></div>
 <div class="tw" id="usrT"></div></section>
 <section id="act"><div class="card frow"><div class="field"><label>User</label><select id="ac_u"><option value="">All users</option></select></div>
 <div class="field"><label>Activity</label><select id="ac_t"><option value="">All activities</option></select></div>
@@ -904,14 +904,18 @@ function edit(t,id){if(!ADMIN)return;const r=(t==='vehicles'?vehicles:drivers).f
  f.querySelector('button').innerHTML='<i class="fa-solid fa-floppy-disk"></i>Save changes';f.scrollIntoView({behavior:'smooth'});f.elements[0].focus()}
 async function del(t,id){if(!ADMIN)return;if(confirm('Delete this item?')){const nm=((t==='vehicles'?vehicles:drivers).find(x=>x.id===id)||{}).name||id;
  await sb.from(t).delete().eq('id',id);logAct('Deleted '+t.replace(/s$/,''),nm);refs()}}
-let USRS=[];
+let USRS=[],DC={};
 const uname=id=>((USRS.find(x=>x.id===id)||{}).email||'').replace('@fleet.local','')||'this account';
 async function users(){
  // ask the database to put its clocks forward first: a count that aged out overnight or
  // a lockout that ran its time should not still read as a warning in this table
  try{await sb.rpc('login_sweep')}catch(e){}
  const {data:ps}=await sb.from('profiles').select('*').order('email');const {data:as}=await sb.from('assignments').select('*');
+ // A database that has not run v28 has no such table: the read comes back empty and this
+ // page shows nobody a phone, which is the honest answer rather than an error.
+ let dcs=null;try{dcs=(await sb.from('device_claim').select('*')).data}catch(e){}
  USRS=ps||[];
+ DC={};(dcs||[]).forEach(c=>DC[c.user_id]=c);
  const mine=(id,k)=>(as||[]).filter(x=>x.user_id===id&&x[k]).map(x=>x[k]);
  const HP=t=>`<span class="hp" data-tip="${t}">?</span>`;
  // the lock lives in the database, so this column only reports what it says. Since v21
@@ -923,10 +927,24 @@ async function users(){
   :+p.fails>0?`<span class="chip chipO">${p.fails} wrong ${p.fails==1?'try':'tries'}</span><br><small class="mut">locks at ${LOCK_AT} · clears after ${LWIN()} min quiet</small>`
   :p.must_change?`<span class="chip chipO">Temp password</span><br><small class="mut">must set their own</small>`
   :`<span class="chip" style="background:var(--grl);color:var(--gr)">Active</span>`;
+ // One account sits on one handset, and this is where that shows. The phone holding the
+ // account names itself here and renews about every half minute; a second handset signing in
+ // as the same login is refused while this one keeps answering, and the row is what tells an
+ // administrator which handset the driver was refused by and when. A claim nobody has renewed
+ // for two minutes is a dead phone rather than a second handset - the next one simply takes
+ // it - so a grey row is history, not something to fix. tried_at is the one thing here the
+ // driver may never have seen: an attempt on a handset that was refused, which his own phone
+ // was told about.
+ const dev=p=>{const c=DC[p.id];if(!c)return '<small class="mut">No phone</small>';
+  const age=Math.max(0,Math.round((Date.now()-new Date(c.renewed_at).getTime())/1000)),live=age<150;
+  return `<span class="chip ${live?'chipB':'chipO'}"><i class="fa-solid fa-mobile-screen-button"></i> ${esc(c.model||'a phone')}</span><br>
+   <small class="mut">${live?'answering':'not answering'} · seen ${age<120?age+'s':Math.round(age/60)+' min'} ago</small>
+   ${c.tripping?`<br><small class="mut"><i class="fa-solid fa-road"></i> on a trip since ${new Date(c.trip_since||c.since).toLocaleTimeString('en-GB')}</small>`:''}
+   ${c.tried_at?`<br><small class="mut"><i class="fa-solid fa-triangle-exclamation"></i> ${esc(c.tried_model||'another phone')} tried ${new Date(c.tried_at).toLocaleTimeString('en-GB')}</small>`:''}`};
  const LKM=LLOCK();
  const LKT=HP(`Five wrong passwords on the sign-in screen lock an account out of the dashboard and the phone. The count only adds up while the tries keep coming: after <b>${LWIN()} minutes</b> of quiet it starts again from nothing, and a lockout that was actually reached ${LKM?'<b>opens itself again after '+LKM+' minutes</b>':'<b>stays on until you unlock it</b>'}. Both waits are set on the Configuration page. A lock <b>you</b> press here has no expiry at all — it waits for your Unlock.`);
- $('usrT').innerHTML=`<table><tr><th>User</th><th>Vehicles ${HP('Open the list and tick every vehicle this login should see - use Select all or the search box when the fleet is large. A phone signed in here gets a vehicle picker on its own screen.')}</th><th>Drivers ${HP('Tick every driver profile this login should see. The first tick is paired with the first vehicle tick, the second with the second, and so on - that pairing is what the phone stamps on each position and event.')}</th><th>Role</th><th>Status ${LKT}</th><th></th></tr>${USRS.map(p=>{const lk=lockOn(p);
- return `<tr><td><i class="fa-solid fa-user"></i> ${esc((p.email||'').replace('@fleet.local',''))}${p.role==='admin'?' <span class="chip chipB">admin</span>':''}</td><td><div id="v_${p.id}"></div></td><td><div id="d_${p.id}"></div></td><td><select id="r_${p.id}" style="height:34px"><option value="user" ${p.role!=='admin'?'selected':''}>User</option><option value="admin" ${p.role==='admin'?'selected':''}>Admin</option></select></td><td class="nw">${stat(p)}</td><td class="act"><button class="btn g sm" onclick="link('${p.id}')"><i class="fa-solid fa-floppy-disk"></i>Save</button> <button class="btn ${lk?'b':'r'} sm" onclick="lockU('${p.id}')" title="${lk?'Clear the lock and the count of wrong passwords so this account can sign in again. It changes nothing else.':'Shut this account out straight away, without waiting for the five tries: the dashboard and the phone both refuse it until you press Unlock here. Unlike a lockout, this one never expires by itself.'}"><i class="fa-solid ${lk?'fa-lock-open':'fa-lock'}"></i>${lk?'Unlock':'Lock'}</button> <button class="btn gh sm" onclick="resetPw('${p.id}')" title="Give this account a new password. It has no mailbox, so hand the password to the person yourself; they must replace it with their own at their next sign-in."><i class="fa-solid fa-key"></i>Reset</button></td></tr>`}).join('')}</table>`;
+ $('usrT').innerHTML=`<table><tr><th>User</th><th>Vehicles ${HP('Open the list and tick every vehicle this login should see - use Select all or the search box when the fleet is large. A phone signed in here gets a vehicle picker on its own screen.')}</th><th>Drivers ${HP('Tick every driver profile this login should see. The first tick is paired with the first vehicle tick, the second with the second, and so on - that pairing is what the phone stamps on each position and event.')}</th><th>Role</th><th>Status ${LKT}</th><th>Phone ${HP('One login works on one handset at a time: the phone a driver is using names itself here and keeps saying it is still there. A second handset signing in as the same login is refused while this one answers, and his own phone is only told that somebody tried. Two minutes of silence is a dead battery rather than a second handset, and the next phone then takes the account by itself - so <b>Release</b> is only needed for a handset that is lost, broken or left in a drawer, and it lets a second phone in while the first one is still working.')}</th><th></th></tr>${USRS.map(p=>{const lk=lockOn(p);
+ return `<tr><td><i class="fa-solid fa-user"></i> ${esc((p.email||'').replace('@fleet.local',''))}${p.role==='admin'?' <span class="chip chipB">admin</span>':''}</td><td><div id="v_${p.id}"></div></td><td><div id="d_${p.id}"></div></td><td><select id="r_${p.id}" style="height:34px"><option value="user" ${p.role!=='admin'?'selected':''}>User</option><option value="admin" ${p.role==='admin'?'selected':''}>Admin</option></select></td><td class="nw">${stat(p)}</td><td class="nw">${dev(p)}</td><td class="act"><button class="btn g sm" onclick="link('${p.id}')"><i class="fa-solid fa-floppy-disk"></i>Save</button> <button class="btn ${lk?'b':'r'} sm" onclick="lockU('${p.id}')" title="${lk?'Clear the lock and the count of wrong passwords so this account can sign in again. It changes nothing else.':'Shut this account out straight away, without waiting for the five tries: the dashboard and the phone both refuse it until you press Unlock here. Unlike a lockout, this one never expires by itself.'}"><i class="fa-solid ${lk?'fa-lock-open':'fa-lock'}"></i>${lk?'Unlock':'Lock'}</button> <button class="btn gh sm" onclick="resetPw('${p.id}')" title="Give this account a new password. It has no mailbox, so hand the password to the person yourself; they must replace it with their own at their next sign-in."><i class="fa-solid fa-key"></i>Reset</button> ${DC[p.id]?`<button class="btn gh sm" onclick="relDev('${p.id}')" title="Let a second handset sign in as this account while the phone named above is still holding it. Only for a handset that is lost, broken or left somewhere - the driver sitting on the first one is signed straight out of his app by this, so tell him before you press it. An account with no phone on it needs nothing here."><i class="fa-solid fa-mobile-screen-button"></i>Release</button>`:''}</td></tr>`}).join('')}</table>`;
  USRS.forEach(p=>{msel('v_'+p.id,vehicles,'None selected',mine(p.id,'vehicle_id'));msel('d_'+p.id,drivers,'None selected',mine(p.id,'driver_id'))});tools($('usrT'))}
 // ---- the administrator actions on an account. Locking and unlocking are each one
 // ordinary profiles update, which the existing admin policy already allows, so they
@@ -954,6 +972,19 @@ async function lockU(id){if(!ADMIN)return;const p=USRS.find(x=>x.id===id)||{},nm
   ({error}=await sb.from('profiles').update(on?{locked_at:new Date().toISOString()}:{fails:0,locked_at:null}).eq('id',id));
  if(error)return toast(error.message);
  logAct(on?'Locked user':'Unlocked user',nm);toast(nm+(on?' is locked out':' can sign in again'),on?0:1);users()}
+// Freeing an account from the handset it is sitting on. The two-minute wait already does
+// this by itself for a phone that is merely dead or left switched off, so this button is
+// only for a handset that is lost, broken or in a drawer and would otherwise hold the login
+// out of use - and it says plainly what happens to the driver on that phone, because he is
+// not asked first: his next half-minute check is refused, his trip closes, and he is signed
+// out of the app.
+async function relDev(id){if(!ADMIN)return;const nm=uname(id),c=DC[id];
+ if(!c)return toast('No handset holds '+nm+' right now.');
+ if(!confirm('Release '+nm+' from '+(c.model||'the phone it is on')+
+  '? The handset named above keeps working until its next half-minute check, and then it closes whatever trip it is recording and signs itself out. Use this for a phone that is lost, broken or left somewhere - the driver holding it is not asked first.'))return;
+ let e=null;try{({error:e}=await sb.from('device_claim').delete().eq('user_id',id))}catch(x){e={message:x.message||x}}
+ if(e)return toast('Could not release it: '+(e.message||e));
+ logAct('Released phone',nm+' · '+(c.model||'a phone'));toast(nm+' can sign in on another handset now',1);users()}
 // a password someone has to read out over the phone or type in front of them: no
 // look-alike characters (no I, O, 0 or 1) and split into two short groups
 function tmpPw(){const A='ABCDEFGHJKLMNPQRSTUVWXYZ',B='abcdefghijkmnopqrstuvwxyz',D='23456789',
@@ -997,7 +1028,7 @@ async function link(id){const role=$('r_'+id).value;if(id===UID&&role!=='admin')
 // ---- activity log (admin only). The action list below is what both this
 // dashboard and the driver phone write, so the filter offers every kind of
 // entry even when the current period happens to contain none of it.
-const ACTS=['Signed in','Signed out','Session time','Opened dashboard','Opened app','Opened dashboard from app','Allowed permissions','Switched vehicle','Changed own password','Reset password','Unlocked user','Added vehicle','Edited vehicle','Deleted vehicle','Added driver','Edited driver','Deleted driver','Created user','Saved user access','Saved configuration','Reset vehicles to fleet defaults','Exported report','Printed trip','Started trip','Started trip automatically','Ended trip automatically','Ended trip'];
+const ACTS=['Signed in','Signed out','Session time','Opened dashboard','Opened app','Opened dashboard from app','Allowed permissions','Switched vehicle','Changed own password','Reset password','Unlocked user','Added vehicle','Edited vehicle','Deleted vehicle','Added driver','Edited driver','Deleted driver','Created user','Saved user access','Saved configuration','Reset vehicles to fleet defaults','Exported report','Printed trip','Started trip','Started trip automatically','Ended trip automatically','Ended trip','Second phone refused','Another phone tried to use this account','Account now running on another phone','Released phone'];
 let ACT=[],ACTU=null,ACF='';
 async function loadAct(){if(!ADMIN)return;fSave('act');
  if(!ACTU){const {data}=await sb.from('profiles').select('id,email').order('email');
