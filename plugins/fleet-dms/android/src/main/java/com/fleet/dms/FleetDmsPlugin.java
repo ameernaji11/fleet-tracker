@@ -109,10 +109,15 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
                 requestPermissionForAlias(CAMERA, call, "cameraResult");
                 return;
             }
-            launch(wantTrip);
+            String why = launch(wantTrip);
             JSObject r = new JSObject();
             r.put("granted", true);
             r.put("running", DmsService.get() != null);
+            // Whether the phone took the order. `running` cannot answer it: an instance
+            // left open by the driver's own watch is running while it judges nothing, and
+            // a trip that was told "running" then drives its whole shift unwatched.
+            r.put("started", why.isEmpty());
+            if (!why.isEmpty()) r.put("reason", why);
             r.put("preview", wantBox);
             r.put("trip", wantTrip);
             call.resolve(r);
@@ -124,9 +129,11 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
     private void cameraResult(PluginCall call) {
         safe(call, () -> {
             boolean granted = getPermissionState(CAMERA) == PermissionState.GRANTED;
-            if (granted) launch(wantTrip);
+            String why = granted ? launch(wantTrip) : "";
             JSObject r = new JSObject();
             r.put("granted", granted);
+            r.put("started", why.isEmpty());
+            if (!why.isEmpty()) r.put("reason", why);
             call.resolve(r);
         });
     }
@@ -147,8 +154,12 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
                 i.setAction(DmsService.ACTION_STOP);
                 try {
                     getContext().startService(i);
-                } catch (Exception ignore) {
-                    // a service that refuses the stop is being taken down anyway
+                } catch (Exception e) {
+                    // The same refusal as a start, from an app that is off screen - and here
+                    // the cost of swallowing it is a lens left open over a driver nobody is
+                    // watching, held by an app that has just been told it stopped.
+                    Logger.error("fleet-dms: the camera stop was not accepted, " + name(e), e);
+                    s.stopFromPage();
                 }
             }
             call.resolve();
@@ -402,7 +413,11 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
 
     // ---- the service
 
-    private void launch(boolean tripping) {
+    /**
+     * Hand the order to the camera service. Answers with the reason it could not, or an
+     * empty string when it did.
+     */
+    private String launch(boolean tripping) {
         Context ctx = getContext();
         Intent i = new Intent(ctx, DmsService.class);
         i.setAction(DmsService.ACTION_START);
@@ -412,8 +427,22 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
             // is on screen - the only moment Android lets a camera service begin. From
             // anywhere else it is a refusal, and the page is told by the status call.
             ContextCompat.startForegroundService(ctx, i);
+            return "";
         } catch (Throwable t) {
             Logger.error("fleet-dms: the camera service could not be started", t);
+            // Android 12 and later refuse this from an app that is not the screen in front:
+            // a trip started by the speed sentry, or resumed after a process Android killed.
+            // The order is not lost when a service is already alive - the driver's own watch
+            // holds one, and so does a lens this trip opened a minute ago - so it goes to
+            // that instance directly. What used to happen to this exception was nothing at
+            // all: it was written to logcat, the page was told the camera was running, and
+            // the driver drove a shift that was filmed and judged by nobody.
+            DmsService s = DmsService.get();
+            if (s != null) {
+                s.holdFromPage(tripping);
+                return "";
+            }
+            return "this phone would not start the camera service (" + name(t) + ")";
         }
     }
 

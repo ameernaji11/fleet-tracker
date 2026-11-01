@@ -331,6 +331,25 @@ public class DmsService extends Service implements LifecycleOwner {
                 : tripping ? "Watching the driver" : "Driver camera open, no trip running");
     }
 
+    /**
+     * The page's order, applied to the instance that is already alive rather than sent as
+     * an intent. Android will not let an app that is off screen raise a camera service, and
+     * a start it refuses there is a trip that believes its lens is judging when it is not -
+     * which looks, from the driver's seat, exactly like a camera that works. The same holds
+     * for a stop: the one the phone would not deliver is a lens left open over a man nobody
+     * is watching. Both go to the thread the camera itself belongs to, because a lens is
+     * only ever opened and put away there.
+     */
+    void holdFromPage(boolean tripping) {
+        if (isMain()) hold(tripping);
+        else main.post(() -> hold(tripping));
+    }
+
+    void stopFromPage() {
+        if (isMain()) stopSelf();
+        else main.post(this::stopSelf);
+    }
+
     void applyNewConfig(Config next) {
         cfg = next;
         if (dead) return;
@@ -364,6 +383,13 @@ public class DmsService extends Service implements LifecycleOwner {
     /** The fix the app already has, so an event can say where the vehicle was. */
     void feed(double lat, double lng, double acc, double alt, double heading, double speedKmh, long atMs) {
         kmh = speedKmh;
+        // A receiver that has not locked anything reports 0,0, and the page hands over
+        // every reading it gets. The speed still counts, because the wheels did turn, but
+        // the last place the phone really held says more about where the vehicle is than a
+        // point in the Gulf of Guinea does, so a pair outside the map is dropped and the
+        // good fix is kept. An event raised before the first lock gets the page's own copy
+        // of the last real fix when it drains - see evFix().
+        if (!(lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) || (lat == 0 && lng == 0)) return;
         fix = new double[]{lat, lng, acc, alt, heading, atMs};
     }
 
