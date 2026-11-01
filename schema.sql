@@ -658,6 +658,13 @@ alter table profiles add column if not exists fails int not null default 0,
   add column if not exists locked_at timestamptz,
   add column if not exists must_change boolean not null default false;
 
+-- These two are dropped rather than replaced, and that is not tidiness: a database that
+-- has already run v21 holds the four-word answers, and Postgres refuses to change a
+-- function's return type in place ("42P13: cannot change return type of existing
+-- function"), which aborted the whole file here and stopped v22 onward ever running.
+-- Dropped first, this file lands the same shape whether the lockout block it meets is the
+-- old one or the new one, and v21 replaces both again below with the wider answers.
+drop function if exists login_gate(text);
 -- asked before a sign-in is attempted: is this account already locked?
 create or replace function login_gate(p_email text) returns table(locked boolean, tries_left int)
 language sql security definer set search_path = public as $$
@@ -669,6 +676,7 @@ language sql security definer set search_path = public as $$
 $$;
 
 -- one wrong password. Returns what the screen should say next.
+drop function if exists login_fail(text);
 create or replace function login_fail(p_email text) returns table(locked boolean, tries_left int)
 language plpgsql security definer set search_path = public as $$
 declare n int;
