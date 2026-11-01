@@ -1501,7 +1501,14 @@ async function resetSelV(){if(!ADMIN)return;const ids=selCfg();
 async function saveCfg(){if(!ADMIN)return;
  const hasVL=Object.values(RULES).some(r=>'voice_lang'in r);
  const rules=Object.values(RULES).map(r=>{const bt=$('bt_'+r.type).value,vl=$('vl_'+r.type).value;
-  return{type:r.type,label:r.label,enabled:$('re_'+r.type).checked,threshold:NOLIM[r.type]?null:+$('rt_'+r.type).value||null,hold_s:Math.max(0,+$('rh_'+r.type).value||0),alert:$('ra_'+r.type).checked,beep:bt!=='off',beep_duration:Math.max(1,Math.round(+$('bd_'+r.type).value||5)),beep_type:bt,voice:vl!=='off',...(hasVL?{voice_lang:vl}:{}),...(SPD?{speed_min:DMS[r.type]?Math.max(0,+$('rs_'+r.type).value||0):0}:{}),...(CLIPCOL&&DMS[r.type]?{clip:$('rc_'+r.type).checked}:{})}});
+  return{type:r.type,label:r.label,enabled:$('re_'+r.type).checked,threshold:NOLIM[r.type]?null:+$('rt_'+r.type).value||null,hold_s:Math.max(0,+$('rh_'+r.type).value||0),alert:$('ra_'+r.type).checked,beep:bt!=='off',beep_duration:Math.max(1,Math.round(+$('bd_'+r.type).value||5)),beep_type:bt,voice:vl!=='off',...(hasVL?{voice_lang:vl}:{}),...(SPD?{speed_min:DMS[r.type]?Math.max(0,+$('rs_'+r.type).value||0):0}:{}),
+   // one bulk upsert is one INSERT for the whole batch, and a column named in some rows
+   // and not others arrives as an explicit null in the rest - which the not-null
+   // clip column rejects and the whole Save fails on. So every row says clip, exactly
+   // the way every row says speed_min: a rule with no lens to record with says true,
+   // the same thing the schema default says, and nothing but a driver-camera rule
+   // carries a switch that could ever turn it off.
+   ...(CLIPCOL?{clip:DMS[r.type]?$('rc_'+r.type).checked:true}:{})}});
  const vls=rules.map(r=>r.voice_lang).filter(v=>v&&v!=='off');
  // a typed 0 must survive: "0 seconds after the alert" is a choice, so the box is
  // read as text and only an empty box falls back to the schema default
