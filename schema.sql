@@ -1106,7 +1106,7 @@ insert into event_rules (type, label, enabled, threshold, alert, hold_s, speed_m
   ('dms_talking', 'Talking while driving', true, 40, true, 2, 10),
   ('dms_eating',  'Eating while driving',  true, 40, true, 1, 15),
   ('dms_drinking','Drinking while driving', true, 40, true, 1, 15),
-  ('dms_smoking', 'Hand at the mouth',  false, 50, true,  2, 15)
+  ('dms_smoking', 'Smoking',            false, 50, true,  2, 15)
   on conflict (type) do nothing;
 
 -- A phone that is offline does not know which build of the rules its own settings copy
@@ -1192,6 +1192,25 @@ end $$;
 alter table event_rules add column if not exists clip boolean not null default true;
 comment on column event_rules.clip is
   'Driver-camera rules only: keep a few seconds of picture with the event. Vehicle rules ignore it.';
+
+-- -------------------------------------------- v27 the smoking rule, by its name ----
+-- The rule the camera raises when a bare hand sits at this driver's mouth is called
+-- Smoking everywhere it is read - the Configuration row, the alert on the phone, the
+-- Events table and the headline of the notice - so the row's own label goes with it.
+--
+-- This is an UPDATE and not just a seed edit, on purpose. The insert above says "do
+-- nothing on conflict", which is what protects thresholds a fleet has tuned, and it is
+-- also why a project that already has this row would keep answering "Hand at the mouth"
+-- for ever: the Configuration page prints the label the database holds, and the phone
+-- reads the same column. Only these two lines reach a live project, and they name the
+-- old wording in the WHERE clause so a label an administrator has changed himself is
+-- left alone.
+--
+-- What the rule measures has not moved: the shipped model has no cigarette class, so it
+-- reports a hand at the face. The name says what a fleet acts on; the reading, which is
+-- written into the event and burned onto its clip, still says what was seen.
+update event_rules set label = 'Smoking'
+  where type = 'dms_smoking' and label = 'Hand at the mouth';
 
 -- ------------------------------------------------------------- admin seed ----
 -- Promote the owner account. Runs after the tables/policies exist, and is safe
@@ -1549,4 +1568,14 @@ end $$;
 --   Run this file before publishing the phone build that reads the switch and the dashboard build that draws it.
 --   An older phone records for every camera rule, which is the behaviour this column has until then; an older
 --   dashboard simply has no box to tick and its save does not send the word.
+--
+-- v27, on top of the above (the hand-at-the-mouth rule called by what a fleet acts on):
+--   update event_rules set label='Smoking' where type='dms_smoking' and label='Hand at the mouth'
+--        -> one line, and the only part of it a live project needs. The v25 seed writes the new words but says
+--        "do nothing on conflict", so a project that already ran v25 keeps the old label from the database: the
+--        Configuration row, the phone's alert and the Events table all print this column. The rule measures the
+--        same thing as before (the shipped model has no cigarette class, so the reading burned into the clip still
+--        says a hand at the face); only the name changed, and an administrator's own wording is left alone.
+--        Both builds already say Smoking, so run this whenever convenient - a project that skips it shows one
+--        old name and nothing else goes wrong.
 -- ============================================================================
