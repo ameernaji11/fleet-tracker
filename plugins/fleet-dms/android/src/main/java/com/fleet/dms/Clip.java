@@ -224,9 +224,10 @@ class Clip {
                 built.frames.add(fs.next());
                 built.us.add(ts.next());
             }
-            // the frame that raised the alert is the one after these: the rules are
-            // asked before the picture is put in the ring, so it is not in it yet
-            built.alertAt = built.frames.size();
+            // the frame that raised the alert is the newest one in the ring: the
+            // picture is put here before the rules are asked what it shows, so the
+            // moment the driver is warned about is a moment this clip contains
+            built.alertAt = built.frames.size() - 1;
             built.endUs = built.us.get(built.us.size() - 1) + (long) (Math.max(0, afterSeconds) * 1000000);
             if (afterSeconds > 0) runs.add(built);
             else straight = true;
@@ -369,7 +370,17 @@ class Clip {
             MediaCodec.BufferInfo bi = new MediaCodec.BufferInfo();
             boolean inputDone = false;
             int i = 0, guard = 0;
-            long t0 = c.us.get(0);
+            // The pictures reach the ring as fast as this phone can think, which is rarely
+            // the rate the camera was asked for: a model that needs 350 ms over a frame
+            // leaves one every 350 ms, and a film stamped with those readings of the clock
+            // hangs on every picture and lurches over the next. A wall-clock correction in
+            // the middle of a trip is worse still, and freezes the clip for seconds. Each
+            // picture is therefore given its own equal share of the rate the Configuration
+            // page set, so a clip plays as one smooth film at that rate however long its
+            // pictures really took to come. The seconds burned across the picture are
+            // still the real ones, from the ring's own clock: see Captioner.offset. A sped
+            // up record of an incident is only evidence if it still says when.
+            long step = 1000000L / Math.max(1, fps);
             // the words this clip carries, written across every picture of it on the way
             // through the encoder - see Captioner for why it is the picture and not the
             // row that has to say them
@@ -388,10 +399,10 @@ class Clip {
                             byte[] frame = cap == null ? c.frames.get(i) : cap.burn(c, i);
                             buf.clear();
                             buf.put(frame);
-                            mc.queueInputBuffer(in, 0, frame.length, c.us.get(i) - t0, 0);
+                            mc.queueInputBuffer(in, 0, frame.length, (long) i * step, 0);
                             i++;
                         } else {
-                            mc.queueInputBuffer(in, 0, 0, i > 0 ? c.us.get(i - 1) - t0 : 0,
+                            mc.queueInputBuffer(in, 0, 0, i > 0 ? (long) (i - 1) * step : 0,
                                     MediaCodec.BUFFER_FLAG_END_OF_STREAM);
                             inputDone = true;
                         }
@@ -604,6 +615,12 @@ class Clip {
             all[0] = offset(c, i);
             System.arraycopy(c.lines, 0, all, 1, c.lines.length);
             draw(all);
+            // The words were painted onto the picture, not into this array, and it is the
+            // array the encoder is handed: reading the drawn result back is the only thing
+            // that puts a caption in the file at all. Without it every clip leaves the phone
+            // with its event, its speed and its driver invisible, and nothing on the phone
+            // or the dashboard ever says so, because the clip looks perfectly watchable.
+            img.getPixels(argb, 0, w, 0, 0, w, h);
             made = pack(argb, w, w, h);
             at = i;
             return made;
@@ -613,8 +630,10 @@ class Clip {
         private String offset(Capture c, int i) {
             int n = c.us.size();
             if (n == 0) return "";
-            // the alert frame is the one the rules saw, which is not in the ring yet
-            // when the clip starts: until it arrives, its moment is a step ahead
+            // the frame the rules saw is the one this clip was started on, so its index
+            // is inside the picture; the step past the end is only a clip that was cut
+            // short by a camera that stopped answering, and its last frame is the best
+            // answer it can give for where the alert sat
             long gap = n > 1 ? (c.us.get(n - 1) - c.us.get(0)) / (n - 1) : 200000L;
             long alertUs = c.alertAt < n ? c.us.get(c.alertAt) : c.us.get(n - 1) + gap;
             double s = (c.us.get(i) - alertUs) / 1000000.0;

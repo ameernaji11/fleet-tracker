@@ -231,15 +231,32 @@ public class DmsService extends Service implements LifecycleOwner {
         // Java catch can see coming, and recycling a bitmap the camera thread is drawing
         // with is the black picture that gives the rules nothing to judge.
         ExecutorService e = analysis;
-        if (e != null) {
+        if (e == null) {
+            teardown();
+        } else {
+            boolean taken = true;
             try {
                 e.execute(this::teardown);
             } catch (Throwable t) {
-                teardown();
+                taken = false;
             }
             e.shutdown();
-        } else {
-            teardown();
+            if (!taken) {
+                // The pool would not take the chore, so it cannot be trusted to run it
+                // after the frame already in flight either - and a face graph taken away
+                // under a detection is the crash this whole method is arranged around.
+                // A thread of our own waits for the last frame to finish, then does it
+                // there rather than on the main thread beside it.
+                final ExecutorService pool = e;
+                new Thread(() -> {
+                    try {
+                        pool.awaitTermination(5, java.util.concurrent.TimeUnit.SECONDS);
+                    } catch (Throwable ignore) {
+                        // interrupted or refused: the frame is as finished as it is going to be
+                    }
+                    teardown();
+                }, "dms-teardown").start();
+            }
         }
         super.onDestroy();
     }
@@ -393,8 +410,36 @@ public class DmsService extends Service implements LifecycleOwner {
 
     // ---- the camera
 
+    /**
+     * Whether this call is already on the thread Android owns the lens from.
+     *
+     * A service's own callbacks run on the main thread, but every command the driver
+     * page sends arrives on Capacitor's bridge thread: "start a trip", "here are the
+     * settings", "close the camera". CameraX refuses to bind or unbind a use case from
+     * anywhere but the main thread, and the refusal is thrown back at the caller - which
+     * for the page's configure call means it lands in the plugin, and for the press of
+     * the driver's own camera button means the app goes down. So both entry points below
+     * put their work on the main thread rather than doing it where they were asked.
+     */
+    private boolean isMain() {
+        return Looper.myLooper() == Looper.getMainLooper();
+    }
+
     private void openCamera() {
         if (dead || cameraOn) return;
+        if (isMain()) {
+            openCameraNow();
+            return;
+        }
+        main.post(() -> {
+            // re-asked on the way in: a close, a stop or the trip ending can all have
+            // happened between the bridge thread asking and the main thread getting here
+            if (dead || cameraOn) return;
+            openCameraNow();
+        });
+    }
+
+    private void openCameraNow() {
         if (checkSelfPermission(android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             reason = "The camera permission has not been given to this app.";
             return;
@@ -484,6 +529,17 @@ public class DmsService extends Service implements LifecycleOwner {
     private void closeCamera() {
         if (!cameraOn) return;
         cameraOn = false;
+        if (isMain()) {
+            unbind();
+            return;
+        }
+        // the flag goes down on the caller's thread at once, so a re-open asked for in
+        // the same breath cannot bind the lens twice while this is still waiting its
+        // turn; the untangling itself happens where CameraX allows it
+        main.post(this::unbind);
+    }
+
+    private void unbind() {
         // Unbound here, on the thread that owns the lens, rather than from a listener
         // that may not run until the service asking for it has gone: what is left bound
         // after that feeds a thread that no longer exists, and that is the crash.
@@ -515,8 +571,12 @@ public class DmsService extends Service implements LifecycleOwner {
             Bitmap b = upright(proxy);
             if (b == null) return;
             FaceReader.Reading r = reader.read(b, now);
-            rules.frame(r, kmh, cfg);
+            // The picture is put in the ring before it is judged, so the frame that
+            // raises an alert is inside its own clip rather than one frame past the
+            // last copy of it. An administrator watching a "head turned 40 degrees"
+            // film has to see the head turned in it.
             clip.push(b, now * 1000L, cfg.preFrames());
+            rules.frame(r, kmh, cfg);
             Host h = host;
             // the driver decides whether he wants to see himself; the dashboard only
             // decides what that choice is when the trip begins

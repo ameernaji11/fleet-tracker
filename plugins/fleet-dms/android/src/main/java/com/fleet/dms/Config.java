@@ -35,7 +35,7 @@ public class Config {
     /** One rule row of the Configuration page, already clamped to what can be acted on. */
     static class Rule {
         String type = "";
-        boolean on = true, alert = true, beep = true, voice = true;
+        boolean on = true, alert = true, beep = true, voice = true, clip = true;
         double threshold, holdS, speedMin;
         int beepDur = 5;
         String beepType = "discontinuous", voiceLang = "en";
@@ -44,6 +44,12 @@ public class Config {
             Rule r = new Rule();
             r.type = type;
             r.on = j.optBoolean("enabled", true);
+            // A database that has not run v26 has no clip column, so the page sends no
+            // word for it. Recording is then the answer to guess at, and it is the one
+            // every rule of this fleet has had since the camera first wrote a film: an
+            // alert nobody can watch afterwards is an alert an administrator has to
+            // take on trust.
+            r.clip = j.optBoolean("clip", true);
             r.threshold = j.optDouble("threshold", 0);
             r.holdS = Math.max(0, j.optDouble("hold_s", 0));
             // A database that has not run v19 yet has no speed_min column, so the page
@@ -185,7 +191,8 @@ public class Config {
                     .put("driver_id", driverId).put("vehicle_name", vehicleName).put("driver_name", driverName));
             JSONArray rs = new JSONArray();
             for (String t : TYPES) rs.put(new JSONObject().put("type", t)
-                    .put("enabled", rule(t).on).put("threshold", rule(t).threshold).put("hold_s", rule(t).holdS)
+                    .put("enabled", rule(t).on).put("clip", rule(t).clip)
+                    .put("threshold", rule(t).threshold).put("hold_s", rule(t).holdS)
                     .put("speed_min", rule(t).speedMin).put("alert", rule(t).alert).put("beep", rule(t).beep)
                     .put("beep_duration", rule(t).beepDur).put("beep_type", rule(t).beepType)
                     .put("voice", rule(t).voice).put("voice_lang", rule(t).voiceLang));

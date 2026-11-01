@@ -12,10 +12,19 @@ import java.util.UUID;
  *
  * Each one works the way the vehicle's own rules already work on this phone, so an
  * administrator who has set a tolerance time for overspeed is setting the same thing
- * here: the moment the limit is broken is the moment the driver is warned, the event
- * is only written once the breach has outlasted that tolerance, and the row is closed
- * with an end time and a duration when it stops. The reading kept with the row is the
- * worst of the breach, which is what a report should sort on.
+ * here: the event is written once the breach has outlasted that tolerance, and the row
+ * is closed with an end time and a duration when it stops. The reading kept with the row
+ * is the worst of the breach, which is what a report should sort on.
+ *
+ * The warning sounds at that same moment rather than at the first bad frame, and that is
+ * the whole of why a driver's alerts and the dashboard's events agree with each other.
+ * They used to be two decisions: a buzz came on frame one, the row only once the
+ * tolerance had run out, and a breach that flickered back inside the limit before then
+ * was written off - so the driver was warned about seven things the fleet never saw
+ * recorded. Now one moment answers for all three of a breach's consequences: the sound,
+ * the row and its video. An alert the driver hears is always an event somebody can
+ * watch, and the only way to be warned the instant a limit is broken is to set that
+ * rule's tolerance to zero, which is the same lever the vehicle rules offer.
  *
  * Nothing here decides what the numbers mean. FaceReader measures the face and names
  * what is in the driver's hand; this class only asks three things of each of them -
@@ -31,8 +40,8 @@ class Rules {
 
     static final String[] ORDER = {Alerts.FATIGUE, Alerts.DISTRACTED, Alerts.PHONE, Alerts.YAWN,
             Alerts.TALK, Alerts.EAT, Alerts.DRINK, Alerts.SMOKE, Alerts.BLOCKED};
-    // One minute between the sound for the same rule, exactly as the page does it: a
-    // driver who is still turning his head must not be buzzed once a second.
+    // One minute between the sound for the same rule, exactly as the page does it. See
+    // notice() for why the sound is said with the row rather than with the frame.
     private static final long REPEAT_MS = 60000;
     // How long a face that was just in view still holds its cover reading, used only
     // so a phone raised in front of the face is not also reported as a blocked lens.
@@ -194,10 +203,12 @@ class Rules {
     // is called once per frame per rule, so it is taken from the frame rather than
     // passed down through nine arguments.
     private double lastKmh;
-    // The clock face of the clip caption. Local time, because the driver and the man
+    // The clock face of the clip caption, with the day in front of the time: a file that
+    // leaves this phone is watched beside another day's alerts, and "08:41:07" alone
+    // cannot say which day it belongs to. Local time, because the driver and the man
     // who reads the clip an hour later both live in the same timezone as the phone.
     private static final java.text.SimpleDateFormat CLOCK =
-            new java.text.SimpleDateFormat("HH:mm:ss", Locale.US);
+            new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.US);
 
     // The eyes: the last second of closure, which is how the page defines this threshold.
     private final Win shutWin = new Win();
@@ -393,7 +404,6 @@ class Rules {
             b.why = why;
             open.put(type, b);
         }
-        int i = idx(type);
         // counted rather than remembered from the last picture: a driver on the
         // telephone moves the handset about his ear, and the row has to say the side
         // it was on for most of the breach, not the side it happened to be at the
@@ -406,12 +416,8 @@ class Rules {
             b.why = why;
         }
         if (b.start == now) {
-            // the warning is for the moment the limit was broken, not the moment the
-            // row was written, and a breach of the same rule one minute later is quiet
-            if (now - lastNotice[i] >= REPEAT_MS) {
-                lastNotice[i] = now;
-                svc.announced(type, shortText(type, rule, b.peak, b.why, b), val, rule);
-            }
+            // a rule with no tolerance is a rule that answers on the first bad frame,
+            // so this is the one case where the warning is also immediate
             if (rule.holdS <= 0) write(type, rule, b, now);
             return;
         }
@@ -421,6 +427,20 @@ class Rules {
         else b.acc += Math.max(0, now - b.last);
         b.last = now;
         if (!b.row && b.acc / 1000.0 >= rule.holdS) write(type, rule, b, now);
+    }
+
+    /**
+     * The sound and the banner for a breach that has just been written.
+     *
+     * A breach of the same rule one minute later stays quiet, exactly as the page does
+     * it: a driver who is still turning his head must not be buzzed once a second, and
+     * the row for the second breach is written all the same.
+     */
+    private void notice(String type, Config.Rule rule, Br b, long now) {
+        int i = idx(type);
+        if (now - lastNotice[i] < REPEAT_MS) return;
+        lastNotice[i] = now;
+        svc.announced(type, shortText(type, rule, b.peak, b.why, b), b.peak, rule);
     }
 
     private void recover(String type, Config.Rule rule, long now) {
@@ -438,9 +458,12 @@ class Rules {
     }
 
     /**
-     * The row opens with the readings of the moment the limit was first broken, and
-     * the clip named after it starts here: the seconds of picture before that moment
-     * are already in the ring, which is the only reason they exist.
+     * The one moment a breach becomes something the fleet can see. The row opens with
+     * the readings of the moment the limit was first broken, the clip named after it
+     * starts here - the seconds of picture before that moment are already in the ring,
+     * which is the only reason they exist - and the driver is warned. All three are
+     * decided by this single call, so nothing the driver hears can fail to reach the
+     * dashboard and nothing on the dashboard can be missing the picture it belongs to.
      */
     private void write(String type, Config.Rule rule, Br b, long now) {
         Config cfg = svc.cfg();
@@ -448,15 +471,22 @@ class Rules {
         b.cid = UUID.randomUUID().toString();
         JSONObject p = svc.row(type, b.cid, b.start, value(type, b.peak),
                 fullText(type, rule, b, now, false));
-        svc.clip().begin(b.cid, cfg.preFrames(), cfg.postS, caption(type, rule, b));
+        // the record-video switch of this rule on the Configuration page. A rule that is
+        // not watched on film still warns the driver and still keeps its row; only the
+        // seconds of picture are withheld, which is what an operator wants in a cab he
+        // has agreed with his drivers to record, and what he does not want in another.
+        boolean film = rule.clip;
+        if (film) svc.clip().begin(b.cid, cfg.preFrames(), cfg.postS, caption(type, rule, b));
         JSONObject item = new JSONObject();
         try {
-            item.put("op", "ev").put("cid", b.cid).put("clip", b.cid + ".mp4").put("p", p);
+            item.put("op", "ev").put("cid", b.cid)
+                    .put("clip", film ? b.cid + ".mp4" : null).put("p", p);
         } catch (Exception ignore) {
             // as above
         }
         svc.outbox().add(item);
         svc.pageEvent();
+        notice(type, rule, b, now);
     }
 
     private void close(String type, Config.Rule rule, Br b, long now) {
