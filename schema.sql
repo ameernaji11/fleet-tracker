@@ -1463,8 +1463,10 @@ end $$;
 --        Both apps write a 'Session time' row (sign out, tab hidden, app backgrounded) holding the seconds spent
 --        there; without the column those rows land as ordinary entries with no length.
 --   event_rules.voice_lang                                             -> one voice per event (Off, English,
---        Arabic, Hindi or Urdu) chosen on the Configuration page; the two app_settings keys above become the
---        fallback only.
+--        Arabic, Hindi, Urdu, and since v28 Kurdish in both scripts: ku for Kurmanji, ckb for Sorani) chosen on
+--        the Configuration page; the two app_settings keys above become the
+--        fallback only. The column is free text on purpose: the words live in each app's own VMSG table, so a new
+--        language is a release of the apps, never a migration.
 --   app_settings key 'offline_after_h' (24)                            -> Live Tracking greys a vehicle out as
 --        Offline after this many hours without a position; the number is editable in the Offline tile itself.
 -- v14, on top of the above:
