@@ -1182,7 +1182,67 @@ const arw=(b,c)=>L.divIcon({className:'arw',html:`<svg width="14" height="14" vi
 // reason. Such an event keeps its row, its count, its place in the trip details and its
 // line in the print-out. It simply is not on the map, because it does not know where it
 // happened.
-const evMk=x=>okXY(x)?L.marker([x.lat,x.lng],{icon:evIcon(x.type),zIndexOffset:900}).bindPopup(()=>evPop(x),{minWidth:240}):null;
+// ---- several events on one spot, and the ground a breach covered
+// A driver on the phone answers one call and the fleet gets four rows for the same second
+// at the same place, or a fatigued blink and a yawning mouth a heartbeat apart. Four pins
+// stacked on each other read as one event, and the supervisor decides from what he can
+// count. So a spot takes one pin with the number of events on it, and its popup carries an
+// arrow each way - the small chevron walks through every event that came in at that
+// position, oldest first, with its own time and readings in the card.
+const ECL=[],EIX=[];
+// five decimals is about a metre: close enough for two fixes of one stop, far apart
+// enough that a car moving between two breaches is not mistaken for the same spot.
+const eSpot=x=>(+x.lat).toFixed(5)+','+(+x.lng).toFixed(5);
+function evGroups(list){const m=new Map(),out=[];
+ (list||[]).forEach(x=>{if(!okXY(x))return;const k=eSpot(x);if(!m.has(k))m.set(k,[]);m.get(k).push(x)});
+ m.forEach(g=>out.push(g.sort((a,b)=>tms(a)-tms(b))));
+ return out.sort((a,b)=>tms(a[0])-tms(b[0]))}
+const stkIcon=g=>L.divIcon({className:'',html:`<div style="position:relative;width:26px;height:26px">`+
+ `<div class="mk sm" style="background:${EVX(g[0].type)[2]}"><i class="fa-solid ${EVX(g[0].type)[1]}"></i></div>`+
+ `<b style="position:absolute;right:-6px;top:-6px;background:#12202b;color:#fff;border:2px solid #fff;border-radius:9px;font-size:10px;line-height:1;padding:2px 4px;box-shadow:0 1px 3px #0007">${g.length}</b></div>`,
+ iconSize:[26,26],iconAnchor:[13,13]});
+// the ring the breach stopped inside: same colour as its own start marker, hollow so the
+// two ends of a line cannot be mistaken for two separate events.
+const endIcon=t=>L.divIcon({className:'',html:`<div style="width:16px;height:16px;border-radius:50%;border:3px solid ${EVX(t)[2]};background:#fff;box-shadow:0 1px 3px #0008"></div>`,
+ iconSize:[16,16],iconAnchor:[8,8]});
+function evFoot(gi){const g=ECL[gi],i=EIX[gi]||0;
+ return HR+`<div style="display:flex;align-items:center;gap:7px">`+
+  `<button class="btn gh sm" title="The previous event at this spot" aria-label="Previous event at this spot" ${i?'':'disabled'} onclick="evStep(${gi},-1)"><i class="fa-solid fa-chevron-left"></i></button>`+
+  `<b style="font-size:12px">${i+1} of ${g.length} at this spot</b>`+
+  `<button class="btn gh sm" title="The next event at this spot" aria-label="Next event at this spot" ${i+1<g.length?'':'disabled'} onclick="evStep(${gi},1)"><i class="fa-solid fa-chevron-right"></i></button></div>`+
+  `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">${g.map((x,j)=>`<button class="btn gh sm" style="height:24px;padding:0 8px;font-size:11px${j===i?';background:'+EVX(x.type)[2]+';color:#fff;border-color:'+EVX(x.type)[2]:''}" onclick="evGo(${gi},${j})"><i class="fa-solid ${EVX(x.type)[1]}"></i> ${esc(EVX(x.type)[0])} · ${new Date(x.recorded_at).toLocaleTimeString()}</button>`).join('')}</div>`}
+function evCard(gi){const g=ECL[gi];return evPop(g[EIX[gi]||0])+(g.length>1?evFoot(gi):'')}
+function evGo(gi,i){const g=ECL[gi];if(!g)return;i=Math.min(Math.max(0,+i||0),g.length-1);EIX[gi]=i;
+ const m=g[0].__mk;if(!m)return;const p=m.getPopup();if(p)p.setContent(evCard(gi));else m.bindPopup(evCard(gi),{minWidth:240});
+ if(!m.isPopupOpen())m.openPopup()}
+const evStep=(gi,d)=>evGo(gi,(EIX[gi]||0)+d);
+// Where a breach ended. The phone pushes the fix that closed it as its own position row
+// (see endEv in the driver app), so the closing point is looked for in the trip's own
+// loaded points rather than guessed at: no second query, and nothing drawn that the
+// handset did not report. A moment event - a zone crossing, a blink - has no ground to
+// cover, and an event whose ends fall in the same place is one pin, not a line.
+function endFix(x){if(!okXY(x)||!x.ended_at||evDur(x)<2)return null;
+ const te=new Date(x.ended_at).getTime();let best=null;
+ for(const p of hData){const t=tms(p);if(t<te-9e4||t>te+9e4)continue;
+  if(t<tms(x))continue;if(!okXY(p))continue;if(!best||Math.abs(t-te)<Math.abs(tms(best)-te))best=p}
+ if(!best)return null;
+ const a={lat:+x.lat,lng:+x.lng},b={lat:+best.lat,lng:+best.lng};
+ if(km(a,b)<.02)return null;
+ return{p:best,a,b,xy:[b.lat,b.lng]}}
+function evLine(x,g){const e=endFix(x);if(!e)return;
+ L.polyline([[+x.lat,+x.lng],e.xy],{color:EVX(x.type)[2],weight:4,opacity:.95,dashArray:'7 6'}).addTo(g)
+  .bindPopup(()=>`<b style="color:${EVX(x.type)[2]}">${esc(EVX(x.type)[0])} · the ground it covered</b>${HR}From ${new Date(x.recorded_at).toLocaleTimeString()}<br>To ${new Date(x.ended_at).toLocaleTimeString()} · <b>${hms(evDur(x))}</b><br>${km(e.a,e.b).toFixed(2)} km between the two fixes`);
+ L.marker(e.xy,{icon:endIcon(x.type),zIndexOffset:860}).addTo(g)
+  .bindPopup(()=>`<b style="font-size:15px;color:${EVX(x.type)[2]}"><i class="fa-solid fa-flag-checkered"></i> End of ${esc(EVX(x.type)[0])}</b>${HR}Start <i class="fa-regular fa-clock"></i> ${new Date(x.recorded_at).toLocaleString()}<br>End <i class="fa-regular fa-clock"></i> ${new Date(x.ended_at).toLocaleString()} · <b>${hms(evDur(x))}</b><br><i class="fa-solid fa-location-dot"></i> ${(+e.xy[0]).toFixed(5)}, ${(+e.xy[1]).toFixed(5)}<br><i class="fa-solid fa-gauge-high"></i> ${Math.round(e.p.speed||0)} km/h at the closing fix`)
+}
+// one pass per trip: group the events by spot, stand one pin on each, then hang the
+// start-to-end lines of every breach in the group off the same layer
+function evPaint(list,g){evGroups(list).forEach(gr=>{
+ const gi=ECL.push(gr)-1;EIX[gi]=0;
+ const m=L.marker([+gr[0].lat,+gr[0].lng],{icon:gr.length>1?stkIcon(gr):evIcon(gr[0].type),zIndexOffset:900}).addTo(g);
+ m.__gi=gi;gr[0].__mk=m;
+ m.bindPopup(()=>evCard(gi),{minWidth:240});
+ gr.forEach(x=>{if(x!==gr[0])x.__mk=m;evLine(x,g)})})}
 function geoFill(pop,p){geoOne(gk(p)).then(nm=>{const el=pop.getElement&&pop.getElement();const s=el&&el.querySelector('.gname');if(!s)return;
  s.textContent=nm||'Place name not found';
  // an admin can rename the spot from wherever he is looking at it
@@ -1213,7 +1273,7 @@ function drawTrip(T,Vh){const P=T.pts,g=T.ly,fm=+Vh.fuel_moving||0,fi=+Vh.fuel_i
  const a=P[0],z=P.at(-1);
  L.marker([a.lat,a.lng],{icon:shp('s'),zIndexOffset:1500}).addTo(g).bindPopup(()=>tPop(T,'s')).on('popupopen',e=>geoFill(e.popup,a));
  if(P.length>1)L.marker([z.lat,z.lng],{icon:shp('e'),zIndexOffset:1400}).addTo(g).bindPopup(()=>tPop(T,'e')).on('popupopen',e=>geoFill(e.popup,z));
- T.evs.forEach(x=>evMk(x)?.addTo(g))}
+ evPaint(T.evs,g)}
 // `keep` is set when Historical Tracking is opened by clicking an event: that
 // fifteen-minute window is a jump to a moment, not a criteria anybody chose, so it
 // must not become what the page opens with tomorrow.
@@ -1225,13 +1285,17 @@ async function loadHist(keep){if(!keep)fSave('hist');pbStop();
  // The print-out already dropped these; now the map, the tiles and the trip list agree.
  const data=ded((await fetchAll(()=>sb.from('positions').select('*').eq('vehicle_id',vid).gte('recorded_at',hf).lte('recorded_at',ht).order('recorded_at'))).filter(x=>okFix(x)&&okXY(x)));
  if(hLayer)hLayer.remove();TRIPS.forEach(t=>t.ly.remove());TRIPS=[];TSEL=-1;HEVS=[];hData=data;
+ // the pins this page stood are gone, so the spot groups they pointed at must go with them
+ ECL.length=0;EIX.length=0;
  if(!data.length){$('hstat').innerHTML='';hSide();return toast('No data in this period.')}
  HEVS=(await fetchAll(()=>sb.from('events').select('*').eq('vehicle_id',vid).gte('recorded_at',hf).lte('recorded_at',ht).order('recorded_at'))).filter(x=>EV[x.type]&&okFix(x));
  await evBorrow(HEVS);
  const Vh=vehicles.find(x=>x.id===vid)||{};
  TRIPS=splitTrips(data,Vh).map((pts,i)=>({n:i+1,pts,col:TCOL[i%TCOL.length],on:true,st:tStats(pts,Vh),ly:L.layerGroup(),evs:[]}));
  hLayer=L.layerGroup().addTo(mapH);
- HEVS.forEach(x=>{const t=tms(x),T=TRIPS.find(T=>t>=T.st.s-6e4&&t<=T.st.e+6e4);if(T)T.evs.push(x);else evMk(x)?.addTo(hLayer)});
+ const ORPH=[];
+ HEVS.forEach(x=>{const t=tms(x),T=TRIPS.find(T=>t>=T.st.s-6e4&&t<=T.st.e+6e4);if(T)T.evs.push(x);else ORPH.push(x)});
+ evPaint(ORPH,hLayer);
  TRIPS.forEach(T=>{drawTrip(T,Vh);T.ly.addTo(mapH)});
  if(!+Vh.fuel_moving&&!+Vh.fuel_idle)toast('Set the fuel rates on the Vehicles page to see fuel figures');
  hSide();hKpis();hFit()}
@@ -1280,10 +1344,13 @@ async function tPrint(){const T=TRIPS[TSEL];if(!T)return;const a=T.pts[0],z=T.pt
  // in the list of events below but cannot stand as a dot on the route, and a reader who
  // counted four oranges beside a legend saying five would conclude the map was broken.
  const EP=T.evs.filter(x=>okXY(x)&&Math.abs(+x.lat)<=90&&Math.abs(+x.lng)<=180);
+ // and a printed dot that sits on another printed dot is one mark, not two: the legend
+ // says how many marks the page can actually see, the same way the map groups them.
+ const SP=new Set(EP.map(x=>eSpot(x))).size;
  const MAP=JSON.stringify({u:B[0],o:{attribution:B[1],maxZoom:B[2],...B[3]},pts:FL,runs:PS,col:T.col,evs:EP.map(x=>[+x.lat,+x.lng])});
  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Trip ${T.n} - ${esc(a.vehicle_name||'')}</title><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"><\/script><style>*{print-color-adjust:exact;-webkit-print-color-adjust:exact}body{font:14px system-ui,sans-serif;margin:28px;color:#222}h2{margin:0 0 4px}h3{margin:22px 0 6px}small{color:#666}table{border-collapse:collapse;width:100%;margin-top:14px}td,th{border:1px solid #ccc;padding:6px 9px;text-align:left}td:first-child{background:#f5f5f5;font-weight:600;width:38%}th{background:#eee}.rt{margin-top:16px;break-inside:avoid;page-break-inside:avoid}#pm{height:430px;width:100%;border:1px solid #ccc;border-radius:10px;background:#f7fafc}.lg{font-size:12px;color:#444;margin:6px 0 0}</style></head><body>
  <h2>Trip ${T.n} details</h2><small>Fleet Tracker · Generated: ${new Date().toLocaleString()}</small>
- <div class="rt"><h3>Route map</h3><div id="pm"></div><p class="lg"><b style="color:${T.col}">&#9644;</b> driven route &nbsp;·&nbsp; <span style="color:#27a46a">&#9679;</span> start ${esc(ls||gk(a))} &nbsp;·&nbsp; <span style="color:#d9534f">&#9679;</span> end ${esc(le||gk(z))}${EP.length?' &nbsp;·&nbsp; <span style="color:#f28c28">&#9679;</span> '+EP.length+' event(s)':''}${EP.length<T.evs.length?' &nbsp;·&nbsp; '+(T.evs.length-EP.length)+' further event(s) listed below have no place of their own to draw':''}</p></div>
+ <div class="rt"><h3>Route map</h3><div id="pm"></div><p class="lg"><b style="color:${T.col}">&#9644;</b> driven route &nbsp;·&nbsp; <span style="color:#27a46a">&#9679;</span> start ${esc(ls||gk(a))} &nbsp;·&nbsp; <span style="color:#d9534f">&#9679;</span> end ${esc(le||gk(z))}${EP.length?' &nbsp;·&nbsp; <span style="color:#f28c28">&#9679;</span> '+EP.length+' event(s)':''}${SP<EP.length?' (shown as '+SP+' mark(s): '+(EP.length-SP)+' stand on the same spot as another)':''}${EP.length<T.evs.length?' &nbsp;·&nbsp; '+(T.evs.length-EP.length)+' further event(s) listed below have no place of their own to draw':''}</p></div>
  <table>${rows.map(r=>`<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join('')}</table>
  ${T.evs.length?`<h3>Events</h3><table><tr><th>Time</th><th>Event</th><th>Speed</th></tr>${T.evs.map(x=>`<tr><td style="background:none;font-weight:400">${new Date(x.recorded_at).toLocaleString()}</td><td>${esc(EVX(x.type)[0])}</td><td>${Math.round(x.speed||0)} km/h</td></tr>`).join('')}</table>`:''}
  <script>window.MAP=${MAP};window.addEventListener('load',function(){var m=L.map('pm',{zoomControl:false,attributionControl:false,scrollWheelZoom:false,maxZoom:MAP.o.maxZoom||19});L.tileLayer(MAP.u,MAP.o).addTo(m);var band=function(w,o,c){(MAP.runs||[MAP.pts]).forEach(function(r){L.polyline(r,{color:c,weight:w,opacity:o}).addTo(m)})};band(9,.95,'#fff');band(5,1,MAP.col);var dot=function(p,c){L.circleMarker(p,{radius:7,color:'#fff',weight:2,fillColor:c,fillOpacity:1}).addTo(m)};if(MAP.pts.length){dot(MAP.pts[0],'#27a46a');if(MAP.pts.length>1)dot(MAP.pts[MAP.pts.length-1],'#d9534f')}MAP.evs.forEach(function(e){L.circleMarker(e,{radius:5,color:'#fff',weight:1.5,fillColor:'#f28c28',fillOpacity:1}).addTo(m)});
@@ -1479,8 +1546,12 @@ function renderEvt(){
   noClip=film.filter(r=>!r.clip_path&&ago(r)>CLIPWAIT).length,
   waitClip=film.filter(r=>!r.clip_path&&ago(r)<=CLIPWAIT).length,
   cn=noClip?`<span class="chip chipO">${noClip} of ${film.length} camera events have no recording <span class="hp" data-tip="A recording is made on the handset and travels out with that driver's own events, so it reaches the server only when his phone next has a signal - and a phone that stayed out of signal past a quarter of an hour is a phone this page has stopped counting as still uploading. It is also missing from an event raised by an older build of the app, which kept its pictures on the phone and never sent them, and from an alert fired before the lens had given a single picture. Nothing here is a reason to drop the event: the reading in its Details column stands on its own.">?</span></span>`:'',
-  cw=waitClip?`<span class="chip chipB"><i class="fa-solid fa-hourglass-half"></i> ${waitClip} recording${waitClip==1?'':'s'} still on the handset</span>`:'';
- $('evFl').innerHTML=[tb,ch,cw,cn].filter(Boolean).join(' ')+((tb||ch)?' <button class="btn gh sm" onclick="evReset()"><i class="fa-solid fa-rotate-left"></i>Reset filter</button>':'');
+  cw=waitClip?`<span class="chip chipB"><i class="fa-solid fa-hourglass-half"></i> ${waitClip} recording${waitClip==1?'':'s'} still on the handset</span>`:'',
+  // the switch that judges the driver's face is the one setting this table cannot show a
+  // row for: with it off no handset looks at anything, and the empty Events list then
+  // reads the same as a fleet that drives carefully - or as a camera nobody installed.
+  off=SET.dms_on==='1'?'':`<span class="chip chipO"><i class="fa-solid fa-video-slash"></i> Driver camera is switched off for this fleet <span class="hp" data-tip="No handset watches the driver while this stays off: no fatigue, distraction, phone, yawning, eating, drinking, smoking, blocked-camera alert and no recording will ever appear here, however the nine rules below are set. It ships off on purpose - a build that has just learned to look at a face must not start looking at every fleet the moment it updates - so switch it on yourself under &lt;b&gt;Configuration &gt; Driver camera&lt;/b&gt; once the drivers have been told. The phone says the same thing to the driver when a trip starts unwatched.">?</span> <button class="btn gh sm" onclick="switchTab('cfg')">Turn it on</button></span>`;
+ $('evFl').innerHTML=[off,tb,ch,cw,cn].filter(Boolean).join(' ')+((tb||ch)?' <button class="btn gh sm" onclick="evReset()"><i class="fa-solid fa-rotate-left"></i>Reset filter</button>':'');
  // the tiles count without the type filter, so every type stays clickable
  const bt=cnt(base,r=>r.type),ct=(c,i,v,l,js,on)=>tile(c,i,v,l).replace('class="card kpi ',`onclick="${js}" title="Click to show only these" class="card kpi click${on?' on':''} `);
  $('evK').innerHTML=ct('gy','fa-bell',base.length,'Total events',"EVF.type=undefined;renderEvt()",!EVF.type)+K.map(k=>ct(EV[k][3],EV[k][1],bt[k]||0,EV[k][0],`evSet('type','${k}')`,EVF.type===k)).join('');
@@ -1694,19 +1765,23 @@ function muteTog(){MUTE=!MUTE;localStorage.mute=MUTE?'1':'0';if(MUTE)stopTone();
  logAct('Alert sounds',MUTE?'muted':'audible')}
 // ---- voice messages. The phone speaks them with its own text-to-speech; the
 // ▶ buttons here use the browser's voice so the wording can be checked.
-const VLANG={en:['English','en-US'],ar:['Arabic','ar-SA'],hi:['Hindi','hi-IN'],ur:['Urdu','ur-PK']};
+const VLANG={en:['English','en-US'],ar:['Arabic','ar-SA'],hi:['Hindi','hi-IN'],ur:['Urdu','ur-PK'],ku:['Kurdish (Kurmanji)','ku'],ckb:['Kurdish (Sorani)','ckb-IQ']};
 const VMSG={
- en:{overspeed:'You are over the speed limit. Please slow down.',harsh_braking:'Harsh braking detected. Keep a safe distance and brake gently.',harsh_acceleration:'Harsh acceleration detected. Please accelerate smoothly.',dms_fatigue:'You look tired. Please take a break.',dms_distraction:'Please keep your eyes on the road.',dms_phone_use:'Please do not use a phone while driving.',dms_cam_blocked:'The driver camera is covered. Keep the view clear.',dms_yawning:'You are yawning. Please take a break.',dms_talking:'Please keep conversations short while driving.',dms_eating:'Please do not eat while driving.',dms_drinking:'Please do not drink while driving.',dms_smoking:'Please keep your hands on the wheel.'},
- ar:{overspeed:'لقد تجاوزت حد السرعة. يرجى تخفيف السرعة.',harsh_braking:'تم رصد فرملة قوية. حافظ على مسافة آمنة واضغط على الفرامل بهدوء.',harsh_acceleration:'تم رصد تسارع قوي. يرجى التسارع بسلاسة.',dms_fatigue:'يبدو أنك متعب. يرجى أخذ استراحة.',dms_distraction:'رجاءً أبقِ ناظريك على الطريق.',dms_phone_use:'رجاءً لا تستخدم الهاتف أثناء القيادة.',dms_cam_blocked:'كاميرا السائق مغطاة. أبقِ الرؤية واضحة.',dms_yawning:'أنت تتثاءب. يرجى أخذ استراحة.',dms_talking:'رجاءً اجعل المحادثات قصيرة أثناء القيادة.',dms_eating:'رجاءً لا تأكل أثناء القيادة.',dms_drinking:'رجاءً لا تشرب أثناء القيادة.',dms_smoking:'رجاءً أبقِ يديك على المقود.'},
- hi:{overspeed:'आप गति सीमा से ऊपर हैं। कृपया गति कम करें।',harsh_braking:'तेज़ ब्रेक लगाया गया। सुरक्षित दूरी रखें और धीरे ब्रेक लगाएँ।',harsh_acceleration:'तेज़ रफ़्तार पकड़ी गई। कृपया धीरे-धीरे गति बढ़ाएँ।',dms_fatigue:'आप थके हुए लगते हैं। कृपया विश्राम करें।',dms_distraction:'कृपया नज़र सड़क पर रखें।',dms_phone_use:'कृपया ड्राइव करते समय फ़ोन का उपयोग न करें।',dms_cam_blocked:'ड्राइवर कैमरा ढका है। दृश्य साफ़ रखें।',dms_yawning:'आप उबासी ले रहे हैं। कृपया विश्राम करें।',dms_talking:'कृपया ड्राइव करते समय बातें छोटी रखें।',dms_eating:'कृपया ड्राइव करते समय कुछ न खाएँ।',dms_drinking:'कृपया ड्राइव करते समय कुछ न पिएँ।',dms_smoking:'कृपया अपने हाथ स्टीयरिंग पर रखें।'},
- ur:{overspeed:'آپ رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',harsh_braking:'سخت بریک لگائی گئی۔ محفوظ فاصلہ رکھیں اور آہستہ بریک لگائیں۔',harsh_acceleration:'تیز رفتاری پکڑی گئی۔ براہ کرم آہستہ آہستہ رفتار بڑھائیں۔',dms_fatigue:'آپ تھکے ہوئے لگتے ہیں۔ براہ کرم آرام کریں۔',dms_distraction:'براہ کرم نظر سڑک پر رکھیں۔',dms_phone_use:'براہ کرم ڈرائیو کرتے وقت فون استعمال نہ کریں۔',dms_cam_blocked:'ڈرائیور کیمیر ڈھکا ہوا ہے۔ دید صاف رکھیں۔',dms_yawning:'آپ اونگھ رہے ہیں۔ براہ کرم آرام کریں۔',dms_talking:'براہ کرم ڈرائیو کرتے وقت باتیں مختصر رکھیں۔',dms_eating:'براہ کرم ڈرائیو کے دوران کھانا نہ کھائیں۔',dms_drinking:'براہ کرم ڈرائیو کے دوران کچھ نہ پئیں۔',dms_smoking:'براہ کرم اپنے ہاتھ اسٹیئرنگ پر رکھیں۔'}};
+ en:{overspeed:'You are over the speed limit. Please slow down.',harsh_braking:'Harsh braking detected. Keep a safe distance and brake gently.',harsh_acceleration:'Harsh acceleration detected. Please accelerate smoothly.',zone_enter:'You have entered a restricted zone.',zone_exit:'You have left the zone.',zone_overspeed:'You are over the speed limit for this zone. Please slow down.',dms_fatigue:'You look tired. Please take a break.',dms_distraction:'Please keep your eyes on the road.',dms_phone_use:'Please do not use a phone while driving.',dms_cam_blocked:'The driver camera is covered. Keep the view clear.',dms_yawning:'You are yawning. Please take a break.',dms_talking:'Please keep conversations short while driving.',dms_eating:'Please do not eat while driving.',dms_drinking:'Please do not drink while driving.',dms_smoking:'Please keep your hands on the wheel.'},
+ ar:{overspeed:'لقد تجاوزت حد السرعة. يرجى تخفيف السرعة.',harsh_braking:'تم رصد فرملة قوية. حافظ على مسافة آمنة واضغط على الفرامل بهدوء.',harsh_acceleration:'تم رصد تسارع قوي. يرجى التسارع بسلاسة.',zone_enter:'لقد دخلت المنطقة المحددة.',zone_exit:'لقد غادرت المنطقة المحددة.',zone_overspeed:'لقد تجاوزت السرعة المحددة داخل هذه المنطقة. يرجى تخفيف السرعة.',dms_fatigue:'يبدو أنك متعب. يرجى أخذ استراحة.',dms_distraction:'رجاءً أبقِ ناظريك على الطريق.',dms_phone_use:'رجاءً لا تستخدم الهاتف أثناء القيادة.',dms_cam_blocked:'كاميرا السائق مغطاة. أبقِ الرؤية واضحة.',dms_yawning:'أنت تتثاءب. يرجى أخذ استراحة.',dms_talking:'رجاءً اجعل المحادثات قصيرة أثناء القيادة.',dms_eating:'رجاءً لا تأكل أثناء القيادة.',dms_drinking:'رجاءً لا تشرب أثناء القيادة.',dms_smoking:'رجاءً أبقِ يديك على المقود.'},
+ hi:{overspeed:'आप गति सीमा से ऊपर हैं। कृपया गति कम करें।',harsh_braking:'तेज़ ब्रेक लगाया गया। सुरक्षित दूरी रखें और धीरे ब्रेक लगाएँ।',harsh_acceleration:'तेज़ रफ़्तार पकड़ी गई। कृपया धीरे-धीरे गति बढ़ाएँ।',zone_enter:'आप निर्धारित क्षेत्र में प्रवेश कर गए हैं।',zone_exit:'आप निर्धारित क्षेत्र से बाहर निकल गए हैं।',zone_overspeed:'इस क्षेत्र की गति सीमा से ऊपर चल रहे हैं। कृपया गति कम करें।',dms_fatigue:'आप थके हुए लगते हैं। कृपया विश्राम करें।',dms_distraction:'कृपया नज़र सड़क पर रखें।',dms_phone_use:'कृपया ड्राइव करते समय फ़ोन का उपयोग न करें।',dms_cam_blocked:'ड्राइवर कैमरा ढका है। दृश्य साफ़ रखें।',dms_yawning:'आप उबासी ले रहे हैं। कृपया विश्राम करें।',dms_talking:'कृपया ड्राइव करते समय बातें छोटी रखें।',dms_eating:'कृपया ड्राइव करते समय कुछ न खाएँ।',dms_drinking:'कृपया ड्राइव करते समय कुछ न पिएँ।',dms_smoking:'कृपया अपने हाथ स्टीयरिंग पर रखें।'},
+ ur:{overspeed:'آپ رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',harsh_braking:'سخت بریک لگائی گئی۔ محفوظ فاصلہ رکھیں اور آہستہ بریک لگائیں۔',harsh_acceleration:'تیز رفتاری پکڑی گئی۔ براہ کرم آہستہ آہستہ رفتار بڑھائیں۔',zone_enter:'آپ مقررہ علاقے میں داخل ہو گئے ہیں۔',zone_exit:'آپ مقررہ علاقے سے باہر نکل گئے ہیں۔',zone_overspeed:'اس علاقے کی رفتار کی حد سے اوپر جا رہے ہیں۔ براہ کرم رفتار کم کریں۔',dms_fatigue:'آپ تھکے ہوئے لگتے ہیں۔ براہ کرم آرام کریں۔',dms_distraction:'براہ کرم نظر سڑک پر رکھیں۔',dms_phone_use:'براہ کرم ڈرائیو کرتے وقت فون استعمال نہ کریں۔',dms_cam_blocked:'ڈرائیور کیمیر ڈھکا ہوا ہے۔ دید صاف رکھیں۔',dms_yawning:'آپ اونگھ رہے ہیں۔ براہ کرم آرام کریں۔',dms_talking:'براہ کرم ڈرائیو کرتے وقت باتیں مختصر رکھیں۔',dms_eating:'براہ کرم ڈرائیو کے دوران کھانا نہ کھائیں۔',dms_drinking:'براہ کرم ڈرائیو کے دوران کچھ نہ پئیں۔',dms_smoking:'براہ کرم اپنے ہاتھ اسٹیئرنگ پر رکھیں۔'},
+ ku:{overspeed:'Tu ji leza destûrkirî zêdetir diçî. Ji kerema xwe hêdî bibe.',harsh_braking:'Frenandina tund hat dîtin. Mesafeya ewle biparêze û hêdî frene bike.',harsh_acceleration:'Lezgirtina tund hat dîtin. Ji kerema xwe bi nermî lezê zêde bike.',zone_enter:'Tu ketî nav herêma qedexekirî.',zone_exit:'Tu ji herêmê derketî.',zone_overspeed:'Di vê herêmê de tu ji leza destûrkirî zêdetir diçî. Ji kerema xwe hêdî bibe.',dms_fatigue:'Tu westiyayî xuya dikî. Ji kerema xwe bêhnvedanê bike.',dms_distraction:'Ji kerema xwe çavên xwe li rê bihêle.',dms_phone_use:'Ji kerema xwe di dema ajotinê de telefonê bikar neyne.',dms_cam_blocked:'Kamera ajokerê girtî ye. Dîmenê vekirî bihêle.',dms_yawning:'Tu kenimê dikî. Ji kerema xwe bêhnvedanê bike.',dms_talking:'Ji kerema xwe di dema ajotinê de axaftinê kurt bike.',dms_eating:'Ji kerema xwe di dema ajotinê de nexwe.',dms_drinking:'Ji kerema xwe di dema ajotinê de nevexwe.',dms_smoking:'Ji kerema xwe destên xwe li steerîngê biparêze.'},
+ ckb:{overspeed:'لە خێرایی ڕێپێدراو خێراتر دەڕۆیت. تکایە خێراییەکەت کەم بکەرەوە.',harsh_braking:'بڕانی تۆزگوێزە تۆمارکرا. مەسافەی سەلامەت بپارێزە و بە هێواشی مۆترە بکە.',harsh_acceleration:'خێرابوونەوەی توند تۆمارکرا. تکایە بە هێواشی خێرایی زیاد بکە.',zone_enter:'چوویتەتە ناو ناوچەی قەدەغەکراو.',zone_exit:'لە ناوچەکە دەرچوویت.',zone_overspeed:'لەم ناوچەیەدا لە خێرایی ڕێپێدراو خێراتر دەڕۆیت. تکایە خێراییەکەت کەم بکەرەوە.',dms_fatigue:'ماندوو دەردەکەویت. تکایە پشوو بدە.',dms_distraction:'تکایە سەرنجت لەسەر شەقام بێت.',dms_phone_use:'تکایە لە کاتی شۆفێریکردندا مۆبایل بەکارمەهێنە.',dms_cam_blocked:'کامێرای شۆفێر داخراوە. دیمەنەکە کراوە بپارێزە.',dms_yawning:'کێفت دەکەیت. تکایە پشوو بدە.',dms_talking:'تکایە لە کاتی شۆفێریکردندا قسەکانت کورت بکەرەوە.',dms_eating:'تکایە لە کاتی شۆفێریکردندا خواردن نخۆ.',dms_drinking:'تکایە لە کاتی شۆفێریکردندا خواردەمەنی نخۆ.',dms_smoking:'تکایە دەستەکانت لەسەر سێرنووز ڕابگرە.'}};
 let VOC=[];const sv=()=>{try{VOC=(window.speechSynthesis?speechSynthesis.getVoices():[])||[]}catch(e){VOC=[]}};
 sv();if(window.speechSynthesis)speechSynthesis.addEventListener('voiceschanged',sv);
 function say(lg,txt){const S=window.speechSynthesis;if(!S||!window.SpeechSynthesisUtterance)return toast('This browser cannot speak. The phone uses its own voice.');
- if(!VOC.length)sv();const code=(VLANG[lg]||VLANG.en)[1],base=code.slice(0,2);
+ if(!VOC.length)sv();const code=(VLANG[lg]||VLANG.en)[1],base=code.split('-')[0];
  // an exact tag first, then any voice for the same language, then one whose name
- // mentions it (many desktop voices report only "Google العربية" style tags)
- const v=VOC.find(x=>x.lang===code)||VOC.find(x=>(x.lang||'').slice(0,2)===base)||VOC.find(x=>new RegExp(VLANG[lg][0],'i').test(x.name));
+ // mentions it (many desktop voices report only "Google العربية" style tags). The language
+ // tag is taken whole, because Kurdish Sorani reports as ckb - two letters would cut it
+ // to ck and find no voice at all.
+ const v=VOC.find(x=>x.lang===code)||VOC.find(x=>(x.lang||'').split('-')[0]===base)||VOC.find(x=>new RegExp(VLANG[lg][0],'i').test(x.name));
  const u=new SpeechSynthesisUtterance(txt);u.lang=v?v.lang:code;if(v)u.voice=v;u.rate=1;u.pitch=1;
  S.cancel();S.speak(u);
  if(!v&&lg!=='en')toast('This computer has no '+(VLANG[lg]||['that language'])[0]+' voice. Add it in Windows Settings > Time & language > Speech & recognition > Add voices; the phone speaks it anyway.',1)}
@@ -1877,10 +1952,20 @@ function geoVis(){const q=[];
  document.querySelectorAll('#trT td.gx').forEach(td=>{if(td.offsetParent!==null&&!(td.dataset.gk in GC))q.push(td.dataset.gk)});
  const rest=tr.slice(0,2000).map(gk).filter(k=>!(k in GC));
  GQ=[...new Set(q.concat(rest))].slice(0,600);geoRun()}
+// The Position column is the second of driving the supervisor is reading, and the question
+// after it is always where that second happened on the road - so the coordinates open
+// Historical Tracking on this vehicle, framed on the quarter hour around this fix, with the
+// map standing on this spot. A fix the handset never placed carries the same dash every
+// other column of this table uses: nothing to open, and it sorts below the places.
+// (PLI was already taken at the top of this file by the saved-places dialog.)
+const POSI=6;
+const posTxt=r=>okXY(r)?(+r.lat).toFixed(5)+', '+(+r.lng).toFixed(5):'-';
+function posCell(r){if(!okXY(r))return '-';
+ return `<a href="#" title="Open this position in Historical Tracking" onclick="goHist('${r.vehicle_id}','${r.recorded_at}',${+r.lat},${+r.lng});return false"><i class="fa-solid fa-map-location-dot"></i> ${posTxt(r)}</a>`}
 function trTable(){
  const H=['Date','Time','Vehicle Name','Driver Name','Vehicle Status','Location','Position','Accuracy (m)','Elevation (m)','Direction (°)','Ignition','Speed','Accel (km/h/s)','Battery (%)'];
- const R=r=>{const d=new Date(r.recorded_at);return [DD(d),d.toLocaleTimeString(),r.vehicle_name||'',r.driver_name||'',stt(r),plName(r)||'',(+r.lat).toFixed(5)+', '+(+r.lng).toFixed(5),r.accuracy??'',r.altitude!=null?Math.round(r.altitude):'',r.heading!=null?Math.round(r.heading):'',r.ignition===false?0:1,Math.round(r.speed||0),r.accel??'',r.battery_pct!=null?Math.round(r.battery_pct)+(r.charging?' ⚡':''):'']};
- $('trT').innerHTML=`<table><tr>${H.map(h=>`<th>${h}</th>`).join('')}</tr>${tr.slice(0,2000).map(r=>{const c=R(r);return `<tr>${c.map((v,i)=>`<td${i===GLI?' class="gx" data-gk="'+gk(r)+'"':''}>${i===GLI?(v?esc(v):'…'):esc(v)}</td>`).join('')}</tr>`}).join('')}</table>`+(tr.length>2000?`<p style="padding:8px">Showing the first 2000 of ${tr.length} rows. Exports include all rows.</p>`:'');
+ const R=r=>{const d=new Date(r.recorded_at);return [DD(d),d.toLocaleTimeString(),r.vehicle_name||'',r.driver_name||'',stt(r),plName(r)||'',posTxt(r),r.accuracy??'',r.altitude!=null?Math.round(r.altitude):'',r.heading!=null?Math.round(r.heading):'',r.ignition===false?0:1,Math.round(r.speed||0),r.accel??'',r.battery_pct!=null?Math.round(r.battery_pct)+(r.charging?' ⚡':''):'']};
+ $('trT').innerHTML=`<table><tr>${H.map(h=>`<th>${h}</th>`).join('')}</tr>${tr.slice(0,2000).map(r=>{const c=R(r);return `<tr>${c.map((v,i)=>`<td${i===GLI?' class="gx" data-gk="'+gk(r)+'"':''}>${i===POSI?posCell(r):i===GLI?(v?esc(v):'…'):esc(v)}</td>`).join('')}</tr>`}).join('')}</table>`+(tr.length>2000?`<p style="padding:8px">Showing the first 2000 of ${tr.length} rows. Exports include all rows.</p>`:'');
  tools($('trT'),{full:()=>({head:H,rows:tr.map(R)}),page:geoVis});geoVis()}
 // ---- shared tools: date ranges, tables, panels
 const PRE=[['today','Today'],['yest','Yesterday'],['24h','Last 24 hrs'],['lw','Last Week (previous Sun-Sat)'],['w','A week ago (last 7 days)'],['lm','Last Month (previous month)'],['m','A month ago (last 30 days)'],['ly','Last Year (previous year)'],['y','A year ago (last 365 days)'],['custom','Custom']];
@@ -1943,7 +2028,28 @@ addEventListener('scroll',()=>$('tip').classList.remove('on'),true);
 // as blank in a spreadsheet it looks like the event has no recording, which is exactly the
 // opposite of what it means.
 const cv=c=>{if(c.querySelector('[data-clip]'))return'Yes';const m=c.querySelector('.ms');if(m)return[...m.querySelectorAll('input.it:checked')].map(i=>i.nextElementSibling.textContent).join(', ');const p=c.querySelector('.pick');if(p)return[...p.querySelectorAll('input:checked')].map(i=>i.nextElementSibling.textContent).join(', ');const i=c.querySelector('input,select');return i?(i.type==='checkbox'?(i.checked?'Yes':'No'):i.tagName==='SELECT'?(i.multiple?[...i.selectedOptions].map(o=>o.text).join(', '):(i.options[i.selectedIndex]||{}).text||''):i.value):c.innerText.trim()};
-const ky=v=>{const m=/^(\d\d)\/(\d\d)\/(\d{4})\s*(\d\d:\d\d:\d\d)?/.exec(v);if(m)return m[3]+m[2]+m[1]+(m[4]||'');const n=parseFloat(v);return isNaN(n)?String(v).toLowerCase():n};
+// What a column is sorted by. A cell holds the words a person reads - "02/11/2026 08:03:25",
+// "01:30:00", "1,234.5 km", "-" - and none of those compare as written: a date read as text
+// orders by the day before the month, an hh:mm:ss length read as a number is only its hours
+// (so every duration under an hour ties), parseFloat stops at the first comma, and a lone
+// dash landing among the numbers makes the whole column fall back to comparing "9" against
+// "10" as text. Each shape is turned into what it actually means, and a column that holds
+// both kinds never compares one against the other.
+// The unit a fleet table hangs on the end of a number - %, km/h, °, m, the charging
+// bolt - carries no digits and no comma, so it is read as the tail of the quantity and
+// "85%" means 85. Anything that keeps a second group of digits behind a comma or a space
+// - a pair of coordinates, a phone number - is not one quantity and stays a word.
+const KY_DTM=/^(\d\d)\/(\d\d)\/(\d{4})(?:[ T]+(\d\d):(\d\d)(?::(\d\d))?)?/,
+ KY_HMS=/^(\d{1,3}):(\d\d):(\d\d)$/,
+ KY_NUM=/^[-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?[\s\u00A0]*[^\d,;\s]{0,8}$/;
+function ky(v){const s=String(v==null?'':v).trim();
+ if(!s||s==='-'||s==='—'||s==='–')return{g:3,n:0,s:''};
+ const d=KY_DTM.exec(s);
+ if(d)return{g:1,n:+new Date(+d[3],+d[2]-1,+d[1],+(d[4]||0),+(d[5]||0),+(d[6]||0)).getTime()||0,s:''};
+ const h=KY_HMS.exec(s);if(h)return{g:2,n:(+h[1])*3600+(+h[2])*60+(+h[3]),s:''};
+ if(KY_NUM.test(s)){const n=parseFloat(s.replace(/,/g,''));if(Number.isFinite(n))return{g:0,n,s:''}}
+ // text: digits inside it read as numbers, so Trip 2 comes before Trip 10
+ return{g:4,n:0,s:s.toLowerCase()}}
 const RG={hist:['hf','ht'],evt:['ev_f','ev_to'],trip:['tr_f','tr_t'],rep:['rp_f','rp_t'],act:['ac_f','ac_to']};
 const dtv=id=>{const d=new Date($(id).value);return isNaN(d)?$(id).value:d.toLocaleString()};
 function rangeInfo(){const s=document.querySelector('main section.on'),k=RG[s?s.id:'']||[];return k.length?dtv(k[0])+' → '+dtv(k[1]):''}
@@ -2018,7 +2124,21 @@ function tools(el,opt={}){const t=el.querySelector('table');if(!t)return;
   if(opt.page)opt.page()}
  bar.querySelector('.ts').oninput=e=>{mask=e.target.value.toLowerCase();cur=1;apply()};
  bar.querySelector('.ps').onchange=e=>{TPS=e.target.value;localStorage.tps=TPS;cur=1;apply()};
- hs.forEach((h,i)=>{if(!h.innerText.trim())return;h.title='Click to sort';h.onclick=()=>{const dir=h._d=-(h._d||-1);dr().sort((a,b)=>{const x=ky(cv(a.cells[i])),y=ky(cv(b.cells[i]));return (typeof x==='number'&&typeof y==='number'?x-y:String(x).localeCompare(String(y)))*dir}).forEach(r=>t.tBodies[0].appendChild(r));apply()}});
+ hs.forEach((h,i)=>{if(!h.innerText.trim())return;h.title='Click to sort';h.onclick=()=>{
+  const list=dr();list.forEach((r,j)=>{r._k=[ky(cv(r.cells[i])),j]});
+  // a header holding moments or lengths opens on the newest and the longest first: whoever
+  // clicks a time column is looking for what just happened, not for the oldest row in the
+  // period, and there was no way to tell which of the two the first click had given you
+  const tm=list.some(r=>r._k[0].g===1||r._k[0].g===2),dir=h._d=h._d?-(h._d):(tm?-1:1);
+  list.sort((a,b)=>{const A=a._k[0],B=b._k[0];
+   if((A.g===3)!==(B.g===3))return A.g===3?1:-1;
+   return (A.g!==B.g?A.g-B.g:(A.g===4?A.s.localeCompare(B.s,navigator.language||undefined,{numeric:true,sensitivity:'base'}):A.n-B.n))*dir||(a._k[1]-b._k[1])});
+  list.forEach(r=>t.tBodies[0].appendChild(r));
+  hs.forEach(o=>{const m=o.querySelector('.sor');if(m)m.remove()});
+  const mk=document.createElement('i');mk.className='sor fa-solid fa-caret-'+(dir<0?'down':'up');
+  mk.style.cssText='margin-left:5px;opacity:.8';h.appendChild(mk);
+  h.title='Sorted '+(tm?(dir<0?'newest first':'oldest first'):(dir<0?'Z to A':'A to Z'))+' - click for the other way';
+  apply()}});
  const data=()=>{const keep=hs.map((h,i)=>i).filter(i=>!off(i));
   if(opt.full){const f=opt.full();return {head:keep.map(i=>f.head[i]),rows:f.rows.map(r=>keep.map(i=>r[i]))}}
   const c=keep.map(i=>[nm[i],i]).filter(x=>x[0]);
