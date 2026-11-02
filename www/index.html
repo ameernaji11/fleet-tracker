@@ -704,24 +704,38 @@ async function askNotif(){await logAct('Allowed permissions');
  // a quiet channel for the banners posted while the app is on screen, so the same
  // breach never sounds twice at once
  try{await CapPlugins.LN.registerChannel({id:'fleet.quiet',name:'Fleet alerts: in app',description:'Shown while the app is open',importance:2,visibility:1,vibration:false});CHAN=true}catch(e){}}
-// ---- spoken safety warnings. English, Arabic, Hindi and Urdu; the language and
-// the on/off switches come from the dashboard Configuration page.
-const VLANG={en:['English','en-US'],ar:['Arabic','ar-SA'],hi:['Hindi','hi-IN'],ur:['Urdu','ur-PK']};
+// ---- spoken safety warnings. English, Arabic, Kurdish in both scripts, Hindi and Urdu;
+// the language and the on/off switches come from the dashboard Configuration page.
+const VLANG={en:['English','en-US'],ar:['Arabic','ar-SA'],hi:['Hindi','hi-IN'],ur:['Urdu','ur-PK'],ku:['Kurdish (Kurmanji)','ku'],ckb:['Kurdish (Sorani)','ckb-IQ']};
 const VMSG={
  en:{overspeed:'You are over the speed limit. Please slow down.',harsh_braking:'Harsh braking detected. Keep a safe distance and brake gently.',harsh_acceleration:'Harsh acceleration detected. Please accelerate smoothly.',zone_enter:'You have entered a restricted zone.',zone_exit:'You have left the zone.',zone_overspeed:'You are over the speed limit for this zone. Please slow down.',dms_fatigue:'You look tired. Please take a break.',dms_distraction:'Please keep your eyes on the road.',dms_phone_use:'Please do not use a phone while driving.',dms_cam_blocked:'The driver camera is covered. Keep the view clear.',dms_yawning:'You are yawning. Please take a break.',dms_talking:'Please keep conversations short while driving.',dms_eating:'Please do not eat while driving.',dms_drinking:'Please do not drink while driving.',dms_smoking:'Please keep your hands on the wheel.'},
  ar:{overspeed:'لقد تجاوزت حد السرعة. يرجى تخفيف السرعة.',harsh_braking:'تم رصد فرملة قوية. حافظ على مسافة آمنة واضغط على الفرامل بهدوء.',harsh_acceleration:'تم رصد تسارع قوي. يرجى التسارع بسلاسة.',zone_enter:'لقد دخلت المنطقة المحددة.',zone_exit:'لقد غادرت المنطقة المحددة.',zone_overspeed:'لقد تجاوزت السرعة المحددة داخل هذه المنطقة. يرجى تخفيف السرعة.',dms_fatigue:'يبدو أنك متعب. يرجى أخذ استراحة.',dms_distraction:'رجاءً أبقِ ناظريك على الطريق.',dms_phone_use:'رجاءً لا تستخدم الهاتف أثناء القيادة.',dms_cam_blocked:'كاميرا السائق مغطاة. أبقِ الرؤية واضحة.',dms_yawning:'أنت تتثاءب. يرجى أخذ استراحة.',dms_talking:'رجاءً اجعل المحادثات قصيرة أثناء القيادة.',dms_eating:'رجاءً لا تأكل أثناء القيادة.',dms_drinking:'رجاءً لا تشرب أثناء القيادة.',dms_smoking:'رجاءً أبقِ يديك على المقود.'},
  hi:{overspeed:'आप गति सीमा से ऊपर हैं। कृपया गति कम करें।',harsh_braking:'तेज़ ब्रेक लगाया गया। सुरक्षित दूरी रखें और धीरे ब्रेक लगाएँ।',harsh_acceleration:'तेज़ रफ़्तार पकड़ी गई। कृपया धीरे-धीरे गति बढ़ाएँ।',zone_enter:'आप निर्धारित क्षेत्र में प्रवेश कर गए हैं।',zone_exit:'आप निर्धारित क्षेत्र से बाहर निकल गए हैं।',zone_overspeed:'इस क्षेत्र की गति सीमा से ऊपर चल रहे हैं। कृपया गति कम करें।',dms_fatigue:'आप थके हुए लगते हैं। कृपया विश्राम करें।',dms_distraction:'कृपया नज़र सड़क पर रखें।',dms_phone_use:'कृपया ड्राइव करते समय फ़ोन का उपयोग न करें।',dms_cam_blocked:'ड्राइवर कैमरा ढका है। दृश्य साफ़ रखें।',dms_yawning:'आप उबासी ले रहे हैं। कृपया विश्राम करें।',dms_talking:'कृपया ड्राइव करते समय बातें छोटी रखें।',dms_eating:'कृपया ड्राइव करते समय कुछ न खाएँ।',dms_drinking:'कृपया ड्राइव करते समय कुछ न पिएँ।',dms_smoking:'कृपया अपने हाथ स्टीयरिंग पर रखें।'},
- ur:{overspeed:'آپ رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',harsh_braking:'سخت بریک لگائی گئی۔ محفوظ فاصلہ رکھیں اور آہستہ بریک لگائیں۔',harsh_acceleration:'تیز رفتاری پکڑی گئی۔ براہ کرم آہستہ آہستہ رفتار بڑھائیں۔',zone_enter:'آپ مقررہ علاقے میں داخل ہو گئے ہیں۔',zone_exit:'آپ مقررہ علاقے سے باہر نکل گئے ہیں۔',zone_overspeed:'اس علاقے کی رفتار کی حد سے اوپر جا رہے ہیں۔ براہ کرم رفتار کم کریں۔',dms_fatigue:'آپ تھکے ہوئے لگتے ہیں۔ براہ کرم آرام کریں۔',dms_distraction:'براہ کرم نظر سڑک پر رکھیں۔',dms_phone_use:'براہ کرم ڈرائیو کرتے وقت فون استعمال نہ کریں۔',dms_cam_blocked:'ڈرائیور کیمیر ڈھکا ہوا ہے۔ دید صاف رکھیں۔',dms_yawning:'آپ اونگھ رہے ہیں۔ براہ کرم آرام کریں۔',dms_talking:'براہ کرم ڈرائیو کرتے وقت باتیں مختصر رکھیں۔',dms_eating:'براہ کرم ڈرائیو کے دوران کھانا نہ کھائیں۔',dms_drinking:'براہ کرم ڈرائیو کے دوران کچھ نہ پئیں۔',dms_smoking:'براہ کرم اپنے ہاتھ اسٹیئرنگ پر رکھیں۔'}};
+ ur:{overspeed:'آپ رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',harsh_braking:'سخت بریک لگائی گئی۔ محفوظ فاصلہ رکھیں اور آہستہ بریک لگائیں۔',harsh_acceleration:'تیز رفتاری پکڑی گئی۔ براہ کرم آہستہ آہستہ رفتار بڑھائیں۔',zone_enter:'آپ مقررہ علاقے میں داخل ہو گئے ہیں۔',zone_exit:'آپ مقررہ علاقے سے باہر نکل گئے ہیں۔',zone_overspeed:'اس علاقے کی رفتار کی حد سے اوپر جا رہے ہیں۔ براہ کرم رفتار کم کریں۔',dms_fatigue:'آپ تھکے ہوئے لگتے ہیں۔ براہ کرم آرام کریں۔',dms_distraction:'براہ کرم نظر سڑک پر رکھیں۔',dms_phone_use:'براہ کرم ڈرائیو کرتے وقت فون استعمال نہ کریں۔',dms_cam_blocked:'ڈرائیور کیمیر ڈھکا ہوا ہے۔ دید صاف رکھیں۔',dms_yawning:'آپ اونگھ رہے ہیں۔ براہ کرم آرام کریں۔',dms_talking:'براہ کرم ڈرائیو کرتے وقت باتیں مختصر رکھیں۔',dms_eating:'براہ کرم ڈرائیو کے دوران کھانا نہ کھائیں۔',dms_drinking:'براہ کرم ڈرائیو کے دوران کچھ نہ پئیں۔',dms_smoking:'براہ کرم اپنے ہاتھ اسٹیئرنگ پر رکھیں۔'},
+ ku:{overspeed:'Tu ji leza destûrkirî zêdetir diçî. Ji kerema xwe hêdî bibe.',harsh_braking:'Frenandina tund hat dîtin. Mesafeya ewle biparêze û hêdî frene bike.',harsh_acceleration:'Lezgirtina tund hat dîtin. Ji kerema xwe bi nermî lezê zêde bike.',zone_enter:'Tu ketî nav herêma qedexekirî.',zone_exit:'Tu ji herêmê derketî.',zone_overspeed:'Di vê herêmê de tu ji leza destûrkirî zêdetir diçî. Ji kerema xwe hêdî bibe.',dms_fatigue:'Tu westiyayî xuya dikî. Ji kerema xwe bêhnvedanê bike.',dms_distraction:'Ji kerema xwe çavên xwe li rê bihêle.',dms_phone_use:'Ji kerema xwe di dema ajotinê de telefonê bikar neyne.',dms_cam_blocked:'Kamera ajokerê girtî ye. Dîmenê vekirî bihêle.',dms_yawning:'Tu kenimê dikî. Ji kerema xwe bêhnvedanê bike.',dms_talking:'Ji kerema xwe di dema ajotinê de axaftinê kurt bike.',dms_eating:'Ji kerema xwe di dema ajotinê de nexwe.',dms_drinking:'Ji kerema xwe di dema ajotinê de nevexwe.',dms_smoking:'Ji kerema xwe destên xwe li steerîngê biparêze.'},
+ ckb:{overspeed:'لە خێرایی ڕێپێدراو خێراتر دەڕۆیت. تکایە خێراییەکەت کەم بکەرەوە.',harsh_braking:'بڕانی تۆزگوێزە تۆمارکرا. مەسافەی سەلامەت بپارێزە و بە هێواشی مۆترە بکە.',harsh_acceleration:'خێرابوونەوەی توند تۆمارکرا. تکایە بە هێواشی خێرایی زیاد بکە.',zone_enter:'چوویتەتە ناو ناوچەی قەدەغەکراو.',zone_exit:'لە ناوچەکە دەرچوویت.',zone_overspeed:'لەم ناوچەیەدا لە خێرایی ڕێپێدراو خێراتر دەڕۆیت. تکایە خێراییەکەت کەم بکەرەوە.',dms_fatigue:'ماندوو دەردەکەویت. تکایە پشوو بدە.',dms_distraction:'تکایە سەرنجت لەسەر شەقام بێت.',dms_phone_use:'تکایە لە کاتی شۆفێریکردندا مۆبایل بەکارمەهێنە.',dms_cam_blocked:'کامێرای شۆفێر داخراوە. دیمەنەکە کراوە بپارێزە.',dms_yawning:'کێفت دەکەیت. تکایە پشوو بدە.',dms_talking:'تکایە لە کاتی شۆفێریکردندا قسەکانت کورت بکەرەوە.',dms_eating:'تکایە لە کاتی شۆفێریکردندا خواردن نخۆ.',dms_drinking:'تکایە لە کاتی شۆفێریکردندا خواردەمەنی نخۆ.',dms_smoking:'تکایە دەستەکانت لەسەر سێرنووز ڕابگرە.'}};
 const vrMsg=(t,l)=>(VMSG[l]||VMSG.en)[t]||VMSG.en[t]||'';
 // the WebView's own speechSynthesis is unreliable on Android, so the native
 // text-to-speech plugin is tried first and the browser voice is the fallback.
-async function speak(txt,lang){if(MUTE)return;const code=(VLANG[lang]||VLANG.en)[1],try2=[];
- if(CapPlugins&&CapPlugins.TTS){for(const c of [code,code.split('-')[0],'en-US']){if(try2.includes(c))continue;try2.push(c);
-   try{await CapPlugins.TTS.speak({text:txt,lang:c,rate:1,pitch:1,volume:1});return}catch(e){}}return}
+// A driver has to hear every breach, so when this handset has no voice for the language
+// the fleet chose, the warning is spoken in English instead of being read by an English
+// voice in words it cannot pronounce - and the driver is told once, on his screen, why
+// the voice he was promised is not the voice he is hearing.
+const NOSPOK={};
+function noVoiceFor(l){if(NOSPOK[l])return;NOSPOK[l]=1;
+ banner('<i class="fa-solid fa-volume-xmark"></i> This phone has no '+(VLANG[l]||['that language'])[0]+' voice installed, so warnings are spoken in English. Your fleet office can add one under Settings > System > Languages > Speech services.',9000)}
+async function speak(type,lang){if(MUTE)return;const L=VLANG[lang]?lang:'en',full=VLANG[L][1],base=full.split('-')[0],txt=vrMsg(type,L);
+ if(!txt)return;
+ if(L!=='en'&&CapPlugins&&CapPlugins.TTS&&CapPlugins.TTS.isLanguageSupported){
+  try{const r=await CapPlugins.TTS.isLanguageSupported({lang:base});if(r&&r.supported===false){noVoiceFor(L);return speak(type,'en')}}catch(e){}}
+ if(CapPlugins&&CapPlugins.TTS){for(const c of [full,base].filter((v,i,a)=>a.indexOf(v)===i)){
+   try{await CapPlugins.TTS.speak({text:txt,lang:c,rate:1,pitch:1,volume:1});return}catch(e){}}
+  if(L!=='en'){noVoiceFor(L);return speak(type,'en')}return}
  const S=window.speechSynthesis,U=window.SpeechSynthesisUtterance;if(!S||!U)return;
  try{let vs=[];try{vs=S.getVoices()||[]}catch(e){}
-  const v=vs.find(x=>x.lang===code)||vs.find(x=>(x.lang||'').split('-')[0]===code.split('-')[0]);
-  const u=new U(txt);u.lang=v?v.lang:code;if(v)u.voice=v;S.cancel();S.speak(u)}catch(e){}}
+  const v=vs.find(x=>x.lang===full)||vs.find(x=>(x.lang||'').split('-')[0]===base);
+  if(!v&&L!=='en'){noVoiceFor(L);return speak(type,'en')}
+  const u=new U(txt);u.lang=v?v.lang:full;if(v)u.voice=v;S.cancel();S.speak(u)}catch(e){}}
 // ---- the driver's own switch for every sound this app makes. A cab can be loud,
 // a passenger can be asleep, and the warning still has to reach the screen and the
 // record, so muting silences the buzzer, the voice and the notification tone only.
@@ -762,8 +776,8 @@ function notify(type,kmh,lvl){const R=RUL[type]||{},txt=Math.round(kmh)+' km/h'+
    // the voice waits for the tone only while the app is on screen, where a timer is
    // safe to rely on; in the background it is spoken at once instead of never
    const vl=R.voice_lang&&VLANG[R.voice_lang]?R.voice_lang:(R.voice_lang==='off'||R.voice===false||!V.voice_on?'off':V.lang);
-   if(ANN[type]!==false&&vl!=='off'){const m=vrMsg(type,vl);
-     if(back)speak(m,vl);else setTimeout(()=>speak(m,vl),Math.min(2,Math.max(1,+R.beep_duration||5)))}}
+   if(ANN[type]!==false&&vl!=='off'){
+     if(back)speak(type,vl);else setTimeout(()=>speak(type,vl),Math.min(2,Math.max(1,+R.beep_duration||5)))}}
  beep(type)}
 // A driver, or whoever hands the phone over, must be able to prove the alarm works
 // before setting off: this runs the overspeed alert exactly the way a breach does,
@@ -774,7 +788,7 @@ function testAlert(){const R=RUL.overspeed||{};
  if(MUTE){banner('<i class="fa-solid fa-volume-xmark"></i> Shown without sound - alerts are muted. Tap the speaker to unmute, then test again.',7000);logAct('Tested alert','muted');return}
  beep('overspeed');
  const vl=R.voice_lang&&VLANG[R.voice_lang]?R.voice_lang:(R.voice===false||!V.voice_on?'off':V.lang);
- if(vl!=='off')setTimeout(()=>speak(vrMsg('overspeed',vl),vl),900);
+ if(vl!=='off')setTimeout(()=>speak('overspeed',vl),900);
  logAct('Tested alert')}
 // ---- driving events and telemetry
 const MIN_MOVING_KMH=2;
@@ -831,6 +845,14 @@ function zEv(type,z,loc,kmh){if(!ON[type])return;
   accuracy:loc.accuracy,altitude:loc.altitude,heading:loc.bearing,accel:+(lastA*3.6).toFixed(1),
   battery_pct:bat.p,charging:bat.c,ignition:true,road_limit:+z.speed_limit||null};
  P.details+=evFix(P);
+ // A zone crossing is the one event the fleet can ask for and the driver never hears: this
+ // row is a moment rather than a breach that grows, so it never passes through hold(), and
+ // hold() is where the banner, the buzzer and the spoken message live. It wrote its row and
+ // stayed silent. The same 60 second guard the other alerts use is kept, so crossing back and
+ // forth over a boundary does not speak twice, and the rule's own Alert / Buzzer / Voice
+ // switches on the Configuration page are what decide what this says - notify() reads them.
+ const n=Date.now();ANN[type]=n-(lastNotify[type]||0)>60000;
+ if(ANN[type]){lastNotify[type]=n;notify(type,kmh)}
  outAdd({t:'ev',p:P});
  flush()}
 // the zones a fix falls inside, tightest speed limit first
@@ -877,7 +899,15 @@ function hold(type,bad,loc,kmh,val,t){if(!ON[type])return;
   if(ANN[type]){lastNotify[type]=n;notify(type,kmh,lvl)}
   // the dashboard needs the fix that opened the breach on the map straight away,
   // so it is pushed and flushed instead of waiting for the next sampling tick
-  lastLoc=loc;outAdd({t:'pos',p:row(loc,Math.round(kmh),true)});flush()}
+  lastLoc=loc;outAdd({t:'pos',p:row(loc,Math.round(kmh),true)});flush();
+  // A hard launch and a panic stop are peaks, not states that go on being broken: both are
+  // over inside a second or two. The tolerance window exists so that one noisy fix cannot
+  // become an overspeed record, and applying it here meant the phone buzzed the driver for a
+  // harsh acceleration and then threw the record away for ending too soon - which is what a
+  // trip full of hard launches and an empty Events report looks like from the seat. The peak
+  // itself is the evidence, so the row is opened from the sample that broke the limit and is
+  // closed, as ever, with the peak and the seconds it actually lasted.
+  if(!isSp(type))ev(type)}
  else if(Math.abs(val)>Math.abs(VS[type].peak))VS[type].peak=val}
 const isSp=t=>t==='overspeed'||t==='zone_overspeed';
 const evLvl=type=>type==='overspeed'?Math.round(LIM.speed+LIM.buf)+' km/h':
@@ -885,7 +915,10 @@ const evLvl=type=>type==='overspeed'?Math.round(LIM.speed+LIM.buf)+' km/h':
  Math.abs(+(type==='harsh_braking'?LIM.brake:LIM.accel)*3.6).toFixed(1)+' km/h/s';
 function evTxt(type,kmh,val,peak,lvl,dur){
  if(isSp(type))return `${Math.round(kmh)} km/h against a ${lvl} alert level${HOLD[type]?' held over '+HOLD[type]+' s':''}${dur?' · lasted '+hms(dur):''}${peak&&peak>kmh?' · peak '+Math.round(peak)+' km/h':''}`;
- return `${Math.abs(val).toFixed(1)} km/h/s ${type==='harsh_braking'?'deceleration':'acceleration'} against a ${lvl} limit${HOLD[type]?' held over '+HOLD[type]+' s':''}${dur?' · lasted '+hms(dur):''}${peak&&Math.abs(peak)>Math.abs(val)?' · peak '+Math.abs(peak).toFixed(1)+' km/h/s':''}`}
+ // "held over N s" is only true of a limit that stayed broken for it. A harsh stop or launch
+ // is now recorded from the sample that peaked, so what its row says about time is how long
+ // the driver actually held the pedal down, printed below as "lasted".
+ return `${Math.abs(val).toFixed(1)} km/h/s ${type==='harsh_braking'?'deceleration':'acceleration'} against a ${lvl} limit${dur?' · lasted '+hms(dur):''}${peak&&Math.abs(peak)>Math.abs(val)?' · peak '+Math.abs(peak).toFixed(1)+' km/h/s':''}`}
 // one duration format for the whole system: hh:mm:ss, hours can pass 24
 const hms=x=>{x=Math.max(0,Math.round(x||0));const p=n=>String(n).padStart(2,'0');return p(Math.floor(x/3600))+':'+p(Math.floor(x%3600/60))+':'+p(x%60)};
 function ev(type){const b=VS[type];if(!b)return;RST[type]='';
@@ -1001,7 +1034,12 @@ async function dmsStatus(){if(!(dmsOn()||CAMW))return;try{dmsSay(await CapPlugin
 // begin while this app is the screen in front - which is exactly when Start is pressed.
 // A watch the driver started for himself is his own and keeps running through a trip start,
 // so this only paints over the panel when the fleet's switch is the thing that opened it
-async function dmsStart(){if(CAMW&&!dmsOn())return;camPaint(false);if(!dmsOn())return;
+async function dmsStart(){if(CAMW&&!dmsOn())return;camPaint(false);
+ // The fleet's own switch is the one gate a driver can neither see nor press. A trip that
+ // starts with it off used to be silent from here: no panel, no warning, no word - which
+ // from his seat is indistinguishable from a camera that is broken, and from the office
+ // looks like a driver who never does anything wrong.
+ if(!dmsOn()){if(dmsHas())banner('<i class="fa-solid fa-video-slash"></i> Your fleet office has the driver camera switched off, so this trip is not watched and no camera warning will sound',8000);return}
  CAMSEEN=false;let r=null;
  try{r=await CapPlugins.Dms.start({trip:true})}catch(e){camErr('Driver camera could not start: '+(e.message||e));return}
  // Android will not let an app that is off screen raise a camera service. The page asked
@@ -1039,7 +1077,7 @@ function dmsAlert(type,detail){if(!type||DMS.indexOf(type)<0||!RUL[type])return;
  beep(type);
  if(MUTE||V.voice_on===0||R.voice===false)return;
  const vl=R.voice_lang&&VLANG[R.voice_lang]?R.voice_lang:V.lang;
- speak(vrMsg(type,vl),vl)}
+ speak(type,vl)}
 // the events the camera raised while this page was frozen. They arrive as the rows the
 // service would have written, but the people named on them are taken from the session
 // this page holds, not from what the camera was told earlier.
