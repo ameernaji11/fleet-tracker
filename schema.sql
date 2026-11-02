@@ -146,8 +146,12 @@ create table if not exists events (
   id bigint generated always as identity primary key,
   user_id uuid not null, vehicle_id uuid, driver_id uuid,
   vehicle_name text, driver_name text,
-  type text not null,                            -- harsh_braking | harsh_acceleration | overspeed
-                                                 -- | zone_enter | zone_exit | zone_overspeed
+  type text not null,                            -- any of the eighteen names the "events insert own"
+                                                 -- policy at v31 allows: the six the vehicle and its
+                                                 -- zones make, the nine the driver camera makes,
+                                                 -- cam_off, which the driver's own button makes, and
+                                                 -- the two that say when the handset stopped and
+                                                 -- started seeing satellites again
   lat double precision, lng double precision,
   speed double precision,
   value double precision,                        -- km/h per second, or km/h when overspeed
@@ -1366,6 +1370,57 @@ insert into app_settings (key, value) values
   ,('auto_kmh','5')
   on conflict (key) do nothing;
 
+-- ------------------ v30 the driver's own camera stop, written down by his handset ----
+-- Since this build the driver's video button puts down the trip's judging as well as his
+-- own picture, and it stays down until he presses again. A trip that is silent because a man
+-- switched his camera off and a trip that is silent because he did nothing wrong look the same
+-- on the map unless the phone is allowed to say so, so it writes one row of its own for the
+-- stretch: opened by his press, closed when the lens comes back or the trip ends.
+--
+-- Nothing else changes. The row is written by the page rather than the camera service, so no
+-- Java, no clip and no rule is involved: there is no threshold to configure and nothing to
+-- warn about, which is why it is absent from event_rules and from the Configuration page.
+--
+-- The policy below is the whole migration, and it has to be run before the phone build that
+-- writes this row: a type outside this list is refused by the database, the handset drops the
+-- record out loud and the office simply never learns the camera was stopped.
+drop policy if exists "events insert own" on events;
+create policy "events insert own" on events for insert with check (
+  user_id = auth.uid() and owns_vehicle(vehicle_id) and owns_pair(vehicle_id, driver_id)
+  and type in ('harsh_braking','harsh_acceleration','overspeed',
+               'zone_enter','zone_exit','zone_overspeed',
+               'dms_fatigue','dms_distraction','dms_phone_use','dms_cam_blocked',
+               'dms_yawning','dms_talking','dms_eating','dms_drinking','dms_smoking',
+               'cam_off'));
+
+-- ------------------ v31 the handset says out loud when it stops seeing satellites ----
+-- A vehicle can be driving perfectly and reporting nothing at all: the fix never locks, so no
+-- position, no speed and no place for any other event to stand on. Until now the only sign of
+-- that was a gap in the route, which an office reads as a parked vehicle. These two rows turn
+-- the silence into something the driver hears and the fleet can count.
+--
+-- Both are written by his handset, from the same watcher that delivers every fix: gps_lost
+-- opens once the fleet's own wait has passed with no locked position, gps_recovered closes it
+-- with ended_at when a fix arrives again. The wait is the Trigger limit of the gps_lost rule,
+-- in seconds, so an office that wants a tighter leash sets 60 and one that drives through long
+-- tunnels sets 300.
+insert into event_rules (type, label, enabled, threshold, alert, hold_s) values
+  ('gps_lost',      'GPS lost',      true, 120, true, 0),  -- seconds with no locked position
+  ('gps_recovered', 'GPS recovered', true, null, true, 0)   -- a moment: no limit to measure
+  on conflict (type) do nothing;
+
+-- Eighteen types instead of sixteen: the two above. A phone that raises one against a database
+-- that has not run this block has its record refused, says so on the driver's screen and drops
+-- it - which is why the wait is only honoured while the rule row itself exists.
+drop policy if exists "events insert own" on events;
+create policy "events insert own" on events for insert with check (
+  user_id = auth.uid() and owns_vehicle(vehicle_id) and owns_pair(vehicle_id, driver_id)
+  and type in ('harsh_braking','harsh_acceleration','overspeed',
+               'zone_enter','zone_exit','zone_overspeed',
+               'dms_fatigue','dms_distraction','dms_phone_use','dms_cam_blocked',
+               'dms_yawning','dms_talking','dms_eating','dms_drinking','dms_smoking',
+               'cam_off','gps_lost','gps_recovered'));
+
 -- ------------------------------------------------------------- admin seed ----
 -- Promote the owner account. Runs after the tables/policies exist, and is safe
 
@@ -1775,5 +1830,36 @@ end $$;
 --   Run this BEFORE publishing the phone build that reads the switches. Until then a handset keeps the
 --        hardcoded behaviour, so a fleet that saves Off here and does not update its handsets sees trips
 --        still starting on their own.
+--
+-- v30, on top of the above (the driver's own camera stop, written down):
+--   the events insert policy takes sixteen types instead of fifteen: cam_off.
+--        -> The driver's video button now puts down the trip's judging as well as his own
+--        picture, and stays down until he presses it again, so a quiet trip can be read two
+--        ways from the map. This row is the difference: his handset opens it with the press
+--        and closes it with ended_at when the lens comes back or the trip ends.
+--        -> Page-written, like a zone crossing: no event_rules row, no Configuration switch,
+--        no clip and no Java. It has no voice wording in any language because nothing
+--        announces a switch the driver pressed himself.
+--   Run this BEFORE publishing the phone build that writes it. Until then the database refuses
+--        the type, the handset says so and drops the record, and the office cannot tell a
+--        stopped camera from a clean shift - which is the one thing this row exists to say.
+--
+-- v31, on top of the above (the handset names a lost satellite lock):
+--   two event_rules rows: gps_lost (threshold 120 s, recorded, alert on)
+--        and gps_recovered (no threshold: a moment, like a zone crossing).
+--        -> gps_lost is the wait before anything is said, in seconds: the phone's own location
+--        watcher delivers a fix every second while it can, so two minutes of silence means the
+--        position is genuinely gone, not merely throttled. Set it wide for a fleet that drives
+--        tunnels and under bridges, narrow for one that must never disappear.
+--        -> Switching gps_lost off at the Recorded column stops both rows: the close belongs to
+--        the breach, and an office that gets gps_recovered without gps_lost would read a
+--        recovery from an outage it was never told about.
+--        -> Both are ordinary rule rows, so the Visual alert / Buzzer / Voice switches work on
+--        them like any other event, and the driver is warned out loud the moment his vehicle
+--        stops being seen.
+--   the events insert policy takes eighteen types instead of sixteen: gps_lost, gps_recovered.
+--   Run this BEFORE publishing the phone build that writes them. Until then a handset with the
+--        wait elapsed has its row refused by the database and says so, and the route keeps
+--        looking like a vehicle that simply stopped moving.
 
 -- ============================================================================
