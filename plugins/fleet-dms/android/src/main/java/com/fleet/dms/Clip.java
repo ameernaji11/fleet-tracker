@@ -14,8 +14,10 @@ import android.media.MediaMuxer;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.nio.ByteBuffer;
+import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
@@ -381,10 +383,12 @@ class Clip {
             // still the real ones, from the ring's own clock: see Captioner.offset. A sped
             // up record of an incident is only evidence if it still says when.
             long step = 1000000L / Math.max(1, fps);
-            // the words this clip carries, written across every picture of it on the way
-            // through the encoder - see Captioner for why it is the picture and not the
-            // row that has to say them
-            if (c.lines != null && c.lines.length > 0) cap = new Captioner(fw, fh);
+            // The pictures go through the captioner whatever the alert said, because two of
+            // its words are not the alert's at all: the clock and the date of this very
+            // picture, which belong in the file rather than beside it. A clip sent to the
+            // person who investigates an incident has to say when it happened even after it
+            // left the account that recorded it.
+            cap = new Captioner(fw, fh);
             while (!eos && guard++ < 20000) {
                 if (!inputDone) {
                     int in = mc.dequeueInputBuffer(10000);
@@ -587,6 +591,9 @@ class Clip {
         private final Canvas cv;
         private final Paint back = new Paint();
         private final Paint ink = new Paint();
+        // the same shape the dashboard prints its moments in, so a clip and the row it
+        // belongs to can be read side by side without translating one into the other
+        private final SimpleDateFormat clock = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.US);
         private byte[] made;
         private int at = -1;
 
@@ -604,7 +611,7 @@ class Clip {
             ink.setShadowLayer(2f, 0f, 1f, 0xE0000000);
         }
 
-        /** The picture of frame `i`, with this clip's words across its bottom. */
+        /** The picture of frame `i`: its own clock in the corner, this clip's words below. */
         byte[] burn(Capture c, int i) {
             // an input buffer that was not ready the first time asks for the same frame
             // again, and a second round of conversion would only draw the same words
@@ -615,6 +622,7 @@ class Clip {
             // rule and its reading come from the alert and never move
             String off = offset(c, i);
             String one = off.isEmpty() ? words(c.lines) : off + " · " + words(c.lines);
+            stamp(c, i);
             draw(one);
             // The words were painted onto the picture, not into this array, and it is the
             // array the encoder is handed: reading the drawn result back is the only thing
@@ -675,6 +683,25 @@ class Clip {
             // drawn exactly as far as it was measured: a word cut by a shrinking that
             // never saw its tail would run off the edge all the same
             cv.drawText(line, 6f, Math.min(top + size, h - 5f), ink);
+        }
+
+        /**
+         * The wall clock of this one picture, burned into its top left corner.
+         *
+         * The ring keeps every frame at the millisecond the camera handed it over, so the
+         * file never has to guess: each picture says the second it is a picture of, and a
+         * clip that has been forwarded, downloaded or opened a week later still says when
+         * it happened. Small on purpose - this is the stamp a person reads once to place
+         * the film in time, not the sentence they watch the whole clip through.
+         */
+        private void stamp(Capture c, int i) {
+            if (i < 0 || i >= c.us.size()) return;
+            String s = clock.format(new Date(c.us.get(i) / 1000));
+            float size = Math.max(7f, h / 34f);
+            ink.setTextSize(size);
+            float pad = Math.max(2f, size * .3f);
+            cv.drawRect(3f, 3f, 3f + ink.measureText(s) + pad * 2, 3f + size * 1.3f + pad * 2, back);
+            cv.drawText(s, 3f + pad, 3f + pad + size, ink);
         }
 
         void close() {
