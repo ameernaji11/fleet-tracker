@@ -321,13 +321,19 @@ async function claimOut(d){if(CLDOWN)return;CLDOWN=true;const msg=claimWhy(d);
  try{
   clearInterval(CLT);CLT=0;
   // the trip this handset was recording is closed and sent first, so the vehicle keeps the
-  // shift it drove rather than ending with the phone that lost it
-  if(watcher||SRT||tripRead()){try{await stop(1)}catch(e){}}
-  await senOff();
-  try{if(dmsHas()){await CapPlugins.Dms.stop();await dmsDrain();await CapPlugins.Dms.clear()}}catch(e){}
-  await logAct('Account now running on another phone',msg.slice(0,140));
-  try{await sb.auth.signOut()}catch(e){}
-  try{localStorage.removeItem('offl')}catch(e){}
+  // shift it drove rather than ending with the phone that lost it. It is the one step here
+  // given a longer deadline, because it is the one whose work the fleet would rather have
+  // finished - and it still has a deadline, since a phone that no longer holds the seat
+  // must not go on being this driver's phone while an upload waits on a network that is
+  // not answering. The camera and his pictures are put away under the same rule.
+  if(watcher||SRT||tripRead()){try{await outWait(stop(1),TRIP_MS)}catch(e){}}
+  await outWait(senOff());
+  await outWait((async()=>{try{if(dmsHas()){await CapPlugins.Dms.stop();await dmsDrain();await CapPlugins.Dms.clear()}}catch(e){}})());
+  await outWait(logAct('Account now running on another phone',msg.slice(0,140)));
+  // the same rule as signing out by hand: this handset must not keep a session it can
+  // no longer prove is its own, and it cannot be allowed to wait on the server for that
+  try{await outWait(sb&&sb.auth.signOut())}catch(e){}
+  outLocal();
   me=null;OFFL=false;CLAM=2;show('lg');$('err').textContent=msg}
  finally{CLDOWN=false}}
 // The keeping part, from the half-minute timer, from the phone coming back to the screen, and
@@ -371,7 +377,7 @@ async function signIn(){
   // second sign-in
   catch(e){r={error:e}}
   const gd=await g;
-  if(gd&&gd.locked){if(r&&!r.error&&r.data&&r.data.session)try{await sb.auth.signOut()}catch(e){}
+  if(gd&&gd.locked){if(r&&!r.error&&r.data&&r.data.session){try{await outWait(sb.auth.signOut())}catch(e){}outLocal()}
    soft('Your account is '+lockMsg(gd.wait_min))}
   if(r.error&&noNet(r.error)){await localEnter();return}
   if(r.error){const m=r.error.message||String(r.error);
@@ -394,17 +400,40 @@ async function signIn(){
   credSave(pwv)}
  catch(e){$('err').textContent=(e.soft?'':'Error: ')+(e.message||e)}
  b.disabled=false;b.innerHTML='<i class="fa-solid fa-right-to-bracket"></i>Sign in'}
-async function signOut(){sessStop();await logAct('Signed out','Phone');
- // the phone stops listening for a vehicle that moves: his session, and the watcher that
- // comes with it, end here
- await senOff();
- // and he stands up from the seat at the same time, so the next handset is not left outside
- // for the two minutes it would otherwise have to wait
- await claimGive();
- // the watch ends with his session, and the warnings and pictures this phone kept of
- // him are deleted rather than left for the next driver of the same handset
- try{if(dmsHas()){await CapPlugins.Dms.stop();await dmsDrain();await CapPlugins.Dms.clear()}}catch(e){}
- localStorage.removeItem('offl');try{await sb.auth.signOut()}catch(e){}location.reload()}
+// ---- signing out. This button did nothing at all on a weak signal, and the reason
+// is that every step of it waited on something that need not answer. Supabase returns
+// a failed logout as an error object instead of throwing, and when the logout request
+// fails for anything other than 401/403/404 it returns before removing the stored
+// session - so the reload below read the tokens back and signed the same driver
+// straight in again. A logout that cannot get the browser's auth lock - the dashboard
+// this phone just handed a session to, or a token refresh already in flight - never
+// answers at all, and the phone sat on the spinner. So each step gets a bounded
+// moment: the server is asked first, while the token it needs is still there, and the
+// copy this handset keeps is then thrown away whatever the answer was. That copy is
+// what signing out is actually about.
+const OUT_MS=2000,TRIP_MS=8000;
+const outWait=(p,ms)=>Promise.race([Promise.resolve(p).then(()=>1,()=>1),new Promise(r=>setTimeout(r,ms||OUT_MS))]);
+function outLocal(){try{const q=sb&&sb.auth&&sb.auth.stopAutoRefresh();if(q&&q.catch)q.catch(()=>{})}catch(e){}
+ try{[localStorage,sessionStorage].forEach(s=>Object.keys(s).forEach(k=>{if(/^sb-.+-auth-token/.test(k))s.removeItem(k)}))}catch(e){}
+ try{localStorage.removeItem('offl')}catch(e){}
+ // The offline identity is the second way back into this app. With no signal - or a
+ // signal slow enough to miss the four-second wait at opening - init() falls back to the
+ // last driver this phone proved and starts the app signed in as him, so wiping Supabase's
+ // tokens and leaving this copy would still end with "sign out does nothing". The zones,
+ // rules and settings in the same cache belong to the fleet and stay for the next handset.
+ try{const c=JSON.parse(localStorage.cfg||'null');if(c&&c.who){delete c.who;localStorage.cfg=JSON.stringify(c)}}catch(e){}}
+async function signOut(){try{sessStop()}catch(e){}
+ // The three things that still want his session go out together, under one deadline:
+ // the audit row, the watcher that listens for a vehicle moving, and standing up from
+ // the seat so the next handset is not left outside for the two minutes it would
+ // otherwise have to wait. The watch ends with his session too, and the warnings and
+ // pictures this phone kept of him are deleted rather than left for the next driver of
+ // the same handset.
+ await outWait(Promise.all([logAct('Signed out','Phone'),senOff(),claimGive(),
+  (async()=>{try{if(dmsHas()){await CapPlugins.Dms.stop();await dmsDrain();await CapPlugins.Dms.clear()}}catch(e){}})()]));
+ // asked last, because it is what takes the token these other calls are written with
+ try{await outWait(sb&&sb.auth.signOut())}catch(e){}
+ outLocal();location.reload()}
 let PWFORCE=0;
 // force=1 opens the panel and takes the Cancel button away: a password the
 // administrator set for somebody else is only ever temporary, so the driver who
@@ -505,7 +534,7 @@ async function init(fresh,who){
   // the lock is not named on the sign-in screen for simply opening the app - that
   // sentence belongs to the moment the driver presses Sign in - and the phone loses
   // its offline credential with it, so a lock cannot be signed around with no signal
-  await sb.auth.signOut();localStorage.removeItem('offl');
+  try{await outWait(sb&&sb.auth.signOut())}catch(e){}outLocal();
   // the sign-in is gone, so this phone has no identity any more - which is also what
   // tells the opening screen to stop waiting and show the form
   me=null;OFFL=false;show('lg');$('err').textContent='';return}
@@ -515,8 +544,14 @@ async function init(fresh,who){
  // second handset is refused at either, and the notice about it belongs to the first one.
  const cd=await claimAsk(!!tripRead());
  if(cd){await logAct('Second phone refused',(cd.model||'another phone')+' holds this account');
-  await sb.auth.signOut();try{localStorage.removeItem('offl')}catch(e){}
+  try{await outWait(sb&&sb.auth.signOut())}catch(e){}outLocal();
   me=null;OFFL=false;CLAM=2;show('lg');$('err').textContent=claimWhy(cd);return}
+ // The waits above give another handset's claim the chance to land in the middle of this
+ // one's opening: a seat that goes while the screen is still being painted is stood down by
+ // claimOut, which takes the session and the identity away and puts the form back. Everything
+ // below speaks for a driver this phone no longer has, so it stops here instead of throwing
+ // half-way through the first screen.
+ if(!me)return;
  if(chk&&chk.a&&chk.a.must_change)pwUi(1);
  // a phone Android restarted while a trip was running has already raised warnings of
  // its own: hear about them from the first moment, not only after Start is pressed
@@ -668,7 +703,7 @@ async function pAsk(){await senOff();
  catch(e){$('err').textContent='Location: '+(e.message||e);senOn()}
  await askNotif()}
 // ---- alerts on the phone
-let RUL={};const EVN={harsh_braking:'Harsh braking',harsh_acceleration:'Harsh acceleration',overspeed:'Overspeed',zone_enter:'Entered zone',zone_exit:'Left zone',zone_overspeed:'Zone overspeed',dms_fatigue:'Driver fatigued',dms_distraction:'Driver distracted',dms_phone_use:'Phone in hand',dms_cam_blocked:'Camera blocked',dms_yawning:'Driver yawning',dms_talking:'Talking while driving',dms_eating:'Eating while driving',dms_drinking:'Drinking while driving',dms_smoking:'Smoking'};
+let RUL={};const EVN={harsh_braking:'Harsh braking',harsh_acceleration:'Harsh acceleration',overspeed:'Overspeed',zone_enter:'Entered zone',zone_exit:'Left zone',zone_overspeed:'Zone overspeed',dms_fatigue:'Driver fatigued',dms_distraction:'Driver distracted',dms_phone_use:'Phone in hand',dms_cam_blocked:'Camera blocked',dms_yawning:'Driver yawning',dms_talking:'Talking while driving',dms_eating:'Eating while driving',dms_drinking:'Drinking while driving',dms_smoking:'Smoking',cam_off:'Driver camera stopped',gps_lost:'GPS signal lost',gps_recovered:'GPS position back'};
 // Alerts must be audible even when the driver never opened the Permissions screen, so every
 // trip start re-asks for notification permission and registers the loud channel it posts to.
 let CHAN=false;
@@ -708,12 +743,12 @@ async function askNotif(){await logAct('Allowed permissions');
 // the language and the on/off switches come from the dashboard Configuration page.
 const VLANG={en:['English','en-US'],ar:['Arabic','ar-SA'],hi:['Hindi','hi-IN'],ur:['Urdu','ur-PK'],ku:['Kurdish (Kurmanji)','ku'],ckb:['Kurdish (Sorani)','ckb-IQ']};
 const VMSG={
- en:{overspeed:'You are over the speed limit. Please slow down.',harsh_braking:'Harsh braking detected. Keep a safe distance and brake gently.',harsh_acceleration:'Harsh acceleration detected. Please accelerate smoothly.',zone_enter:'You have entered a restricted zone.',zone_exit:'You have left the zone.',zone_overspeed:'You are over the speed limit for this zone. Please slow down.',dms_fatigue:'You look tired. Please take a break.',dms_distraction:'Please keep your eyes on the road.',dms_phone_use:'Please do not use a phone while driving.',dms_cam_blocked:'The driver camera is covered. Keep the view clear.',dms_yawning:'You are yawning. Please take a break.',dms_talking:'Please keep conversations short while driving.',dms_eating:'Please do not eat while driving.',dms_drinking:'Please do not drink while driving.',dms_smoking:'Please keep your hands on the wheel.'},
- ar:{overspeed:'لقد تجاوزت حد السرعة. يرجى تخفيف السرعة.',harsh_braking:'تم رصد فرملة قوية. حافظ على مسافة آمنة واضغط على الفرامل بهدوء.',harsh_acceleration:'تم رصد تسارع قوي. يرجى التسارع بسلاسة.',zone_enter:'لقد دخلت المنطقة المحددة.',zone_exit:'لقد غادرت المنطقة المحددة.',zone_overspeed:'لقد تجاوزت السرعة المحددة داخل هذه المنطقة. يرجى تخفيف السرعة.',dms_fatigue:'يبدو أنك متعب. يرجى أخذ استراحة.',dms_distraction:'رجاءً أبقِ ناظريك على الطريق.',dms_phone_use:'رجاءً لا تستخدم الهاتف أثناء القيادة.',dms_cam_blocked:'كاميرا السائق مغطاة. أبقِ الرؤية واضحة.',dms_yawning:'أنت تتثاءب. يرجى أخذ استراحة.',dms_talking:'رجاءً اجعل المحادثات قصيرة أثناء القيادة.',dms_eating:'رجاءً لا تأكل أثناء القيادة.',dms_drinking:'رجاءً لا تشرب أثناء القيادة.',dms_smoking:'رجاءً أبقِ يديك على المقود.'},
- hi:{overspeed:'आप गति सीमा से ऊपर हैं। कृपया गति कम करें।',harsh_braking:'तेज़ ब्रेक लगाया गया। सुरक्षित दूरी रखें और धीरे ब्रेक लगाएँ।',harsh_acceleration:'तेज़ रफ़्तार पकड़ी गई। कृपया धीरे-धीरे गति बढ़ाएँ।',zone_enter:'आप निर्धारित क्षेत्र में प्रवेश कर गए हैं।',zone_exit:'आप निर्धारित क्षेत्र से बाहर निकल गए हैं।',zone_overspeed:'इस क्षेत्र की गति सीमा से ऊपर चल रहे हैं। कृपया गति कम करें।',dms_fatigue:'आप थके हुए लगते हैं। कृपया विश्राम करें।',dms_distraction:'कृपया नज़र सड़क पर रखें।',dms_phone_use:'कृपया ड्राइव करते समय फ़ोन का उपयोग न करें।',dms_cam_blocked:'ड्राइवर कैमरा ढका है। दृश्य साफ़ रखें।',dms_yawning:'आप उबासी ले रहे हैं। कृपया विश्राम करें।',dms_talking:'कृपया ड्राइव करते समय बातें छोटी रखें।',dms_eating:'कृपया ड्राइव करते समय कुछ न खाएँ।',dms_drinking:'कृपया ड्राइव करते समय कुछ न पिएँ।',dms_smoking:'कृपया अपने हाथ स्टीयरिंग पर रखें।'},
- ur:{overspeed:'آپ رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',harsh_braking:'سخت بریک لگائی گئی۔ محفوظ فاصلہ رکھیں اور آہستہ بریک لگائیں۔',harsh_acceleration:'تیز رفتاری پکڑی گئی۔ براہ کرم آہستہ آہستہ رفتار بڑھائیں۔',zone_enter:'آپ مقررہ علاقے میں داخل ہو گئے ہیں۔',zone_exit:'آپ مقررہ علاقے سے باہر نکل گئے ہیں۔',zone_overspeed:'اس علاقے کی رفتار کی حد سے اوپر جا رہے ہیں۔ براہ کرم رفتار کم کریں۔',dms_fatigue:'آپ تھکے ہوئے لگتے ہیں۔ براہ کرم آرام کریں۔',dms_distraction:'براہ کرم نظر سڑک پر رکھیں۔',dms_phone_use:'براہ کرم ڈرائیو کرتے وقت فون استعمال نہ کریں۔',dms_cam_blocked:'ڈرائیور کیمیر ڈھکا ہوا ہے۔ دید صاف رکھیں۔',dms_yawning:'آپ اونگھ رہے ہیں۔ براہ کرم آرام کریں۔',dms_talking:'براہ کرم ڈرائیو کرتے وقت باتیں مختصر رکھیں۔',dms_eating:'براہ کرم ڈرائیو کے دوران کھانا نہ کھائیں۔',dms_drinking:'براہ کرم ڈرائیو کے دوران کچھ نہ پئیں۔',dms_smoking:'براہ کرم اپنے ہاتھ اسٹیئرنگ پر رکھیں۔'},
- ku:{overspeed:'Tu ji leza destûrkirî zêdetir diçî. Ji kerema xwe hêdî bibe.',harsh_braking:'Frenandina tund hat dîtin. Mesafeya ewle biparêze û hêdî frene bike.',harsh_acceleration:'Lezgirtina tund hat dîtin. Ji kerema xwe bi nermî lezê zêde bike.',zone_enter:'Tu ketî nav herêma qedexekirî.',zone_exit:'Tu ji herêmê derketî.',zone_overspeed:'Di vê herêmê de tu ji leza destûrkirî zêdetir diçî. Ji kerema xwe hêdî bibe.',dms_fatigue:'Tu westiyayî xuya dikî. Ji kerema xwe bêhnvedanê bike.',dms_distraction:'Ji kerema xwe çavên xwe li rê bihêle.',dms_phone_use:'Ji kerema xwe di dema ajotinê de telefonê bikar neyne.',dms_cam_blocked:'Kamera ajokerê girtî ye. Dîmenê vekirî bihêle.',dms_yawning:'Tu kenimê dikî. Ji kerema xwe bêhnvedanê bike.',dms_talking:'Ji kerema xwe di dema ajotinê de axaftinê kurt bike.',dms_eating:'Ji kerema xwe di dema ajotinê de nexwe.',dms_drinking:'Ji kerema xwe di dema ajotinê de nevexwe.',dms_smoking:'Ji kerema xwe destên xwe li steerîngê biparêze.'},
- ckb:{overspeed:'لە خێرایی ڕێپێدراو خێراتر دەڕۆیت. تکایە خێراییەکەت کەم بکەرەوە.',harsh_braking:'بڕانی تۆزگوێزە تۆمارکرا. مەسافەی سەلامەت بپارێزە و بە هێواشی مۆترە بکە.',harsh_acceleration:'خێرابوونەوەی توند تۆمارکرا. تکایە بە هێواشی خێرایی زیاد بکە.',zone_enter:'چوویتەتە ناو ناوچەی قەدەغەکراو.',zone_exit:'لە ناوچەکە دەرچوویت.',zone_overspeed:'لەم ناوچەیەدا لە خێرایی ڕێپێدراو خێراتر دەڕۆیت. تکایە خێراییەکەت کەم بکەرەوە.',dms_fatigue:'ماندوو دەردەکەویت. تکایە پشوو بدە.',dms_distraction:'تکایە سەرنجت لەسەر شەقام بێت.',dms_phone_use:'تکایە لە کاتی شۆفێریکردندا مۆبایل بەکارمەهێنە.',dms_cam_blocked:'کامێرای شۆفێر داخراوە. دیمەنەکە کراوە بپارێزە.',dms_yawning:'کێفت دەکەیت. تکایە پشوو بدە.',dms_talking:'تکایە لە کاتی شۆفێریکردندا قسەکانت کورت بکەرەوە.',dms_eating:'تکایە لە کاتی شۆفێریکردندا خواردن نخۆ.',dms_drinking:'تکایە لە کاتی شۆفێریکردندا خواردەمەنی نخۆ.',dms_smoking:'تکایە دەستەکانت لەسەر سێرنووز ڕابگرە.'}};
+ en:{overspeed:'You are over the speed limit. Please slow down.',harsh_braking:'Harsh braking detected. Keep a safe distance and brake gently.',harsh_acceleration:'Harsh acceleration detected. Please accelerate smoothly.',zone_enter:'You have entered a restricted zone.',zone_exit:'You have left the zone.',zone_overspeed:'You are over the speed limit for this zone. Please slow down.',dms_fatigue:'You look tired. Please take a break.',dms_distraction:'Please keep your eyes on the road.',dms_phone_use:'Please do not use a phone while driving.',dms_cam_blocked:'The driver camera is covered. Keep the view clear.',dms_yawning:'You are yawning. Please take a break.',dms_talking:'Please keep conversations short while driving.',dms_eating:'Please do not eat while driving.',dms_drinking:'Please do not drink while driving.',dms_smoking:'Please keep your hands on the wheel.',cam_off:'Driver camera stopped: this trip raises no alerts and records nothing.',gps_lost:'GPS signal lost. Your position is not being recorded. Check that the phone can see the sky.',gps_recovered:'GPS signal is back. Your position is being recorded again.'},
+ ar:{overspeed:'لقد تجاوزت حد السرعة. يرجى تخفيف السرعة.',harsh_braking:'تم رصد فرملة قوية. حافظ على مسافة آمنة واضغط على الفرامل بهدوء.',harsh_acceleration:'تم رصد تسارع قوي. يرجى التسارع بسلاسة.',zone_enter:'لقد دخلت المنطقة المحددة.',zone_exit:'لقد غادرت المنطقة المحددة.',zone_overspeed:'لقد تجاوزت السرعة المحددة داخل هذه المنطقة. يرجى تخفيف السرعة.',dms_fatigue:'يبدو أنك متعب. يرجى أخذ استراحة.',dms_distraction:'رجاءً أبقِ ناظريك على الطريق.',dms_phone_use:'رجاءً لا تستخدم الهاتف أثناء القيادة.',dms_cam_blocked:'كاميرا السائق مغطاة. أبقِ الرؤية واضحة.',dms_yawning:'أنت تتثاءب. يرجى أخذ استراحة.',dms_talking:'رجاءً اجعل المحادثات قصيرة أثناء القيادة.',dms_eating:'رجاءً لا تأكل أثناء القيادة.',dms_drinking:'رجاءً لا تشرب أثناء القيادة.',dms_smoking:'رجاءً أبقِ يديك على المقود.',cam_off:'كاميرا السائق متوقفة: هذه الرحلة لا تصدر أي تنبيه ولا تسجل شيئًا.',gps_lost:'فقدان إشارة نظام تحديد المواقع. موقعك لا يُسجَّل. تأكد أن الهاتف يرى السماء.',gps_recovered:'عادت إشارة نظام تحديد المواقع. يُسجَّل موقعك من جديد.'},
+ hi:{overspeed:'आप गति सीमा से ऊपर हैं। कृपया गति कम करें।',harsh_braking:'तेज़ ब्रेक लगाया गया। सुरक्षित दूरी रखें और धीरे ब्रेक लगाएँ।',harsh_acceleration:'तेज़ रफ़्तार पकड़ी गई। कृपया धीरे-धीरे गति बढ़ाएँ।',zone_enter:'आप निर्धारित क्षेत्र में प्रवेश कर गए हैं।',zone_exit:'आप निर्धारित क्षेत्र से बाहर निकल गए हैं।',zone_overspeed:'इस क्षेत्र की गति सीमा से ऊपर चल रहे हैं। कृपया गति कम करें।',dms_fatigue:'आप थके हुए लगते हैं। कृपया विश्राम करें।',dms_distraction:'कृपया नज़र सड़क पर रखें।',dms_phone_use:'कृपया ड्राइव करते समय फ़ोन का उपयोग न करें।',dms_cam_blocked:'ड्राइवर कैमरा ढका है। दृश्य साफ़ रखें।',dms_yawning:'आप उबासी ले रहे हैं। कृपया विश्राम करें।',dms_talking:'कृपया ड्राइव करते समय बातें छोटी रखें।',dms_eating:'कृपया ड्राइव करते समय कुछ न खाएँ।',dms_drinking:'कृपया ड्राइव करते समय कुछ न पिएँ।',dms_smoking:'कृपया अपने हाथ स्टीयरिंग पर रखें।',cam_off:'ड्राइवर कैमरा बंद है: इस यात्रा में कोई चेतावनी नहीं और कोई रिकॉर्डिंग नहीं।',gps_lost:'GPS सिग्नल नहीं मिल रहा है। आपका स्थान दर्ज नहीं हो रहा है। देखें कि फ़ोन आकाश देख सकता है।',gps_recovered:'GPS सिग्नल वापस आ गया है। आपका स्थान फिर से दर्ज हो रहा है।'},
+ ur:{overspeed:'آپ رفتار کی حد سے اوپر ہیں۔ براہ کرم رفتار کم کریں۔',harsh_braking:'سخت بریک لگائی گئی۔ محفوظ فاصلہ رکھیں اور آہستہ بریک لگائیں۔',harsh_acceleration:'تیز رفتاری پکڑی گئی۔ براہ کرم آہستہ آہستہ رفتار بڑھائیں۔',zone_enter:'آپ مقررہ علاقے میں داخل ہو گئے ہیں۔',zone_exit:'آپ مقررہ علاقے سے باہر نکل گئے ہیں۔',zone_overspeed:'اس علاقے کی رفتار کی حد سے اوپر جا رہے ہیں۔ براہ کرم رفتار کم کریں۔',dms_fatigue:'آپ تھکے ہوئے لگتے ہیں۔ براہ کرم آرام کریں۔',dms_distraction:'براہ کرم نظر سڑک پر رکھیں۔',dms_phone_use:'براہ کرم ڈرائیو کرتے وقت فون استعمال نہ کریں۔',dms_cam_blocked:'ڈرائیور کیمیر ڈھکا ہوا ہے۔ دید صاف رکھیں۔',dms_yawning:'آپ اونگھ رہے ہیں۔ براہ کرم آرام کریں۔',dms_talking:'براہ کرم ڈرائیو کرتے وقت باتیں مختصر رکھیں۔',dms_eating:'براہ کرم ڈرائیو کے دوران کھانا نہ کھائیں۔',dms_drinking:'براہ کرم ڈرائیو کے دوران کچھ نہ پئیں۔',dms_smoking:'براہ کرم اپنے ہاتھ اسٹیئرنگ پر رکھیں۔',cam_off:'ڈرائیور کیمرا بند ہے: اس سفر میں کوئی انتباہ نہیں اور کوئی ریکارڈنگ نہیں۔',gps_lost:'جی پی ایس سگنل ختم ہو گیا۔ آپ کا مقام ریکارڈ نہیں ہو رہا۔ دیکھیں کہ فون آسمان دیکھ سکتا ہے۔',gps_recovered:'جی پی ایس سگنل واپس آ گیا ہے۔ آپ کا مقام دوبارہ ریکارڈ ہو رہا ہے۔'},
+ ku:{overspeed:'Tu ji leza destûrkirî zêdetir diçî. Ji kerema xwe hêdî bibe.',harsh_braking:'Frenandina tund hat dîtin. Mesafeya ewle biparêze û hêdî frene bike.',harsh_acceleration:'Lezgirtina tund hat dîtin. Ji kerema xwe bi nermî lezê zêde bike.',zone_enter:'Tu ketî nav herêma qedexekirî.',zone_exit:'Tu ji herêmê derketî.',zone_overspeed:'Di vê herêmê de tu ji leza destûrkirî zêdetir diçî. Ji kerema xwe hêdî bibe.',dms_fatigue:'Tu westiyayî xuya dikî. Ji kerema xwe bêhnvedanê bike.',dms_distraction:'Ji kerema xwe çavên xwe li rê bihêle.',dms_phone_use:'Ji kerema xwe di dema ajotinê de telefonê bikar neyne.',dms_cam_blocked:'Kamera ajokerê girtî ye. Dîmenê vekirî bihêle.',dms_yawning:'Tu kenimê dikî. Ji kerema xwe bêhnvedanê bike.',dms_talking:'Ji kerema xwe di dema ajotinê de axaftinê kurt bike.',dms_eating:'Ji kerema xwe di dema ajotinê de nexwe.',dms_drinking:'Ji kerema xwe di dema ajotinê de nevexwe.',dms_smoking:'Ji kerema xwe destên xwe li steerîngê biparêze.',cam_off:'Kamera ajokerê hat rawestandin: ev rêwîtî ti hişyariyê nade û tiştek tomar nake.',gps_lost:'Sînyala GPS winda bû. Cihê te nayê tomarkirin. Kontrol bike ku telefon dikare esmanî bibîne.',gps_recovered:'Sînyala GPS vegeriya. Cihê te ji nû ve tê tomarkirin.'},
+ ckb:{overspeed:'لە خێرایی ڕێپێدراو خێراتر دەڕۆیت. تکایە خێراییەکەت کەم بکەرەوە.',harsh_braking:'بڕانی تۆزگوێزە تۆمارکرا. مەسافەی سەلامەت بپارێزە و بە هێواشی مۆترە بکە.',harsh_acceleration:'خێرابوونەوەی توند تۆمارکرا. تکایە بە هێواشی خێرایی زیاد بکە.',zone_enter:'چوویتەتە ناو ناوچەی قەدەغەکراو.',zone_exit:'لە ناوچەکە دەرچوویت.',zone_overspeed:'لەم ناوچەیەدا لە خێرایی ڕێپێدراو خێراتر دەڕۆیت. تکایە خێراییەکەت کەم بکەرەوە.',dms_fatigue:'ماندوو دەردەکەویت. تکایە پشوو بدە.',dms_distraction:'تکایە سەرنجت لەسەر شەقام بێت.',dms_phone_use:'تکایە لە کاتی شۆفێریکردندا مۆبایل بەکارمەهێنە.',dms_cam_blocked:'کامێرای شۆفێر داخراوە. دیمەنەکە کراوە بپارێزە.',dms_yawning:'کێفت دەکەیت. تکایە پشوو بدە.',dms_talking:'تکایە لە کاتی شۆفێریکردندا قسەکانت کورت بکەرەوە.',dms_eating:'تکایە لە کاتی شۆفێریکردندا خواردن نخۆ.',dms_drinking:'تکایە لە کاتی شۆفێریکردندا خواردەمەنی نخۆ.',dms_smoking:'تکایە دەستەکانت لەسەر سێرنووز ڕابگرە.',cam_off:'کامێرای شۆفێر ڕاگیرا: ئەم گەشتە هیچ ئاگادارکردنەوەیەکی لێ دروست نابێت و هیچێک تۆمار ناکات.',gps_lost:'سیگناڵی GPS ون بوو. شوێنەکەت تۆمارناکرێت. دڵنیابەرەوە کە مۆبایلەکە دەتوانێت ئاسمان ببینێت.',gps_recovered:'سیگناڵی GPS گەڕایەوە. شوێنەکەت دووبارە تۆماردەکرێت.'}};
 const vrMsg=(t,l)=>(VMSG[l]||VMSG.en)[t]||VMSG.en[t]||'';
 // the WebView's own speechSynthesis is unreliable on Android, so the native
 // text-to-speech plugin is tried first and the browser voice is the fallback.
@@ -957,6 +992,63 @@ function endEv(type,t){const b=VS[type];if(!b)return;VS[type]=null;
 
 // called when a trip ends: every open breach gets its end time and closing readings
 function closeAll(t){Object.keys(VS).forEach(k=>endEv(k,t))}
+// ---- the satellites stopping. A vehicle that reports nothing looks exactly like a vehicle
+// that stopped moving: the route simply ends, and an office cannot tell a long tunnel from a
+// covered antenna. So the silence is written down as an event of its own and the driver hears
+// it, and the row that follows says when the position came back.
+//
+// Nothing new is watched for: the trip's own location watcher already hands this page every
+// fix it can get, so an outage is simply the time between those deliveries growing past the
+// fleet's own wait. That wait is the Trigger limit of the GPS lost rule on the Configuration
+// page - two minutes to start with, because a handset that is working sends about one a second.
+// The trip's watcher is the only judge: with no trip running there is no route going quiet, so
+// a parked handset in a basement raises nothing.
+let LASTFIX=0,GLOST=null,gpsT=null;
+const GPSWAIT=()=>Math.max(15,Math.round(+((RUL.gps_lost||{}).threshold)||120));
+const gpsTxt=s=>'No GPS position for '+hms(s)+' - the vehicle keeps driving but nothing can be reported';
+// the warning, on the same three switches every other event has: the rule's own Visual
+// alert, Buzzer and Voice. A fleet that only wants the record and not the noise can say so
+// in Configuration without switching the whole event off.
+function gpsSay(type,detail){const R=RUL[type]||{};
+ if(R.alert!==false){banner('<i class="fa-solid fa-satellite-dish"></i> '+(EVN[type]||'GPS')+' · '+detail,6000);alertRing()}
+ beep(type);
+ if(MUTE||V.voice_on===0||R.voice===false)return;
+ const vl=R.voice_lang&&VLANG[R.voice_lang]?R.voice_lang:V.lang;
+ speak(type,vl)}
+// every fix the trip's watcher delivers passes here, locked or not: only a real place
+// counts as a recovery, because a fix of 0,0 is the handset saying it still cannot see
+function gpsSeen(loc){if(!goodLoc(loc))return;LASTFIX=Date.now();if(GLOST)gpsBack(loc)}
+function gpsTick(){if(!SRT||GLOST||!ON.gps_lost||!LASTFIX)return;
+ if(Date.now()-LASTFIX<GPSWAIT()*1000)return;
+ const s=Math.round((Date.now()-LASTFIX)/1000),id=uid();GLOST={id,t:Date.now()};
+ // the row has no place of its own, which is the whole point of it: evFix lends the last
+ // one this handset really locked and writes how long before that was, and leaves both
+ // columns empty rather than stamping 0,0 when a trip never saw a satellite at all
+ const P={cid:id,user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,
+  vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,type:'gps_lost',
+  lat:null,lng:null,speed:null,value:s,
+  details:gpsTxt(s),recorded_at:new Date().toISOString(),
+  battery_pct:bat.p,charging:bat.c,ignition:true};
+ GLOST.bor=evFix(P);P.details+=GLOST.bor;
+ outAdd({t:'ev',p:P});flush();gpsSay('gps_lost','no position for '+hms(s))}
+// the position is back: the outage gets its end time and its true length, and one short
+// row says where the handset started seeing again - so the office can see both edges of it
+function gpsBack(loc){const g=GLOST;GLOST=null;if(!g)return;
+ const at=loc.time||Date.now(),s=Math.max(0,Math.round((at-g.t)/1000));
+ outAdd({t:'upd',id:g.id,p:{ended_at:new Date(at).toISOString(),value:s,details:gpsTxt(s)+(g.bor||'')}});
+ const now=new Date(at);
+ const P={cid:uid(),user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,
+  vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,type:'gps_recovered',
+  lat:loc.latitude,lng:loc.longitude,speed:Math.round((loc.speed||0)*3.6),value:s,
+  details:'Position back after '+hms(s)+' without a fix',recorded_at:now.toISOString(),
+  ended_at:new Date(at+1000).toISOString(),accuracy:loc.accuracy,altitude:loc.altitude,
+  heading:loc.bearing,battery_pct:bat.p,charging:bat.c,ignition:true};
+ P.details+=evFix(P);outAdd({t:'ev',p:P});flush();gpsSay('gps_recovered',hms(s)+' with no position')}
+// a trip that ends while the position is still gone must not leave the row open forever:
+// the outage stops being one when the vehicle stops being tracked, so it is closed here
+function gpsTripEnd(){if(!GLOST)return;const g=GLOST,t=Date.now();GLOST=null;
+ const s=Math.max(0,Math.round((t-g.t)/1000));
+ outAdd({t:'upd',id:g.id,p:{ended_at:new Date(t).toISOString(),value:s,details:gpsTxt(s)+(g.bor||'')+' · trip ended while the position was still missing'}});flush()}
 // ---- the driver camera: tiredness, distraction, a phone in hand and a covered lens.
 // The judgement belongs to Android rather than to this page on purpose: a driver who
 // answers a call or locks the screen freezes this JavaScript, and the watch has to
@@ -1033,12 +1125,19 @@ function dmsSay(s){if(!s)return;
  if(nd||ce)w=(w?w+' ':'')+(nd?nd+' alert'+(nd===1?' has':'s have')+' no recording because the camera had no picture to keep. ':'')+
   (ce?'The last recording failed: '+ce+'. ':'');
  if(w)camErr('Driver camera: '+w);else camErr('')}
-async function dmsStatus(){if(!(dmsOn()||CAMW))return;try{dmsSay(await CapPlugins.Dms.status())}catch(e){}}
+// A stop the driver pressed himself is the one state this page must not talk over: the
+// service answers "not running, nothing judging" for it, and that wording would replace his
+// own reason on the strip with a fault that is not happening.
+async function dmsStatus(){if(CAMOFF)return;if(!(dmsOn()||CAMW))return;try{dmsSay(await CapPlugins.Dms.status())}catch(e){}}
 // trip start: the lens opens with the trip, because Android only lets a camera service
 // begin while this app is the screen in front - which is exactly when Start is pressed.
 // A watch the driver started for himself is his own and keeps running through a trip start,
 // so this only paints over the panel when the fleet's switch is the thing that opened it
 async function dmsStart(){if(CAMW&&!dmsOn())return;camPaint(false);
+ // A driver who closed the lens himself stays closed for the rest of that trip, and a phone
+ // Android restarted mid-trip must not be a way of undoing his stop: the trip marker carries
+ // it, and the camera stays shut until he presses the button again.
+ if(CAMOFF){camErr(CAMOFFTXT);return}
  // The fleet's own switch is the one gate a driver can neither see nor press. A trip that
  // starts with it off used to be silent from here: no panel, no warning, no word - which
  // from his seat is indistinguishable from a camera that is broken, and from the office
@@ -1062,9 +1161,29 @@ async function dmsStart(){if(CAMW&&!dmsOn())return;camPaint(false);
  // whether or not a frame ever arrived
  setTimeout(()=>{if(CAMON)dmsStatus()},5000)}
 async function dmsStop(){const closed=await dwOff();CAMON=false;camErr('');camPaint(false);if(!dmsHas()||closed)return;try{await CapPlugins.Dms.stop()}catch(e){}}
+// A trip the camera never watched and a trip the driver drove cleanly look identical on the
+// map: both are silent. So the driver's own switch writes the one row that tells the two
+// apart - it opens when he closes the lens, and closes when the lens comes back or the trip
+// does. Nothing else on this phone can raise it, because nothing else knows he pressed.
+function camOffEv(on){if(!me||!asg)return;
+ const now=new Date();
+ if(on){CAMOFFID=uid();
+  // the place is the one thing this row cannot do without being rude about: a driver who
+  // closed the lens in a tunnel still closed it, so the stop is written and evFix lends the
+  // last place the phone really held, or leaves both columns empty rather than stamping 0,0
+  const loc=lastLoc||GOOD||{};
+  const P={cid:CAMOFFID,user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,
+   vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,type:'cam_off',
+   lat:loc.latitude,lng:loc.longitude,speed:Math.round(FEEDKM),value:null,
+   details:'The driver closed the forward camera himself: no warning, alert or video is raised for this stretch',
+   recorded_at:new Date(loc.time||now.getTime()).toISOString(),accuracy:loc.accuracy,altitude:loc.altitude,
+   heading:loc.bearing,battery_pct:bat.p,charging:bat.c,ignition:true};
+  P.details+=evFix(P);outAdd({t:'ev',p:P});flush();return}
+ if(!CAMOFFID)return;
+ outAdd({t:'upd',id:CAMOFFID,p:{ended_at:now.toISOString()}});CAMOFFID='';flush()}
 // every fix the vehicle's own watcher already produces, so an event can say where the
 // driver was and how fast the vehicle was going at the moment his face was judged
-function dmsFeed(loc,kmh){if(!(dmsOn()||CAMW))return;
+function dmsFeed(loc,kmh){if(CAMOFF||!(dmsOn()||CAMW))return;
  FEEDKM=kmh;
  // a reading the receiver has not locked is not sent to the service at all: it would
  // replace the good place the camera was holding with a 0,0, and every alert raised in
@@ -1076,7 +1195,10 @@ function dmsUi(){if(!dmsHas())return;
  try{const p=CapPlugins.Dms.ui({visible:!document.hidden});if(p&&p.catch)p.catch(()=>{})}catch(e){}}
 // the warning, when the driver is looking at this screen: the service stays quiet so
 // the same breach never sounds twice. Behind his back, Android posts and speaks it.
-function dmsAlert(type,detail){if(!type||DMS.indexOf(type)<0||!RUL[type])return;const R=RUL[type];
+// A breach that reaches this page after he pressed stop is a message from a lens he closed:
+// the service can still hand over one that was already on its way out, and the driver's
+// answer to that is a warning he asked to stop. Nothing is announced while his own stop stands.
+function dmsAlert(type,detail){if(CAMOFF||!type||DMS.indexOf(type)<0||!RUL[type])return;const R=RUL[type];
  if(R.alert!==false){banner('<i class="fa-solid fa-triangle-exclamation"></i> '+(EVN[type]||'Driver camera')+' · '+(detail||''),6000);alertRing()}
  beep(type);
  if(MUTE||V.voice_on===0||R.voice===false)return;
@@ -1141,13 +1263,19 @@ function camTog(){camBox(!CAMD)}
 // answer while the phone was sitting on this screen with a strong signal, and it did not
 // work. What replaces it is the one thing a handset can always do - the driver presses the
 // video button on his own map and this page opens the forward lens and shows him what it
-// sees. It shows him, and nothing else: the warnings, the buzzer, the voice and the rows
-// written into the events table belong to a trip, and are exactly the ones the fleet's own
-// "Watch the driver" switch produces when Start trip is pressed or the vehicle starts
-// moving by itself. A parked phone with its lens open is a mirror, not an offence.
+// sees. Since v30 it is also the switch that puts a trip's judging down: the warnings, the
+// buzzer, the voice and the rows written into the events table belong to a trip and are the
+// ones the fleet's own "Watch the driver" switch produces when Start trip is pressed or the
+// vehicle starts moving by itself - and a button the driver can press that leaves all of that
+// running behind a picture he believes he closed is not a switch. A parked phone with its lens
+// open is a mirror, not an offence.
 // No server, and nobody else, decides when his face is being looked at.
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let CAMW=false,CAMLENS=false;
+let CAMW=false,CAMLENS=false,CAMOFF=false,CAMOFFID='';
+// The one sentence this phone says about a stopped camera, in the three places it has to
+// stand: the press that stopped it, the trip that restarted under it, and the start that
+// found it there. A driver must never be left guessing which of the three he is in.
+const CAMOFFTXT='Driver camera closed by you: this trip raises no alerts and records nothing until you press the camera button again';
 // A fleet setting is deliberately not a condition here: a driver who wants to see his own
 // picture gets it, whatever the fleet has its switch set to. What is still required is a
 // build that has a camera and a vehicle this login holds, because the lens is opened
@@ -1162,7 +1290,9 @@ function dwUi(){const b=$('dwB');if(!b)return;
  b.classList.toggle('hide',!dmsHas());if(!dmsHas())return;
  b.classList.toggle('on',CAMW);
  b.innerHTML='<i class="fa-solid fa-'+(CAMW?'video':'video-slash')+'"></i>';
- b.title=CAMW?'Your own camera view is open - press to stop':dwWhy()||'Driver camera: open your own view of the forward lens'}
+ b.title=CAMW?'Your own camera view is open - press to stop it and this trip raises no alerts'
+  :CAMOFF?'Driver camera stopped by you: press to watch this trip again'
+  :dwWhy()||'Driver camera: open your own view of the forward lens'}
 // The lens itself. When the trip's own camera is already running there is nothing to open,
 // so the picture box simply comes back and the fleet's setup is left alone.
 async function dwUp(){const why=dwWhy();if(why)return why;
@@ -1197,17 +1327,31 @@ async function dwDown(){if(!CAMLENS)return false;CAMLENS=false;
 // putting the watch down again, from either side: the driver's finger, or the trip ending
 async function dwOff(){if(!CAMW)return false;CAMW=false;const s=await dwDown();dwUi();return s}
 async function dwTog(){
- if(CAMW){await dwOff();camBox(false);logAct('Driver camera stopped',camVeh());
-  // the fleet's own trip camera is not this button's to close, so when that one is
-  // running the banner says what actually went away
-  const still=dmsOn()&&CAMON;
-  return banner('<i class="fa-solid fa-video-slash"></i> '+(still?'Your own camera view is closed: the fleet alerts still watch this trip':'Driver camera stopped: nothing is watching your face now'),5000)}
- // the watch is claimed before the lens is opened, because every gate that lets a picture
- // through - the box, the frame listener, the feed - reads it and the opening runs through them
+ // His finger on this button is the strongest say this phone gets about his own face, and it
+ // used to be a weaker say than the fleet's switch: the trip's camera kept judging him while
+ // he believed he had closed it, so alerts, events and recordings went on being written about
+ // a driver who had asked to stop. Now one press closes both lenses and stays closed until he
+ // presses again, and the office is told - a silent stretch has to look like a stopped camera
+ // on the map, not like a clean shift.
+ if(CAMW){await dmsStop();camBox(false);
+  CAMOFF=true;camOffEv(true);
+  camErr(CAMOFFTXT);
+  dwUi();logAct('Driver camera stopped for this trip',camVeh());
+  return banner('<i class="fa-solid fa-video-slash"></i> Driver camera stopped: this trip raises no alerts and records nothing until you press the button again',5000)}
+ // Pressing again is the only thing in the app that lifts a stop, and it has to reopen both
+ // halves: his own view, and - when this fleet watches faces and a trip is really running -
+ // the camera that judges, which is the half his first press put down. The stop is only
+ // dropped once a lens actually came back: a press that the phone refuses must leave the
+ // office's picture of this trip exactly as it was, not open a second unwatched stretch.
+ const res=CAMOFF;
  CAMW=true;dwUi();
  const why=await dwUp();
- if(why){CAMW=false;dwUi();banner('<i class="fa-solid fa-video-slash"></i> Driver camera is off: '+esc(why),8000);return}
+ if(why){CAMW=false;dwUi();
+  return banner('<i class="fa-solid fa-video-slash"></i> Driver camera is off: '+esc(why),8000)}
+ if(res){CAMOFF=false;camOffEv(false);camErr('')}
  logAct('Driver camera started',camVeh());
+ if(dmsOn()&&SRT){await dmsStart();await camBox(true);
+  if(res){banner('<i class="fa-solid fa-video"></i> Driver camera resumed: this trip is watched, warned and recorded again from now',6000);return}}
  banner('<i class="fa-solid fa-video"></i> The forward camera is open for you to see. Warnings and records start with a trip - press Start trip'+
   (A_STARTON()?', or set off and the phone starts one by itself':''),8000);
  // a lens that has not handed over a picture after a few seconds is a lens that is not
@@ -1518,13 +1662,23 @@ function netUi(why){const t=$('v_sent');if(!t)return;
  if(why)t.title=why;outUi()}
 // a trip the phone never got to finish: kept so that opening the app again after a
 // crash, an update, a phone call or a swipe-away resumes tracking instead of waiting
-// for the driver. `t` is when the trip began, `u` the last fix that reached it, and
-// `o` the distance already driven, so a resumed trip keeps its own odometer.
+// for the driver. `t` is when the trip began, `u` the last fix that reached it, `o` the
+// distance already driven, so a resumed trip keeps its own odometer, and `c`/`e` the driver's
+// camera stop and the row that says it happened.
 let SRT=false,SGEN=0,TS_TRIP=0;
 async function tripSave(){try{const t=tripRead();
- localStorage.trip=JSON.stringify({v:asg?.vehicle_id,t:t&&t.v===asg?.vehicle_id?+t.t||Date.now():Date.now(),u:Date.now(),o:ODOM})}catch(e){}}
+ // c and e carry the driver's own camera stop across an Android process death: without them
+ // a restarted phone would start the fleet's judging again in the middle of a stretch he
+ // closed, and the row he opened would outlive the only thing that knows how to close it.
+ localStorage.trip=JSON.stringify({v:asg?.vehicle_id,t:t&&t.v===asg?.vehicle_id?+t.t||Date.now():Date.now(),u:Date.now(),o:ODOM,c:CAMOFF?1:0,e:CAMOFF?CAMOFFID:''})}catch(e){}}
 const tripRead=()=>{try{const t=JSON.parse(localStorage.trip||'null');return t&&t.v?t:null}catch(e){return null}};
 function tripClear(){localStorage.removeItem('trip')}
+// A restart has to bring back the driver's own camera stop and the row that carries it
+// together: the flag without its id leaves an unwatched stretch that nothing will ever close,
+// and the id without the flag lets the fleet's judging start again under a driver who said
+// stop. A fresh trip inherits neither - the last shift's stop is not this driver's answer.
+function camRestore(quiet){const t=quiet?tripRead():null,c=!!t&&+t.c===1;
+ CAMOFF=c;CAMOFFID=c?String(t.e||''):'';if(c)camErr(CAMOFFTXT);return c}
 // Android ends this app's process for a phone or video call, or simply to get the
 // memory back, and the driver used to come back to a finished-looking trip he had to
 // start again by hand. Nothing here stops a trip: the marker stays on the phone and
@@ -1744,8 +1898,14 @@ async function start(quiet,auto){
  // place over before the trip's own callback can take it
  await senOff();
  SRT=true;STILLAT=Date.now();const myGen=++SGEN;
+ // the outage clock starts with the trip, so a vehicle that never locks a position at all
+ // is reported just as loudly as one that loses it halfway through a tunnel
+ LASTFIX=Date.now();GLOST=null;clearInterval(gpsT);gpsT=setInterval(gpsTick,10000);
  try{
  await loadRules();pollBat();batT=setInterval(pollBat,30000);cfgT=setInterval(loadRules,300000);prev=null;pp=null;HSENT=null;ODOM=quiet?Math.max(0,+(tripRead()?.o||0)):0;TS_TRIP=0;Object.keys(VS).forEach(k=>VS[k]=0);Object.keys(RST).forEach(k=>RST[k]=null);
+ // a phone Android restarted mid-trip comes back into the trip exactly as the driver left it,
+ // his camera stop included; a trip that starts fresh starts watched, whatever the last one did
+ camRestore(quiet);
  // a new trip starts from a clean slate: no alert left remembered as already buzzed
  Object.keys(lastNotify).forEach(k=>lastNotify[k]=0);
  if(!window.CapPlugins)throw new Error('Plugin bridge missing: rebuild the APK with the latest build-apk.yml');
@@ -1755,6 +1915,9 @@ async function start(quiet,auto){
   // position, and above all must not bring back the trip the driver ended
   if(myGen!==SGEN)return;
   if(err){if(err.code==='NOT_AUTHORIZED')$('err').textContent='Allow location "All the time" in app settings (Permissions button).';return}
+  // the outage clock is fed before anything else: every later step in this callback can
+  // return early, and one that did would otherwise be mistaken for a lost satellite lock
+  gpsSeen(loc);
   const kmh=Math.max(0,(loc.speed||0)*3.6),moving=kmh>=MIN_MOVING_KMH,every=(moving?MOV:STP)*1000,n=Date.now();
   // the tone stops on its own deadline even if Android froze the timer that was
   // supposed to stop it, because these callbacks are what keep this page alive
@@ -1808,10 +1971,16 @@ async function start(quiet,auto){
  if(!navigator.onLine)banner('<i class="fa-solid fa-wifi"></i> No internet: records are kept on the phone and sent later',7000);
  }catch(e){$('err').textContent='Error: '+(e.message||e)}
  SRT=false}
-async function stop(auto){SGEN++;stopTone();clearInterval(batT);clearInterval(cfgT);prev=null;pp=null;closeAll(Date.now()/1000);
+async function stop(auto){SGEN++;stopTone();clearInterval(batT);clearInterval(cfgT);clearInterval(gpsT);prev=null;pp=null;closeAll(Date.now()/1000);
+ // an outage the trip outlived is closed here, so the office sees how far it reached
+ gpsTripEnd();
  // the camera ends with the trip: a breach still open on the phone gets its end time
  // there and comes back here before anything is pushed
- await dmsStop();await dmsDrain();
+ await dmsStop();
+ // the driver's own stop dies with the trip it stopped: the unwatched stretch gets its end
+ // time here, so the office sees it as far as it reaches and no longer
+ if(CAMOFF){CAMOFF=false;camOffEv(false)}
+ await dmsDrain();
  Object.keys(VS).forEach(k=>VS[k]=0);tripClear();
  if(lastLoc)outAdd({t:'pos',p:row(lastLoc,0,false)});flush();
  logAct(auto?'Ended trip automatically':'Ended trip',(asg?.vehicles?.name||'')+(lastLoc?' at '+lastLoc.latitude.toFixed(5)+', '+lastLoc.longitude.toFixed(5):''));
