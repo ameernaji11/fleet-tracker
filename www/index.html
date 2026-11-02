@@ -116,7 +116,7 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 <div class="card spd"><div><b id="sp">0</b><span>km/h</span></div><div class="pr"><small>Position</small><b id="v_pos">-</b><br><small id="lt">No record yet</small></div></div>
 <div id="map"><div id="fr"></div><div class="mn hide" id="mn"><i class="fa-solid fa-wifi"></i> No signal: this area was not cached, the route and zones are still drawn</div><div class="layN hide" id="layN"></div><div id="camV" class="hide"><img id="camI" alt="Driver camera view"><i id="camVi" class="fa-solid fa-video"></i></div><div class="mcl"><button id="muteB" onclick="muteTog()" title="Mute the alerts"><i class="fa-solid fa-volume-high"></i></button><button id="layB" onclick="togMap()" title="Map style"><i class="fa-solid fa-layer-group"></i></button><button id="fsB" onclick="fsMap()" title="Full screen"><i class="fa-solid fa-expand"></i></button><button id="pinB" class="on" onclick="togPin()" title="Pin: keep the vehicle in the centre"><i class="fa-solid fa-thumbtack"></i></button><button id="camB" class="hide" onclick="camTog()" title="Show the view of your face"><i class="fa-solid fa-eye-slash"></i></button><button id="dwB" class="hide" onclick="dwTog()" title="Driver camera: start watching for tiredness and distraction"><i class="fa-solid fa-video-slash"></i></button></div></div>
 <div class="grid3" id="vals"></div>
-<div class="btns"><button id="go" class="btn g" onclick="start()" title="You can press this, but you no longer have to: a trip starts by itself once the vehicle has been moving for 5 seconds"><i class="fa-solid fa-play"></i>Start trip</button><button id="stp" class="btn r hide" onclick="stop()" title="A trip also ends by itself after 10 minutes with the vehicle standing still"><i class="fa-solid fa-stop"></i>End trip</button></div>
+<div class="btns"><button id="go" class="btn g" onclick="start()" title="You can press this, but you no longer have to: a trip starts by itself once the vehicle has been above 5 km/h for 5 seconds"><i class="fa-solid fa-play"></i>Start trip</button><button id="stp" class="btn r hide" onclick="stop()" title="A trip also ends by itself after 10 minutes below 5 km/h"><i class="fa-solid fa-stop"></i>End trip</button></div>
 <div class="foot">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</div>
 <div class="card hide" id="pwcard"><small id="pwnote" style="display:none;color:var(--or)">The administrator set the password you signed in with. Choose your own now.</small><small style="display:block;color:var(--mut)">New password — at least 6 characters</small>
 <input type="password" id="np1" placeholder="New password" autocomplete="new-password">
@@ -817,7 +817,11 @@ function evFix(p){if(!p||goodXY(p.lat,p.lng))return '';const l=GOOD;
  const g=Math.max(0,Math.round((Date.now()-(l.time||Date.now()))/1000));
  return ' · place from the last GPS fix, '+(g<90?g+' s':Math.round(g/60)+' min')+' earlier'}
 let V={voice_on:1,lang:'en',
-zones_on:1,bb_on:1,bb_days:3,bb_min_kmh:1,dms_on:0,dms_fps:5,dms_pre_s:3,dms_post_s:1,dms_keep_d:7,dms_preview:1};const LIM={speed:100,brake:-3,accel:2.5,buf:0,warn:0,dist:0,zbuf:0},HOLD={harsh_braking:0,harsh_acceleration:0,overspeed:0,zone_overspeed:0},ON={},lastEv={},lastNotify={},VS={},ANN={};let prev=null,lastA=0,lastLoc=null,ODOM=0,pp=null,bat={},fl=false,batT,cfgT,MOV=10,STP=3600;
+zones_on:1,bb_on:1,bb_days:3,bb_min_kmh:1,dms_on:0,dms_fps:5,dms_pre_s:3,dms_post_s:1,dms_keep_d:7,dms_preview:1,
+// the two halves of the automatic trip, both on and at the waits the fleet started with.
+// A handset with no settings yet - offline on its first morning, or a database that has
+// never run v29 - behaves exactly as every handset has until now.
+auto_start:1,auto_start_s:5,auto_end:1,auto_end_min:10,auto_kmh:5};const LIM={speed:100,brake:-3,accel:2.5,buf:0,warn:0,dist:0,zbuf:0},HOLD={harsh_braking:0,harsh_acceleration:0,overspeed:0,zone_overspeed:0},ON={},lastEv={},lastNotify={},VS={},ANN={};let prev=null,lastA=0,lastLoc=null,ODOM=0,pp=null,bat={},fl=false,batT,cfgT,MOV=10,STP=3600;
 // ---- geofences. An admin draws these on the dashboard's Live Tracking map and
 // gives each one a speed limit; the phone reads the shapes, tests every fix against
 // them and reports driving in, driving out or passing the zone's own limit.
@@ -1204,7 +1208,8 @@ async function dwTog(){
  const why=await dwUp();
  if(why){CAMW=false;dwUi();banner('<i class="fa-solid fa-video-slash"></i> Driver camera is off: '+esc(why),8000);return}
  logAct('Driver camera started',camVeh());
- banner('<i class="fa-solid fa-video"></i> The forward camera is open for you to see. Warnings and records start with a trip - press Start trip, or set off and the phone starts one by itself',8000);
+ banner('<i class="fa-solid fa-video"></i> The forward camera is open for you to see. Warnings and records start with a trip - press Start trip'+
+  (A_STARTON()?', or set off and the phone starts one by itself':''),8000);
  // a lens that has not handed over a picture after a few seconds is a lens that is not
  // working, and the reason belongs on the screen now, not at the end of the shift
  setTimeout(async()=>{if(!CAMW||CAMSEEN)return;let s=null;
@@ -1275,7 +1280,12 @@ function applyCfg(a,r,t,g){
   // the driver camera: off unless the fleet has switched it on, which is also what a
   // database that has not run v19 yet means, because it has no dms_ keys at all
   dms_on:VC.dms_on==='1'?1:0,dms_fps:num(VC.dms_fps,5),dms_pre_s:num(VC.dms_pre_s,3),
-  dms_post_s:num(VC.dms_post_s,1),dms_keep_d:num(VC.dms_keep_d,7),dms_preview:VC.dms_preview==='0'?0:1};
+  dms_post_s:num(VC.dms_post_s,1),dms_keep_d:num(VC.dms_keep_d,7),dms_preview:VC.dms_preview==='0'?0:1,
+  // the two halves of the automatic trip, each with its own switch. Only an explicit 0 from
+  // the dashboard turns one off, so a database that has not run v29 - which has no auto_ keys
+  // at all - keeps the behaviour every handset has had since it learned to drive itself.
+  auto_start:VC.auto_start_on==='0'?0:1,auto_end:VC.auto_end_on==='0'?0:1,
+  auto_start_s:num(VC.auto_start_s,5),auto_end_min:num(VC.auto_end_min,10),auto_kmh:num(VC.auto_kmh,5)};
  // the offline wrong-try count ages out on the fleet's own window, and the sign-in
  // screen has to read it out of storage because nothing is downloaded at that moment
  try{localStorage.lwin=String(Math.max(1,Math.round(S.login_window_m||15)))}catch(e){}
@@ -1311,6 +1321,13 @@ function applyCfg(a,r,t,g){
  // not at the end of the trip - unless the driver pressed his own button, which the
  // fleet switch does not own
  if(CAMON&&!dmsOn()&&!CAMW)dmsStop();
+ // an administrator who switches the automatic start off takes the watcher down now rather
+ // than at the next trip, because a live watcher keeps opening trips the fleet has just said
+ // it does not want. Switching it back on hands the job to senOn, which refuses to install a
+ // second watcher, to work before anybody is signed in, or to run while a trip holds one.
+ // The other half needs no hook here: the trip's own callback asks V.auto_end on every
+ // position it is given, so a trip that was already running obeys the switch from its next fix.
+ autoTips();if(V.auto_start){if(!watcher&&!SRT)senOn()}else senOff();
  // the setup is what a resumed trip was waiting for: an app that restarted with no
  // signal, or with the settings query still running, can only start again from here
  if(map&&!watcher)maybeResume()}
@@ -1524,16 +1541,33 @@ async function maybeResume(){
 // ---- the trip the driver forgets. A handset in a cab knows when the cab is moving, and a
 // fleet whose records only begin when a man remembers to press a button loses the whole
 // first hour of every shift. While no trip is running one watcher stays alive for this
-// page alone: five seconds above 5 km/h starts a trip by itself, and ten minutes below it
-// ends one. The same speed is the rule for both, so one number says what moving means.
+// page alone: the vehicle moving above the fleet's own speed for the fleet's own number of
+// seconds starts a trip by itself, and standing below it for the fleet's own number of
+// minutes ends one. The same speed is the rule for both, so one number says what moving
+// means, and all five are set on the dashboard's Configuration page - each half with its
+// own switch, because a fleet that may only keep the hours a driver claimed needs the
+// buttons to be the only thing that can move a trip.
 // Only one watcher is ever alive, because Android hands this app one background location
 // service rather than two: the sentry steps down before the trip's own takes its place,
 // and steps back up when the trip ends.
-const AUTO_KMH=5,AUTO_START_MS=5000,AUTO_END_MS=600000;
+const A_KMH=()=>Math.min(60,Math.max(0.5,num(V.auto_kmh,5))),
+ A_START=()=>Math.max(1,Math.min(600,num(V.auto_start_s,5)))*1000,
+ A_END=()=>Math.max(1,Math.min(720,num(V.auto_end_min,10)))*60000,
+// each half of the automatic trip. Only an explicit 0 turns one off, so a cache written
+// before the dashboard learned about these switches keeps the behaviour it always had.
+ A_STARTON=()=>V.auto_start!==0,A_ENDON=()=>V.auto_end!==0;
+// The two buttons say what the phone will do without them, in the numbers the fleet chose,
+// because a driver who has been told a trip begins on its own will not press Start - and on
+// a fleet that has switched that off, the record of his whole shift then never opens.
+function autoTips(){const g=$('go'),s=$('stp');if(!g||!s)return;
+ g.title=A_STARTON()?'You can press this, but you no longer have to: a trip starts by itself once the vehicle has been above '+A_KMH()+' km/h for '+Math.round(A_START()/1000)+' seconds'
+  :'Only this button starts a trip: your fleet has switched the automatic start off, so press it when you set off';
+ s.title=A_ENDON()?'A trip also ends by itself after '+Math.round(A_END()/60000)+' minutes below '+A_KMH()+' km/h'
+  :'Only this button ends a trip: your fleet has switched the automatic end off, so press it when you park'}
 let SEN=null,SENUP=0,STILLAT=0;
 async function senOff(){if(!SEN)return;const id=SEN;SEN=null;
  try{await CapPlugins.BG.removeWatcher({id})}catch(e){}}
-async function senOn(){if(SEN||watcher||SRT||!me||!asg?.vehicle_id)return;
+async function senOn(){if(SEN||watcher||SRT||!me||!asg?.vehicle_id||!A_STARTON())return;
  if(!window.CapPlugins||!CapPlugins.BG)return;
  try{SEN=await CapPlugins.BG.addWatcher({requestPermissions:true,backgroundTitle:'Fleet Tracker',
   backgroundMessage:'Waiting for you to set off',stale:false,distanceFilter:10},async(loc,err)=>{
@@ -1543,20 +1577,21 @@ async function senOn(){if(SEN||watcher||SRT||!me||!asg?.vehicle_id)return;
   if(!id||id!==SEN||watcher||SRT)return;
   if(err||!loc)return;
   const kmh=Math.max(0,(loc.speed||0)*3.6);
-  if(kmh<=AUTO_KMH){SENUP=0;return}
+  if(kmh<=A_KMH()){SENUP=0;return}
   const n=Date.now();
   if(!SENUP){SENUP=n;return}
-  if(n-SENUP<AUTO_START_MS)return;
+  if(n-SENUP<A_START())return;
   SENUP=0;await senOff();
   await start(0,1);
-  banner('<i class="fa-solid fa-road"></i> Trip started by itself: the vehicle has been moving for '+
-   Math.round(AUTO_START_MS/1000)+' seconds. Press End trip when you park, or the phone ends it for you',9000);
+  banner('<i class="fa-solid fa-road"></i> Trip started by itself: the vehicle has been above '+A_KMH()+
+   ' km/h for '+Math.round(A_START()/1000)+' seconds. '+(A_ENDON()?'Press End trip when you park, or the phone ends it for you'
+    :'Press End trip when you park - your fleet has left the ending to you'),9000);
  })}catch(e){SEN=null}}
-// the trip's own callback asks the same question on every fix it gets: a vehicle standing
-// still for ten minutes is parked, and a record left open until somebody presses a button
-// is a trip that every report counts again the next day.
+// the trip's own callback asks the same question on every fix it gets: a vehicle that has
+// stood below the moving speed for the fleet's own wait is parked, and a record left open
+// until somebody presses a button is a trip that every report counts again the next day.
 async function endAuto(){banner('<i class="fa-solid fa-road"></i> Trip ended by itself after '+
-  Math.round(AUTO_END_MS/60000)+' minutes without moving. Start a new one when you set off',9000);
+  Math.round(A_END()/60000)+' minutes without moving. Start a new one when you set off',9000);
  await stop(1)}
 // ---- blackbox. Every fix the location watcher delivers above the fleet's own speed
 // (about one per second on the move, none at all while the vehicle stands still) is
@@ -1724,10 +1759,13 @@ async function start(quiet,auto){
   // the tone stops on its own deadline even if Android froze the timer that was
   // supposed to stop it, because these callbacks are what keep this page alive
   toneEnd();
-  // ten minutes of standing still ends the trip: the same speed the auto start measures
-  // against, so one number says what moving means for both halves of a shift
-  if(kmh>AUTO_KMH)STILLAT=n;else if(!STILLAT)STILLAT=n;
-  else if(n-STILLAT>=AUTO_END_MS){STILLAT=0;await endAuto();return}
+  // standing below the moving speed for the fleet's own wait ends the trip. The clock is
+  // kept whatever the switch says, so a fleet that turns the automatic end back on
+  // mid-shift measures from when the vehicle really stopped moving, not from the moment
+  // the settings arrived - and the same speed the auto start measures against says what
+  // moving means for both halves of a shift.
+  if(kmh>A_KMH())STILLAT=n;else if(!STILLAT)STILLAT=n;
+  else if(A_ENDON()&&n-STILLAT>=A_END()){STILLAT=0;await endAuto();return}
   // keep the trip marker fresh: it is the only thing that survives a process
   // Android kills, and its timestamp is what says "this trip was still running"
   if(n-TS_TRIP>60000){TS_TRIP=n;tripSave()}
