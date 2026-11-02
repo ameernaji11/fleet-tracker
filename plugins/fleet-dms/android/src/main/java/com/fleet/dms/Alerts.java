@@ -82,8 +82,9 @@ class Alerts {
 
     /**
      * The words to speak, taken from the page rather than copied here. The driver
-     * app holds them in English, Arabic, Hindi and Urdu and the rule carries which of
-     * those it should use, so a translation added on the page needs no new build.
+     * app holds them in English, Arabic, Kurdish (Kurmanji and Sorani), Hindi and Urdu
+     * and the rule carries which of those it should use, so a translation added on the
+     * page needs no new build.
      */
     void setMessages(JSONObject m) {
         if (m != null) msgs = m;
@@ -270,26 +271,33 @@ class Alerts {
             pending = new String[]{type, lang};
             return;
         }
-        final String text = textFor(type, lang);
+        final String want = lang == null || lang.isEmpty() ? "en" : lang;
+        final String text = textFor(type, want);
         if (text.isEmpty()) return;
         pending = null;
         try {
-            String want = lang == null || lang.isEmpty() ? "en" : lang;
+            String spoken = text;
             if (!want.equals(ttsLang)) {
                 // Android reports its voices by language alone, so a region tag such as
                 // ur-PK is refused by engines that do have Urdu: ask for the bare code.
                 Locale loc = Locale.forLanguageTag(want);
                 int r = tts.setLanguage(loc);
                 if (r == TextToSpeech.LANG_MISSING_DATA || r == TextToSpeech.LANG_NOT_SUPPORTED) {
+                    // no voice for the language on this handset. It must not be handed the
+                    // foreign words it cannot say, and must not be trusted to read Kurdish
+                    // letters with an English mouth: the same warning in English is spoken,
+                    // so the driver always hears what happened even before a voice is added.
                     tts.setLanguage(Locale.ENGLISH);
                     ttsLang = "en";
+                    String en = textFor(type, "en");
+                    if (!en.isEmpty()) spoken = en;
                 } else ttsLang = want;
             }
             // the engine takes its parameters as a Bundle since API 21: the utterance id
             // is how stopVoice() can tell its own sentence from one already queued
             Bundle p = new Bundle();
             p.putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, type);
-            tts.speak(text, TextToSpeech.QUEUE_FLUSH, p, type);
+            tts.speak(spoken, TextToSpeech.QUEUE_FLUSH, p, type);
         } catch (Exception ignore) {
             // no engine, or an engine that will not talk: the notice already said it
         }

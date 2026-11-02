@@ -93,7 +93,10 @@ public class Config {
         String v = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
         int dash = v.indexOf('-');
         if (dash > 0) v = v.substring(0, dash);
-        return v.equals("ar") || v.equals("hi") || v.equals("ur") ? v : "en";
+        // Kurdish arrives as two of these: ku for Kurmanji (Latin letters) and ckb for
+        // Sorani (Arabic letters). A language not on this list is not refused aloud -
+        // the page sends its words in English too, so the driver always hears the warning.
+        return v.equals("ar") || v.equals("hi") || v.equals("ur") || v.equals("ku") || v.equals("ckb") ? v : "en";
     }
 
     /**
