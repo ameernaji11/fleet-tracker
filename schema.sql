@@ -1343,6 +1343,29 @@ revoke all on function device_take(text,text,boolean), device_give(text) from pu
 grant execute on function device_take(text,text,boolean) to authenticated;
 grant execute on function device_give(text) to authenticated;
 
+-- --------------------------- v29 the trips the phone makes when nobody presses ----
+-- A handset in a cab knows when the cab is moving, so a trip does not have to wait for a
+-- driver to remember the button: five seconds above 5 km/h opens one, and ten minutes
+-- below it closes one. That is right for a fleet whose records are otherwise missing the
+-- first hour of every shift, and wrong for one that may only write down the hours a man
+-- said he drove. These five keys are that choice, and they carry the numbers with it,
+-- because a taxi crawling through a city and a lorry idling at a depot cannot both be
+-- measured against the same 5 km/h.
+--
+-- Both switches seed ON, which is exactly what every handset does today, so this block
+-- changes nothing on its own. The new "Trips the phone starts and ends by itself" card on
+-- the Configuration page is where a fleet turns either half off, and the phone reads all
+-- five keys within five minutes or at the next trip start.
+--
+-- A database that has not run this still auto-starts and auto-ends a trip, at five
+-- seconds, ten minutes and 5 km/h: an absent key is the same answer as these defaults, so
+-- an older dashboard build cannot switch the behaviour off by not knowing about it.
+insert into app_settings (key, value) values
+   ('auto_start_on','1'), ('auto_start_s','5')
+  ,('auto_end_on','1'),   ('auto_end_min','10')
+  ,('auto_kmh','5')
+  on conflict (key) do nothing;
+
 -- ------------------------------------------------------------- admin seed ----
 -- Promote the owner account. Runs after the tables/policies exist, and is safe
 
@@ -1734,4 +1757,23 @@ end $$;
 --   honest state of a project that has the table but not the handsets. Publish the dashboard build after the
 --   phone one: its Release button only has rows to delete once handsets are making them.
 --   Releasing a seat by hand is the answer for a phone that is lost, broken or left in a drawer.
+--
+-- v29, on top of the above (the trips the phone makes when nobody presses a button):
+--   app_settings keys 'auto_start_on' (1), 'auto_start_s' (5), 'auto_end_on' (1),
+--        'auto_end_min' (10), 'auto_kmh' (5)   -> the two halves of the automatic trip, each with its
+--        own switch and its own wait. A handset that is not in a trip keeps one background watcher alive
+--        for this alone; auto_start_s seconds above auto_kmh km/h starts the trip, and auto_end_min
+--        minutes below it ends the one that is running. The same speed is the rule for both, so one
+--        number says what moving means. Turn either half off and the button on the driver's screen is
+--        the only thing that can move the trip - the phone then never opens or closes a record by
+--        itself. Nothing is renamed or dropped: an absent key reads as these same defaults, so a project
+--        that skips this migration behaves exactly as it did, and an old phone build ignores keys it has
+--        never heard of.
+--   Configuration page, "Trips the phone starts and ends by itself" -> the two switches and the three
+--        boxes. The driver's own Start/End tooltips and the two banners quote the numbers the fleet set
+--        rather than the old fixed five seconds and ten minutes.
+--   Run this BEFORE publishing the phone build that reads the switches. Until then a handset keeps the
+--        hardcoded behaviour, so a fleet that saves Off here and does not update its handsets sees trips
+--        still starting on their own.
+
 -- ============================================================================
