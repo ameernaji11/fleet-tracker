@@ -408,6 +408,14 @@ const baseN=()=>BASES[localStorage.base]?localStorage.base:'Google Map';
 const baseL=n=>{const b=BASES[n||baseN()];return L.tileLayer(b[0],{attribution:b[1],maxZoom:b[2],...b[3]})};
 function mkMap(id,fit,extra){
  const m=L.map(id).setView([23.6,58.5],8);m._btn={};
+ // Every click bubbles up to the map container, and Leaflet's own preclick handler closes
+ // whatever popup is open when it gets there - so pressing an arrow or an event chip inside
+ // a popup emptied the very box it was pressed in, immediately after the handler had refilled
+ // it. A click on a control in a popup is meant for the popup, not for the road behind it:
+ // stopping it at the popup leaves the X button and a click outside exactly as they were,
+ // which is all that should ever close one.
+ m.on('popupopen',e=>{const el=e.popup.getElement();if(!el||el.__own)return;el.__own=1;
+  el.addEventListener('click',ev=>ev.stopPropagation())});
  let cur=baseN();let layer=baseL(cur).addTo(m);
  const c=L.control({position:'topright'});
  c.onAdd=()=>{const d=L.DomUtil.create('div','mt');L.DomEvent.disableClickPropagation(d);
@@ -1520,7 +1528,7 @@ async function evClip(path,cid){const x=EVROW[cid]||{clip_path:path},E=EVX(x.typ
  <div id="clpR" style="margin-top:8px;font-size:13px">
  <b>${esc(x.driver_name||'-')}</b> · ${esc(x.vehicle_name||'-')} · ${x.recorded_at?new Date(x.recorded_at).toLocaleString():'-'} · ${x.speed!=null?Math.round(x.speed||0)+' km/h':'-'} · ${x.ended_at?hms((new Date(x.ended_at)-new Date(x.recorded_at))/1000):'-'} · ${(size/1024).toFixed(0)} KB
  <div style="margin-top:3px">${esc(x.details||EVX(x.type)[0])}</div>
- <div style="margin-top:3px;color:var(--mut);font-size:12px"><i class="fa-solid fa-circle-info"></i> The small line along the bottom of the picture is written into the file itself, so the download carries it too.</div></div>
+ <div style="margin-top:3px;color:var(--mut);font-size:12px"><i class="fa-solid fa-circle-info"></i> The clock in its top left corner and the small line along the bottom are written into the picture itself, so a download or a forwarded copy carries them.</div></div>
  <div class="dlgB"><a class="btn b sm" href="${url}" download="${esc(clipName(x))}" title="Save this recording to this computer"><i class="fa-solid fa-download"></i>Download</a>
  <button class="btn gh sm" onclick="closeClip()"><i class="fa-solid fa-xmark"></i>Close</button></div>`);
  clipReadSet(clipRead())}
