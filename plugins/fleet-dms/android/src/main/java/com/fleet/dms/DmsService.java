@@ -62,6 +62,10 @@ public class DmsService extends Service implements LifecycleOwner {
     // The preview box is a courtesy to the driver, not a reading; once a second is as
     // often as it needs to move, and every hand-over allocates a picture.
     private static final int UI_EVERY_MS = 1000;
+    // A place or a speed older than this at the moment of a breach is not that breach's own
+    // reading, and the row says so. The app reports every second it is awake, so fifteen of
+    // them without a hand-over means the page was put to sleep rather than the sky was clear.
+    private static final long FIX_STALE_S = 15;
 
     /**
      * What the page can hear. Only ever the plugin of the app's own process, which is
@@ -115,6 +119,10 @@ public class DmsService extends Service implements LifecycleOwner {
     private volatile Config cfg = new Config();
     private volatile double kmh;
     private volatile double[] fix;
+    // The moment the app last handed a reading over, good or not. The lens keeps judging
+    // with the screen off and the page asleep, so this is what says whether the place and
+    // the speed a row is about to carry were measured near that breach or long before it.
+    private volatile long fedAt;
     private volatile String reason = "";
     private long lastFrame, lastUi;
 
@@ -383,6 +391,7 @@ public class DmsService extends Service implements LifecycleOwner {
     /** The fix the app already has, so an event can say where the vehicle was. */
     void feed(double lat, double lng, double acc, double alt, double heading, double speedKmh, long atMs) {
         kmh = speedKmh;
+        fedAt = atMs;
         // A receiver that has not locked anything reports 0,0, and the page hands over
         // every reading it gets. The speed still counts, because the wheels did turn, but
         // the last place the phone really held says more about where the vehicle is than a
@@ -822,10 +831,27 @@ public class DmsService extends Service implements LifecycleOwner {
             if (!cfg.driverName.isEmpty()) p.put("driver_name", cfg.driverName);
             p.put("type", type);
             p.put("recorded_at", Outbox.iso(at));
-            p.put("details", details);
+            // The app hands a reading over every second it is awake and none at all while
+            // Android puts its page to sleep, so a breach raised behind the driver's back can
+            // be stamped with a place the vehicle drove away from a minute ago. That place is
+            // still the honest answer about where the phone last heard itself - it simply is
+            // not a place measured at this second, and the row has to say which of the two a
+            // supervisor is looking at. Four rows on one coordinate is what the alternative
+            // looks like from the map: a stop that never happened, at a speed never reached.
+            double[] f = fix;
+            String note = "";
+            if (f != null) {
+                long placeAge = Math.max(0, (at - (long) f[5]) / 1000);
+                long speedAge = fedAt == 0 ? 0 : Math.max(0, (at - fedAt) / 1000);
+                if (placeAge > FIX_STALE_S || speedAge > FIX_STALE_S) {
+                    note = (speedAge > FIX_STALE_S ? " · place and speed are the last the app reported, "
+                            : " · place is the last fix the phone locked, ")
+                            + ago(Math.max(placeAge, speedAge)) + " before this alert";
+                }
+            }
+            p.put("details", details + note);
             p.put("speed", (double) Math.round(kmh));
             if (value != null) p.put("value", value);
-            double[] f = fix;
             if (f != null) {
                 p.put("lat", f[0]).put("lng", f[1]);
                 if (!Double.isNaN(f[2])) p.put("accuracy", (double) Math.round(f[2]));
@@ -842,6 +868,11 @@ public class DmsService extends Service implements LifecycleOwner {
             // JSONObject only throws on a null key, and none of these are null
         }
         return p;
+    }
+
+    /** A gap in seconds, in the words the page uses: minutes once it is more than a minute. */
+    private static String ago(long s) {
+        return s < 90 ? s + " s" : Math.round(s / 60.0) + " min";
     }
 
     /** The charge on the phone at the moment of the event, from the system's own copy. */
