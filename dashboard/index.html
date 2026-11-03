@@ -244,12 +244,12 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <div class="card kpi gr click" data-f="go" onclick="setF('go')"><div class="ic"><i class="fa-solid fa-gauge-high"></i></div><div><b id="k_go">0</b><span>Moving</span></div></div>
 <div class="card kpi or click" data-f="idle" onclick="setF('idle')"><div class="ic"><i class="fa-solid fa-hourglass-half"></i></div><div><b id="k_idle">0</b><span>Idling</span></div></div>
 <div class="card kpi bl click" data-f="park" onclick="setF('park')"><div class="ic"><i class="fa-solid fa-square-parking"></i></div><div><b id="k_park">0</b><span>Parking</span></div></div>
-<div class="card kpi gy click" data-f="off" onclick="setF('off')"><div class="ic"><i class="fa-solid fa-plug-circle-xmark"></i></div><div><b id="k_off">0</b><span>Offline &middot; after <input id="offH" type="number" min="0.5" step="0.5" onclick="event.stopPropagation()" onchange="saveOff()" title="Hours without a signal before a vehicle counts as offline"> h</span></div></div></div>
+<div class="card kpi gy click" data-f="off" onclick="setF('off')"><div class="ic"><i class="fa-solid fa-plug-circle-xmark"></i></div><div><b id="k_off">0</b><span>Offline &middot; after <input id="offH" type="number" min="0.5" step="0.5" onclick="event.stopPropagation()" onchange="saveOff()"  title="Hours without a signal before a vehicle counts as offline"> h<span class="hp" data-tip="This tile counts every vehicle whose phone has sent nothing for longer than the number in this box - 24 hours unless the office has changed it. A vehicle parked in the yard is not in it: while the app runs it still reports a heartbeat every few minutes, so a silence this long means the phone is off, out of coverage, or signed out. A vehicle that has never reported at all is counted under Parking instead. Click the tile to list the ones it counted.">?</span></span></div></div></div>
 <div class="card lscope"><b style="font-weight:800"><i class="fa-solid fa-list-check"></i> Track</b><div id="lv_v" style="flex:1;min-width:220px"></div><small>Choose one vehicle, several of them, or Select all. An empty choice tracks the whole fleet.</small></div>
 <div class="split"><div class="card panel"><div class="field"><input id="q" placeholder="Search vehicle or driver" oninput="renderList()"></div><div class="list" id="liveList"></div></div><div class="map" id="mapLive"></div></div></section>
 <section id="hist"><div class="card hbar">
 <div class="field"><label>Vehicle</label><select id="hv"></select></div><div class="field"><label>From</label><input id="hf" type="text"></div><div class="field"><label>To</label><input id="ht" type="text"></div>
-<button class="btn b" onclick="loadHist()"><i class="fa-solid fa-route"></i>Show route</button></div>
+<button class="btn b" id="histB" onclick="busy(this,loadHist)"><i class="fa-solid fa-route"></i>Show route</button></div>
 <div class="kbar"><button class="btn gh sm" id="hkB" onclick="hKpi()" title="Show or hide the summary"><i class="fa-solid fa-eye-slash"></i></button><div class="kstrip" id="hstat"></div></div>
 <div class="hwrap"><div class="map" id="mapHist"></div><div class="card hside" id="hside"><p style="color:var(--mut);margin:0">Pick a vehicle and period, then press <b>Show route</b>. Each trip gets its own colour; tick the trips to show and click one to see its details and play it back.</p></div></div></section>
 <section id="evt">
@@ -257,7 +257,7 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <div class="field"><label>Drivers</label><div id="ev_d"></div></div>
 <div class="field"><label>Events</label><div id="ev_t"></div></div>
 <div class="field"><label>From</label><input id="ev_f" type="text"></div><div class="field"><label>To</label><input id="ev_to" type="text"></div>
-<button class="btn b" onclick="loadEvt()"><i class="fa-solid fa-play"></i>Generate</button></div>
+<button class="btn b" onclick="busy(this,loadEvt)"><i class="fa-solid fa-play"></i>Generate</button></div>
 <div id="evFl" class="fbar"></div><div class="kpis" id="evK"></div><div class="cgrid"><div class="card"><canvas id="c1"></canvas></div><div class="card"><canvas id="c2"></canvas></div><div class="card"><canvas id="c3"></canvas></div></div><div class="tw" id="evT"></div></section>
 <section id="cfg"><div class="ctitle"><b><i class="fa-solid fa-gear"></i> Configuration</b><small>An empty box in a vehicle row means "use the default". Press Save at the bottom of this page to keep every change on it.</small></div>
 <div class="card"><div class="csh"><i class="fa-solid fa-sliders"></i><div><b>Fleet defaults</b><small>Values every vehicle follows unless it carries its own further down this page.</small></div></div><div class="tw mt10"><table><tr><th>Setting</th><th>Value</th><th>What it does</th></tr>
@@ -293,10 +293,10 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <div class="tw mt10" id="plT"></div></div>
 <div class="card fbar"><small class="mut" style="flex:1;min-width:220px">Everything on this page is saved together. Phones apply the changes within 5 minutes, or at the next trip start.</small><button class="btn g" onclick="saveCfg()"><i class="fa-solid fa-floppy-disk"></i>Save</button></div></section>
 <section id="trip"><div class="card frow"><div class="field"><label>Vehicle</label><select id="tr_v"></select></div><div class="field"><label>From</label><input id="tr_f" type="text"></div><div class="field"><label>To</label><input id="tr_t" type="text"></div>
-<button class="btn b" onclick="loadTrip()"><i class="fa-solid fa-stopwatch"></i>Generate</button></div>
+<button class="btn b" onclick="busy(this,loadTrip)"><i class="fa-solid fa-stopwatch"></i>Generate</button></div>
 <div class="kpis" id="trK"></div><div class="cgrid"><div class="card"><canvas id="t1"></canvas></div><div class="card"><canvas id="t2"></canvas></div><div class="card"><canvas id="t3"></canvas></div><div class="card"><canvas id="t4"></canvas></div></div><div class="tw" id="trT"></div></section>
 <section id="rep"><div class="card fgrid"><div class="field"><label>From</label><input id="rp_f" type="text"></div><div class="field"><label>To</label><input id="rp_t" type="text"></div>
-<button class="btn b" onclick="loadRep()"><i class="fa-solid fa-chart-column"></i>Build report</button></div>
+<button class="btn b" id="repB" onclick="busy(this,loadRep)"><i class="fa-solid fa-chart-column"></i>Build report</button></div>
 <div class="kpis" id="rpK"></div><div class="cgrid"><div class="card"><canvas id="r1"></canvas></div><div class="card"><canvas id="r2"></canvas></div><div class="card"><canvas id="r3"></canvas></div><div class="card"><canvas id="r4"></canvas></div></div><div class="tw" id="rpT"></div></section>
 <section id="veh"><div class="card"><div class="csh"><i class="fa-solid fa-truck"></i><div><b>Vehicles</b><small>The name or plate you type here is what every map, list and report shows. Only that one box is required.</small></div></div><form class="fgrid mt10" onsubmit="add(event,'vehicles',['name','type','make_model','year','vin','fuel_type','speed_limit','fuel_moving','fuel_idle','notes'])"><div class="field"><label>Vehicle name / plate *</label><input name="name" required></div>
 <div class="field"><label>Type</label><select name="type"><option value="">-</option><option>Sedan</option><option>Hatchback</option><option>SUV</option><option>Pickup</option><option>Van</option><option>Minibus</option><option>Bus</option><option>Truck</option><option>Heavy Truck</option><option>Tanker</option><option>Taxi</option><option>Ambulance</option><option>Motorbike</option><option>Tractor</option><option>Trailer</option><option>Equipment</option><option>Car</option></select></div>
@@ -316,7 +316,7 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <section id="act"><div class="card frow"><div class="field"><label>User</label><select id="ac_u"><option value="">All users</option></select></div>
 <div class="field"><label>Activity</label><select id="ac_t"><option value="">All activities</option></select></div>
 <div class="field"><label>From</label><input id="ac_f" type="text"></div><div class="field"><label>To</label><input id="ac_to" type="text"></div>
-<button class="btn b" onclick="loadAct()"><i class="fa-solid fa-play"></i>Generate</button></div>
+<button class="btn b" id="actB" onclick="busy(this,loadAct)"><i class="fa-solid fa-play"></i>Generate</button></div>
 <div class="card info"><i class="fa-solid fa-circle-info"></i><div><b>Who did what, and when.</b> Every sign-in, saved configuration, vehicle, driver or user change, trip start or end and exported report is listed here. <span class="hp" data-tip="Entries are written by the account they describe, so an anonymous or signed-out visit never appears. The log cannot be edited or deleted by anyone, including admins - it is the proof a change was not made by you. Use the search box or the User filter to read one person's history, then CSV, Excel or PDF to hand it over.">?</span> Only admins can see this page.</div></div>
 <div id="acFl" class="fbar"></div><div class="kpis" id="acK"></div><div class="tw" id="acT"></div></section>
 </main><footer class="pagefoot">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</footer></div></div><div id="toast"></div><div id="tip"></div>
@@ -376,6 +376,28 @@ const SPEED_LIMIT=100, STALE_MIN=3; // km/h over which a vehicle counts as speed
 let REM=localStorage.rem!=='0';const mk=r=>supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storage:r?localStorage:sessionStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'implicit'}});let sb=mk(REM);
 const $=id=>document.getElementById(id),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const toast=(m,ok)=>{const t=$('toast');t.textContent=m;t.className='show '+(ok?'ok':'bad');setTimeout(()=>t.className='',3500)};
+// A report that takes ten seconds over a slow line looks exactly like a page that stopped
+// answering, and the second press on the same button starts the same work again underneath
+// the first. The button that was pressed says it is working and cannot be pressed twice.
+async function busy(el,fn){if(!el||typeof fn!=='function')return;
+ if(el.dataset.busy)return;el.dataset.busy='1';
+ const was=el.innerHTML,dis=el.disabled;el.disabled=true;
+ el.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i>Working';
+ try{await fn()}finally{el.disabled=dis;el.innerHTML=was;delete el.dataset.busy}}
+// Rows, tiles and map pins are drawn with an inline onclick, which a pointer presses and a
+// Tab key cannot reach: with a keyboard alone this page has no fleet list, no report and no
+// filter. Rather than rewrite every template, one pass hands a tab stop to whatever the page
+// has drawn clickable, and Enter or Space presses it the way a click does. Only the boxes that
+// draw clickable rows are looked at, and the look is delayed, so a table that redraws several
+// times a second is walked once rather than on every change.
+function tabify(){document.querySelectorAll("#liveList [onclick],#hside [onclick],#evK [onclick],.kpi.click[onclick]").forEach(function(el){
+ if(el.hasAttribute("tabindex")||el.closest("button,a,input,select,textarea,label"))return;
+ el.setAttribute("tabindex","0");if(!el.getAttribute("role"))el.setAttribute("role","button")})}
+let TABT=null;new MutationObserver(function(){if(TABT)return;TABT=setTimeout(function(){TABT=null;tabify()},400)})
+ .observe(document.documentElement,{childList:true,subtree:true});
+document.addEventListener('keydown',function(e){const el=e.target&&e.target.closest&&e.target.closest('[onclick]');
+ if(!el||['INPUT','SELECT','TEXTAREA'].indexOf(el.tagName)>=0)return;
+ if(e.key==='Enter'||e.key===' '){e.preventDefault();el.click()}});
 let EVR=[],EVF={},ADMIN=false,UID,UNAME,evN=0,charts={},rep=[],mapL,mapH,markers={},last={},hLayer,hData=[],vehicles=[],drivers=[];
 const COL={go:'#27a46a',idle:'#f28c28',park:'#2f7fe6',off:'#8b98a5'},LBL={go:'Moving',idle:'Idling',park:'Parking',off:'Offline'};
 const OFFH=()=>{const h=+SET.offline_after_h;return Number.isFinite(h)&&h>0?h:24};
@@ -497,7 +519,7 @@ function zPaint(){[mapL,mapH].forEach(m=>{if(!m)return;const id=m.getContainer()
  const g=L.layerGroup().addTo(m);
  zones.forEach(z=>{const p=zPts(z.shape);if(p.length<3||!zOn(z.id)||(ZSH&&ZSH.id===z.id))return;const off=z.enabled===false;
   const poly=L.polygon(p,{color:off?'#9aa7b0':(z.color||'#2f7fe6'),weight:2.5,fillOpacity:off?.04:.1,dashArray:off?'6 5':null})
-   .bindTooltip(z.name+(z.speed_limit?' - max '+z.speed_limit+' km/h':'')+(off?' - not watched':'')+(ADMIN?' - click to edit':''),{sticky:true});
+   .bindTooltip(esc(z.name)+(z.speed_limit?' - max '+z.speed_limit+' km/h':'')+(off?' - not watched':'')+(ADMIN?' - click to edit':''),{sticky:true});
   // an admin edits the zone they are looking at, on the map it was drawn on
   if(ADMIN)poly.on('click',()=>{if(!DRAW&&!ZSH)zEdit(z.id)});
   poly.addTo(g)});
@@ -525,8 +547,8 @@ function zPanel(d,m){const b=L.DomUtil.create('button','ic',d);
  m._zq=g('q');m._zl=g('list');m._zp=p;m._zsw=g('show');m._zb=b;
  g('all').title='Show every zone on this map';g('none').title='Take every shape off this map, then tick the ones you want';
  m._zq.oninput=()=>zList(m);
- g('all').onclick=()=>{if(!zones.length)return toast('No zones have been drawn yet');ZOFF.clear();zHide()};
- g('none').onclick=()=>{if(!zones.length)return toast('No zones have been drawn yet');zones.forEach(z=>ZOFF.add(z.id));zHide()};
+ g('all').onclick=()=>{if(!zones.length)return toast('No zones have been drawn yet',1);ZOFF.clear();zHide()};
+ g('none').onclick=()=>{if(!zones.length)return toast('No zones have been drawn yet',1);zones.forEach(z=>ZOFF.add(z.id));zHide()};
  m._zsw.onchange=()=>{ZSHOW=m._zsw.checked;localStorage.zones_show=ZSHOW?'1':'0';zPaint();
   toast(ZSHOW?'Geofences are shown on the maps':'Geofences are hidden on the maps',1)};
  g('add').onclick=()=>{zClosePanel(m);zAdd(m)};
@@ -670,7 +692,7 @@ function zEdit(id){const z=zones.find(x=>x.id===id);if(z)zDlg(Object.assign({},z
 function zDelById(id){const z=zones.find(x=>x.id===id);if(!z)return;
  if(!ADMIN)return toast('Only an admin can delete a zone');
  if(!confirm('Delete the zone "'+z.name+'"? Events already recorded in it stay.'))return;
- sb.from('geofences').delete().eq('id',id).then(()=>{zRefs();toast('Zone deleted');logAct('Deleted zone',z.name)})}
+ sb.from('geofences').delete().eq('id',id).then(()=>{zRefs();toast('Zone deleted',1);logAct('Deleted zone',z.name)})}
 // ---- changing an outline in place. Re-clicking all eighteen corners of a depot
 // because one corner sat thirty metres wrong is not editing, so the ring goes back
 // onto the map with grips: green corners drag, the white dots between them become
@@ -721,11 +743,11 @@ function zshStop(){if(!ZSH)return;const {gp,gh,m}=ZSH,back=ZSH.back;ZSH=null;
  m.removeLayer(gp);m.removeLayer(gh);$('zHint').classList.add('hide');zPaint();return back}
 function zshDone(){if(!ZSH)return;if(ZSH.pts.length<3)return toast('A zone needs at least 3 corners',1);
  const p=ZSH.pts.map(x=>[+x[0].toFixed(6),+x[1].toFixed(6)]),back=zshStop();
- if(!back)return toast('Shape ready');
+ if(!back)return toast('Shape ready',1);
  back.shape={type:'polygon',pts:p};delete back.pts;zDlg(back);
  $('zShape').textContent=p.length+' corners \u00b7 '+zArea(p).toFixed(3)+' km\u00b2 \u2014 press Save zone to put this outline on the map'}
 function zshCancel(){if(!ZSH)return;const back=zshStop();
- if(back)zDlg(back);else toast('Shape change cancelled: the zone keeps its old outline')}
+ if(back)zDlg(back);else toast('Shape change cancelled: the zone keeps its old outline',1)}
 // the dialog covers the map, so the outline is edited with the box put away and
 // carried back into it with the name, limit, alerts and colour untouched
 function zShapeBtn(){if(!ADMIN||!ZED)return;const t=zForm();
@@ -808,13 +830,18 @@ function accMenu(){const m=$('accM');m.classList.toggle('hide',!m.classList.cont
 function accHide(){$('accM').classList.add('hide')}
 document.addEventListener('click',e=>{if(!$('accWrap').contains(e.target))accHide()});
 // forced=1 when the administrator set this password: the box then has no Cancel
-// button, because signing in with somebody else's password must not be ignorable
-function pwForm(force){const m=$('modal');m.innerHTML=`<div class="card" style="max-width:380px"><div class="dlgT">Change my password</div>
+// button, because signing in with somebody else's password must not be ignorable.
+// It does have to be escapable or a person who cannot change it here is stuck in a
+// box with no door, so the way out is to end the session instead of to close it.
+// PWF remembers that this box is the forced one, which is what stops the escape key
+// dismissing it the way it dismisses every other dialog on the page.
+let PWF=0;
+function pwForm(force){const m=$('modal');PWF=force?1:0;m.innerHTML=`<div class="card" style="max-width:380px"><div class="dlgT">Change my password</div>
  <div class="field"><label>New password</label><input type="password" id="np1" autocomplete="new-password"></div>
  <div class="field"><label>Repeat new password</label><input type="password" id="np2" autocomplete="new-password"></div>
  <p class="mutS">${force?'The administrator set the password you signed in with. Choose your own — at least 6 characters. This box stays open until you do.'
   :'At least 6 characters. These usernames have no real mailbox, so a forgotten password cannot be emailed — set it here while signed in, or ask the administrator to reset it on the Users page.'}</p>
- <div class="dlgB">${force?'':'<button class="btn gh sm" onclick="$(\'modal\').classList.remove(\'on\')">Cancel</button>'}<button class="btn b sm" onclick="changePw(${force?1:0})">Save</button></div></div>`;
+ <div class="dlgB">${force?'<button class="btn gh sm" onclick="accHide();signOut()"><i class="fa-solid fa-right-from-bracket"></i>Sign out instead</button>':'<button class="btn gh sm" onclick="$(\'modal\').classList.remove(\'on\')">Cancel</button>'}<button class="btn b sm" onclick="changePw(${force?1:0})">Save</button></div></div>`;
  m.classList.add('on');$('np1').focus()}
 async function changePw(force){const a=$('np1').value,b=$('np2').value;
  if(a.length<6)return toast('The new password must be at least 6 characters');
@@ -824,8 +851,12 @@ async function changePw(force){const a=$('np1').value,b=$('np2').value;
  // the "you must change this password" flag belongs to the database row, and an
  // ordinary account has no update rights on profiles — this narrow function is the
  // only way it can put the flag down, and only about itself
- await sb.rpc('clear_pw_flag');
- $('modal').classList.remove('on');toast('Password changed',1);logAct('Changed own password',force?'after an administrator reset':'')}
+ const {error:ce}=await sb.rpc('clear_pw_flag');
+ PWF=0;$('modal').classList.remove('on');
+ // a flag left standing means the box comes back at the next sign-in, which would
+ // read as though this change had never been taken; that has to be said, not hidden
+ toast(ce?'Password changed, but the database could not put down the "set a new password" mark: '+ce.message:'Password changed',1);
+ logAct('Changed own password',force?'after an administrator reset':'')}
 function themeBtn(){const d=document.documentElement.dataset.theme==='dark';$('themeB').innerHTML=d?'<i class="fa-solid fa-sun"></i><span>Light mode</span>':'<i class="fa-solid fa-moon"></i><span>Dark mode</span>'}
 // ---- audit trail. Writes are fire-and-forget: the database is the only place
 // this can be read from (admin-only policy) and a failed insert must never block
@@ -906,7 +937,10 @@ async function startApp(fresh){
  mapL=mkMap('mapLive',fitAll,[['fa-thumbtack','Pin: keep the selected vehicle in the centre of the map while it moves',pinV,'pin'],['fa-volume-high','Mute the alert buzzer',muteTog,'mute']]);
  mapH=mkMap('mapHist',hFit);muteUi();
  initDates();
- await refs();await getSet();await zRefs();await loadLive();loadRules();evInit();
+ // three reads that want nothing from each other go out together, and the live list -
+ // which does want the fleet, because it counts the vehicles that have no point at all -
+ // is taken after them
+ await Promise.all([refs(),getSet(),zRefs()]);await loadLive();loadRules();evInit();
  sb.channel('pos').on('postgres_changes',{event:'INSERT',schema:'public',table:'positions'},e=>{if(e.new)upsert(e.new)}).subscribe(s=>{const ok=s==='SUBSCRIBED';$('conn').className='pill'+(ok?'':' bad');$('connT').textContent=ok?'Live':'Reconnecting'});
  sb.channel('ev').on('postgres_changes',{event:'INSERT',schema:'public',table:'events'},e=>onEv(e.new)).subscribe();
  // a zone drawn by another admin, or a phone answering a blackbox pull, appears
@@ -926,9 +960,13 @@ document.querySelectorAll('.nb[data-t]').forEach(b=>b.onclick=()=>{shrink(b.data
  // theirs, so nobody lands on four empty boxes and has to press Generate. It can run
  // here because the section is already .on (above) and refs() filled the vehicle
  // picker at sign-in - a chart drawn into a hidden canvas sizes itself to nothing.
- if(b.dataset.t==='evt'){evN=0;$('evb').style.display='none';loadEvt()}if(b.dataset.t==='rep')loadRep();if(b.dataset.t==='trip')loadTrip();if(b.dataset.t==='cfg')loadCfg();if(b.dataset.t==='usr')users();if(b.dataset.t==='act')loadAct();if(b.dataset.t==='veh'||b.dataset.t==='drv'){refs();if(b.dataset.t==='veh')bbTable()}});
+ if(b.dataset.t==='evt'){evN=0;$('evb').style.display='none';loadEvt()}if(b.dataset.t==='rep')busy($('repB'),loadRep);if(b.dataset.t==='trip')loadTrip();if(b.dataset.t==='cfg')loadCfg();if(b.dataset.t==='usr')users();if(b.dataset.t==='act')busy($('actB'),loadAct);if(b.dataset.t==='veh'||b.dataset.t==='drv'){refs();if(b.dataset.t==='veh')bbTable()}});
 async function refs(){
- vehicles=(await sb.from('vehicles').select('*').order('name')).data||[];drivers=(await sb.from('drivers').select('*').order('name')).data||[];
+ // the two fleets are read together: this runs on every sign-in and on every tab that
+ // shows a vehicle or driver picker, and a round trip spent waiting for nothing but the
+ // previous round trip is what makes the page feel heavy on a phone tether
+ const [v,d]=await Promise.all([sb.from('vehicles').select('*').order('name'),sb.from('drivers').select('*').order('name')]);
+ vehicles=v.data||[];drivers=d.data||[];
  $('hv').innerHTML=vehicles.map(v=>`<option value="${v.id}">${esc(v.name)}</option>`).join('');
  msel('lv_v',vehicles,'All vehicles',mselVal('lv_v'));if(!LVW){LVW=1;$('lv_v').addEventListener('change',lvChg)}
  msel('ev_v',vehicles,'All vehicles',mselVal('ev_v'));msel('ev_d',drivers,'All drivers',mselVal('ev_d'));msel('ev_t',Object.keys(EV).map(k=>({id:k,name:EV[k][0]})),'All events',mselVal('ev_t'));
@@ -936,7 +974,12 @@ async function refs(){
  // rebuilding the pickers above wipes whatever was chosen, so the last criteria go
  // back in straight after it
  fApply()}
-const tbl=(rows,cols,t)=>`<table><tr>${cols.map(c=>`<th>${c.replace(/_/g,' ')}</th>`).join('')}<th></th></tr>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(r[c])}</td>`).join('')}<td class="act"><button class="btn b sm" onclick="edit('${t}','${r.id}')"><i class="fa-solid fa-pen"></i>Edit</button> <button class="btn r sm" onclick="del('${t}','${r.id}')"><i class="fa-solid fa-trash"></i>Delete</button></td></tr>`).join('')||'<tr><td colspan="9" class="empty">Nothing here yet. Add one above.</td></tr>'}</table>`;
+// the words the two fleet tables print above their columns, matched to the words the
+// form above them uses for the same box. A column number means something different the
+// day a column is added; these words are also what the Columns button lists and stores.
+const COLW={name:'Name',type:'Type',make_model:'Make / model',year:'Year',speed_limit:'Speed limit km/h',
+ fuel_moving:'Fuel moving L/100 km',fuel_idle:'Fuel idling L/hour',phone:'Phone',license_no:'Licence number',license_expiry:'Licence expiry'};
+const tbl=(rows,cols,t)=>`<table><tr>${cols.map(c=>`<th>${COLW[c]||c.replace(/_/g,' ')}</th>`).join('')}<th></th></tr>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(r[c])}</td>`).join('')}<td class="act"><button class="btn b sm" onclick="edit('${t}','${r.id}')"><i class="fa-solid fa-pen"></i>Edit</button> <button class="btn r sm" onclick="del('${t}','${r.id}')"><i class="fa-solid fa-trash"></i>Delete</button></td></tr>`).join('')||'<tr><td colspan="9" class="empty">Nothing here yet. Add one above.</td></tr>'}</table>`;
 async function add(e,t,cols){e.preventDefault();if(!ADMIN)return;const f=e.target,id=f.dataset.id,o={};cols.forEach(c=>o[c]=f[c].value||null);
  const {error}=id?await sb.from(t).update(o).eq('id',id):await sb.from(t).insert(o);if(error)return toast(error.message);
  logAct((id?'Edited ':'Added ')+t.replace(/s$/,''),o.name);
@@ -945,17 +988,24 @@ function edit(t,id){if(!ADMIN)return;const r=(t==='vehicles'?vehicles:drivers).f
  [...f.elements].forEach(el=>{if(el.name){el.value=r[el.name]??'';if(el._flatpickr)el._flatpickr.setDate(el.value||null)}});f.dataset.id=id;f.dataset.lbl||=f.querySelector('button').innerHTML;
  f.querySelector('button').innerHTML='<i class="fa-solid fa-floppy-disk"></i>Save changes';f.scrollIntoView({behavior:'smooth'});f.elements[0].focus()}
 async function del(t,id){if(!ADMIN)return;if(confirm('Delete this item?')){const nm=((t==='vehicles'?vehicles:drivers).find(x=>x.id===id)||{}).name||id;
- await sb.from(t).delete().eq('id',id);logAct('Deleted '+t.replace(/s$/,''),nm);refs()}}
+ // a vehicle or driver still written into positions, trips or an assignment cannot go.
+ // Skipping this check made the press look like it had worked: the name went into the
+ // audit log as deleted, and the row came straight back on the redraw with no reason
+ const {error}=await sb.from(t).delete().eq('id',id);
+ if(error)return toast(error.code==='23503'?nm+' still has trips or an assignment recorded against it, so it cannot be deleted. Clear those first.':error.message);
+ logAct('Deleted '+t.replace(/s$/,''),nm);toast(nm+' deleted',1);refs()}}
 let USRS=[],DC={};
 const uname=id=>((USRS.find(x=>x.id===id)||{}).email||'').replace('@fleet.local','')||'this account';
 async function users(){
  // ask the database to put its clocks forward first: a count that aged out overnight or
  // a lockout that ran its time should not still read as a warning in this table
  try{await sb.rpc('login_sweep')}catch(e){}
- const {data:ps}=await sb.from('profiles').select('*').order('email');const {data:as}=await sb.from('assignments').select('*');
- // A database that has not run v28 has no such table: the read comes back empty and this
- // page shows nobody a phone, which is the honest answer rather than an error.
- let dcs=null;try{dcs=(await sb.from('device_claim').select('*')).data}catch(e){}
+ // the sweep first, because it is what puts the counts right, then the three reads at once
+ const [pf,ag,dv]=await Promise.all([sb.from('profiles').select('*').order('email'),sb.from('assignments').select('*'),
+  // A database that has not run v28 has no such table: the read comes back empty and this
+  // page shows nobody a phone, which is the honest answer rather than an error.
+  sb.from('device_claim').select('*').catch(()=>({data:null}))]);
+ const ps=pf.data,as=ag.data,dcs=dv.data;
  USRS=ps||[];
  DC={};(dcs||[]).forEach(c=>DC[c.user_id]=c);
  const mine=(id,k)=>(as||[]).filter(x=>x.user_id===id&&x[k]).map(x=>x[k]);
@@ -1021,7 +1071,7 @@ async function lockU(id){if(!ADMIN)return;const p=USRS.find(x=>x.id===id)||{},nm
 // not asked first: his next half-minute check is refused, his trip closes, and he is signed
 // out of the app.
 async function relDev(id){if(!ADMIN)return;const nm=uname(id),c=DC[id];
- if(!c)return toast('No handset holds '+nm+' right now.');
+ if(!c)return toast('No handset holds '+nm+' right now.',1);
  if(!confirm('Release '+nm+' from '+(c.model||'the phone it is on')+
   '? The handset named above keeps working until its next half-minute check, and then it closes whatever trip it is recording and signs itself out. Use this for a phone that is lost, broken or left somewhere - the driver holding it is not asked first.'))return;
  let e=null;try{({error:e}=await sb.from('device_claim').delete().eq('user_id',id))}catch(x){e={message:x.message||x}}
@@ -1126,10 +1176,16 @@ function pinV(){if(PINV){PINV=null;mapL._btn.pin&&mapL._btn.pin.classList.remove
  PINV=uid;mapL.setView([last[uid].lat,last[uid].lng],Math.max(mapL.getZoom(),17));mapL._btn.pin&&mapL._btn.pin.classList.add('on');toast('Pinned to '+(last[uid].vehicle_name||'vehicle')+' — the map follows it',1)}
 function setF(f){FILT=f;document.querySelectorAll('#live .kpi.click').forEach(k=>k.classList.toggle('on',k.dataset.f===f));renderList();fitAll()}
 function fitAll(){const a=Object.values(last).filter(shown);if(a.length)mapL.fitBounds(a.map(p=>[p.lat,p.lng]),{maxZoom:15,padding:[40,40]})}
-async function loadLive(){(await fetchAll(()=>sb.from('latest_positions').select('*'))).filter(okFix).forEach(upsert);fitAll()}
+async function loadLive(){(await fetchAll(()=>sb.from('latest_positions').select('*'))).filter(okFix).forEach(upsert);renderList();fitAll()}
+// The whole fleet's list, its five tiles and every marker's icon are rebuilt by one
+// renderList, so a point arriving from each of forty phones every ten seconds used to
+// redraw the page four times a second for a number that changes once a minute. The marker
+// still moves the moment its own point lands; only the tables wait for the tick.
+let RLT=0;
+function rlSoon(){if(RLT)return;RLT=setTimeout(()=>{RLT=0;renderList()},400)}
 function upsert(p){last[p.user_id]=p;const ll=[p.lat,p.lng];
  if(p.accuracy!=null&&+p.accuracy<=0)return;if(markers[p.user_id])markers[p.user_id].setLatLng(ll).setIcon(icon(p));else markers[p.user_id]=L.marker(ll,{icon:icon(p)}).addTo(mapL).bindPopup(()=>pop(last[p.user_id])).on('click',()=>selLive(p.user_id));
- if(PINV===p.user_id)mapL.panTo(ll);renderList()}
+ if(PINV===p.user_id)mapL.panTo(ll);rlSoon()}
 function renderList(){
  const all=Object.values(last),n={go:0,idle:0,park:0,off:0},rp=new Set(all.map(p=>p.vehicle_id));
  all.forEach(p=>{n[st(p)]++;const m=markers[p.user_id];if(!m)return;m.setIcon(icon(p));shown(p)?m.addTo(mapL):m.remove()});
@@ -1137,11 +1193,16 @@ function renderList(){
  $('k_all').textContent=vehicles.length||all.length;$('k_go').textContent=n.go;$('k_idle').textContent=n.idle;$('k_park').textContent=n.park;$('k_off').textContent=n.off;
  const q=$('q').value.toLowerCase();
  $('liveList').innerHTML=all.filter(p=>shown(p)&&((p.vehicle_name||'')+(p.driver_name||'')).toLowerCase().includes(q)).sort((a,b)=>(a.vehicle_name||'').localeCompare(b.vehicle_name||'')).map(p=>{const s=st(p);
- return `<div class="veh" data-u="${p.user_id}" onclick="mapL.setView([${p.lat},${p.lng}],16);selLive('${p.user_id}');markers['${p.user_id}'].openPopup()"><div class="av" style="background:${COL[s]}"><i class="fa-solid ${vt(p)}"></i></div><div class="t"><b>${esc(p.vehicle_name||'Unassigned')}</b><br><small>${esc(p.driver_name||'-')} · ${new Date(p.recorded_at).toLocaleTimeString()}</small></div><div class="taR"><b>${spd(p)}</b> <small>km/h</small><br><span class="chip" style="background:${COL[s]}22;color:${COL[s]}">${LBL[s]}</span></div></div>`}).join('')||'<p style="color:var(--mut);padding:8px">No vehicles to show.</p>'}
+ return `<div class="veh" data-u="${p.user_id}" onclick="mapL.setView([${p.lat},${p.lng}],16);selLive('${p.user_id}');markers['${p.user_id}'].openPopup()"><div class="av" style="background:${COL[s]}"><i class="fa-solid ${vt(p)}"></i></div><div class="t"><b>${esc(p.vehicle_name||'Unassigned')}</b><br><small>${esc(p.driver_name||'-')} · ${agoTxt(p.recorded_at)}</small></div><div class="taR"><b>${spd(p)}</b> <small>km/h</small><br><span class="chip" style="background:${COL[s]}22;color:${COL[s]}">${LBL[s]}</span></div></div>`}).join('')||'<p style="color:var(--mut);padding:8px">No vehicles to show.</p>'}
 // ---- history: the period is split into trips (a silence longer than this vehicle's own
 // parked heartbeat, or an ended trip, starts a new one), each with its own colour, layer,
 // details and playback
 const km=(a,b)=>{const r=x=>x*Math.PI/180,h=Math.sin(r(b.lat-a.lat)/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(r(b.lng-a.lng)/2)**2;return 12742*Math.asin(Math.sqrt(h))};
+// a vehicle quiet since yesterday still read "08:14" in the list, which every reader takes for
+// this morning: a row has to say how old its last report is, not only what clock time it was
+const agoTxt=t=>{const d=new Date(t),n=new Date(),day=x=>x.toDateString(),
+ yes=day(d)===day(new Date(n.getTime()-864e5));
+ return (day(d)===day(n)?'':yes?'yesterday ':'on '+(d.getMonth()+1)+'/'+d.getDate()+' ')+d.toLocaleTimeString()};
 const tile=(c,i,v,l)=>`<div class="card kpi ${c}"><div class="ic"><i class="fa-solid ${i}"></i></div><div><b>${v}</b><span>${l}</span></div></div>`;
 // a fix reporting accuracy 0 or less is a placeholder, not a real position
 const okFix=p=>!(p.accuracy!=null&&+p.accuracy<=0);
@@ -1206,10 +1267,13 @@ const borAge=x=>BF.has(x)?Math.round((tms(x)-tms(BF.get(x)))/1000):-1;
 const borTxt=x=>{const a=borAge(x);return a<0?'':'last known position, '+(a<90?a+' s':Math.round(a/60)+' min')+' earlier'};
 async function evBorrow(rows){const need=(rows||[]).filter(x=>x&&!okXY(x));if(!need.length)return;
  const by={};need.forEach(x=>{const k=x.vehicle_id||'-';(by[k]=by[k]||[]).push(x)});
- for(const vid of Object.keys(by)){const rs=by[vid];
-  // one read per vehicle, not per event: a shift of camera alerts from one blind handset is
-  // hundreds of rows, and the newest thousand fixes of that vehicle is the whole span they
-  // could have happened in - 10 s reporting covers about four hours of driving
+ // one read per vehicle, not per event: a shift of camera alerts from one blind handset is
+ // hundreds of rows, and the newest thousand fixes of that vehicle is the whole span they
+ // could have happened in - 10 s reporting covers about four hours of driving. Every
+ // vehicle's read goes out together rather than one after the next, because a report that
+ // spans a dozen blind handsets used to spend a dozen round trips on it before drawing a
+ // single row.
+ await Promise.all(Object.keys(by).map(async vid=>{const rs=by[vid];
   const hi=rs.reduce((a,x)=>Math.max(a,tms(x)),0);
   const {data}=await sb.from('positions').select('lat,lng,accuracy,heading,altitude,recorded_at')
    .eq('vehicle_id',vid).lte('recorded_at',new Date(hi).toISOString())
@@ -1219,7 +1283,7 @@ async function evBorrow(rows){const need=(rows||[]).filter(x=>x&&!okXY(x));if(!n
    if(!best)continue;BF.set(x,best);x.lat=+best.lat;x.lng=+best.lng;
    if(x.accuracy==null)x.accuracy=best.accuracy;
    if(x.heading==null)x.heading=best.heading;
-   if(x.altitude==null)x.altitude=best.altitude}}}
+   if(x.altitude==null)x.altitude=best.altitude}}))}
 const drove=(q,p,Vh)=>okXY(q)&&okXY(p)&&(tms(p)-tms(q))/1000<=(p.speed>0||q.speed>0?180:GAP_S(Vh));
 function tripRuns(P,Vh){const out=[];let cur=[];
  for(let i=0;i<P.length;i++){const p=P[i],q=P[i-1];
@@ -1357,7 +1421,7 @@ async function loadHist(keep){if(!keep)fSave('hist');pbStop();
  if(hLayer)hLayer.remove();TRIPS.forEach(t=>{t.ly.remove();t.ely.remove()});TRIPS=[];TSEL=-1;HEVS=[];hData=data;
  // the pins this page stood are gone, so the spot groups they pointed at must go with them
  ECL.length=0;EIX.length=0;
- if(!data.length){$('hstat').innerHTML='';hSide();return toast('No data in this period.')}
+ if(!data.length){$('hstat').innerHTML='';hSide();return toast('No data in this period.',1)}
  HEVS=(await fetchAll(()=>sb.from('events').select('*').eq('vehicle_id',vid).gte('recorded_at',hf).lte('recorded_at',ht).order('recorded_at'))).filter(x=>EV[x.type]&&okFix(x));
  await evBorrow(HEVS);
  const Vh=vehicles.find(x=>x.id===vid)||{};
@@ -1379,7 +1443,9 @@ async function loadHist(keep){if(!keep)fSave('hist');pbStop();
   if(T)T.evs.push(x);else ORPH.push(x)});
  evPaint(ORPH,hLayer,hData);
  TRIPS.forEach(T=>{drawTrip(T,Vh);T.ly.addTo(mapH)});
- if(!+Vh.fuel_moving&&!+Vh.fuel_idle)toast('Set the fuel rates on the Vehicles page to see fuel figures');
+ // the fuel figures come out of the two rates kept on the vehicle record, and a person
+ // who is not an administrator has no Vehicles page to open — the hint has to name who can
+ if(!+Vh.fuel_moving&&!+Vh.fuel_idle)toast(ADMIN?'Set the fuel rates on the Vehicles page to see fuel figures':'This vehicle has no fuel rates recorded, so no fuel figures can be shown. Ask an administrator to enter them on the Vehicles page.',1);
  hSide();hKpis();hFit()}
 function hFit(){mapH.invalidateSize();const b=L.latLngBounds([]);TRIPS.forEach(t=>{if(t.on)t.pts.forEach(p=>b.extend([p.lat,p.lng]))});
  if(!b.isValid()){if(hLayer)hLayer.eachLayer(l=>l.getLatLng&&b.extend(l.getLatLng()))}
@@ -1425,7 +1491,7 @@ function evTog(i,on){const T=TRIPS[i];T.evsOn=!!on;(on&&T.on)?T.ely.addTo(mapH):
 // The pin already carries the card; a spot shared by three events opens on the one that
 // was pressed here, not on whichever one the last click left standing.
 function evJump(k){const x=HEVS[k];if(!x)return;
- if(!okFix(x)||!okXY(x))return toast('This event has no position on the map');
+ if(!okFix(x)||!okXY(x))return toast('This event has no position on the map',1);
  const T=TRIPS.find(t=>t.evs.indexOf(x)>=0);
  if(T){const ti=TRIPS.indexOf(T);
   if(!T.on){T.on=true;T.ly.addTo(mapH);hStyle()}
@@ -1544,7 +1610,14 @@ function evPop(x){const E=EVX(x.type),d=evDur(x),e=evEnd(x),n=(a,u)=>a!=null&&a!
  <i class="fa-regular fa-clock"></i> ${new Date(x.recorded_at).toLocaleString()}${e?'<br><i class="fa-regular fa-clock"></i> Ended '+e.toLocaleTimeString()+' · <b>'+hms(d)+'</b>':''}<br>
  <i class="fa-solid fa-gauge-high"></i> ${Math.round(x.speed||0)} km/h${x.road_limit?' · limit '+x.road_limit+' km/h':''}${val}${x.details?'<br>'+esc(x.details):''}${HR}
  <i class="fa-solid fa-location-dot"></i> ${okXY(x)?(+x.lat).toFixed(5)+', '+(+x.lng).toFixed(5)+(borAge(x)>=0?'<br><small style="opacity:.7"><i class="fa-solid fa-clock-rotate-left"></i> This row carries no position of its own: shown is the ${borTxt(x)}, when the handset last locked a satellite.</small>':''):'No fix'}<br>Accuracy ${n(x.accuracy,' m')} · Elev. ${x.altitude!=null?Math.round(x.altitude)+' m':'-'} · Dir ${x.heading!=null?Math.round(x.heading)+'°':'-'}<br>Accel ${n(x.accel,' km/h/s')} · Ignition ${x.ignition===false?'off':x.ignition?'on':'-'}<br><i class="fa-solid fa-battery-half"></i> ${x.battery_pct!=null?Math.round(x.battery_pct)+'%':'-'}${x.charging?' ⚡':''}</div>`}
-async function fetchAll(q){let a=[];for(let i=0;i<30;i++){const {data,error}=await q().range(i*1000,i*1000+999);if(error){toast(error.message);break}a=a.concat(data);if(data.length<1000)break}return a}
+async function fetchAll(q){const one=async i=>{const {data,error}=await q().range(i*1000,i*1000+999);if(error)throw error;return data||[]};
+ // four pages at a time instead of one after the next: a thirty page report used to spend
+ // thirty round trips in series, which on a slow line is half a minute of watching a
+ // spinner for a table that arrives in the same bytes either way. A short page still ends
+ // it, so a report of one page costs the one wave it always did.
+ let a=[];try{for(let i=0;i<30;i+=4){const rs=await Promise.all([0,1,2,3].map(o=>one(i+o)));
+  for(const r of rs){a=a.concat(r);if(r.length<1000)return a}}}catch(e){toast(e.message||String(e))}
+ return a}
 function chart(id,type,labels,sets,o={}){const cs=getComputedStyle(document.documentElement);Chart.defaults.color=cs.getPropertyValue('--mut');Chart.defaults.borderColor=cs.getPropertyValue('--line');charts[id]?.destroy();
  // o.mark draws a value beside one specific point - used for the trip's max speed
  const pl=o.mark?[{id:'mark',afterDatasetsDraw(c){const p=c.getDatasetMeta(0).data[o.mark.i];if(!p)return;const{ctx}=c;ctx.save();
@@ -1679,7 +1752,7 @@ document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.clos
 // door, so a clip leaves nothing playing behind it. The bytes themselves stay in the small
 // cache above, which is what makes reopening one instant, and the seventh one out pays for
 // it by giving the oldest back.
-document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&$('modal').classList.contains('on'))closeClip()});
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&$('modal').classList.contains('on')&&!PWF)closeClip()});
 function renderEvt(){
  const fx=r=>(!EVF.driver||(r.driver_name||'-')===EVF.driver)&&(!EVF.day||dayOf(r)===EVF.day),base=EVR.filter(fx),rows=base.filter(r=>!EVF.type||r.type===EVF.type),ty=cnt(rows,r=>r.type),K=Object.keys(EV);
  const tb=evTb(),ch=Object.entries(EVF).filter(x=>x[1]).map(x=>`<span class="chip chipB">${x[0]}: ${esc(x[0]==='type'?EVX(x[1])[0]:x[1])}</span>`).join(' ');
@@ -1700,7 +1773,7 @@ function renderEvt(){
   // row for: with it off no handset looks at anything, and the empty Events list then
   // reads the same as a fleet that drives carefully - or as a camera nobody installed.
   off=SET.dms_on==='1'?'':`<span class="chip chipO"><i class="fa-solid fa-video-slash"></i> Driver camera is switched off for this fleet <span class="hp" data-tip="No handset watches the driver while this stays off: no fatigue, distraction, phone, yawning, eating, drinking, smoking, blocked-camera alert and no recording will ever appear here, however the nine rules below are set. It ships off on purpose - a build that has just learned to look at a face must not start looking at every fleet the moment it updates - so switch it on yourself under &lt;b&gt;Configuration &gt; Driver camera&lt;/b&gt; once the drivers have been told. The phone says the same thing to the driver when a trip starts unwatched.">?</span> <button class="btn gh sm" onclick="switchTab('cfg')">Turn it on</button></span>`;
- $('evFl').innerHTML=[off,tb,ch,cw,cn].filter(Boolean).join(' ')+((tb||ch)?' <button class="btn gh sm" onclick="evReset()"><i class="fa-solid fa-rotate-left"></i>Reset filter</button>':'');
+ $('evFl').innerHTML=[off,tb,ch,cw,cn,rows.length>1000?'<span class="chip chipO"><i class="fa-solid fa-filter-circle-xmark"></i> Showing the newest 1000 of '+rows.length+' events in this period: the search, the page numbers and the exports cover these rows only, so shorten the period to reach the rest.</span>':''].filter(Boolean).join(' ')+((tb||ch)?' <button class="btn gh sm" onclick="evReset()"><i class="fa-solid fa-rotate-left"></i>Reset filter</button>':'');
  // the tiles count without the type filter, so every type stays clickable
  const bt=cnt(base,r=>r.type),ct=(c,i,v,l,js,on)=>tile(c,i,v,l).replace('class="card kpi ',`onclick="${js}" title="Click to show only these" class="card kpi click${on?' on':''} `);
  $('evK').innerHTML=ct('gy','fa-bell',base.length,'Total events',"EVF.type=undefined;renderEvt()",!EVF.type)+K.map(k=>ct(EV[k][3],EV[k][1],bt[k]||0,EV[k][0],`evSet('type','${k}')`,EVF.type===k)).join('');
@@ -1721,7 +1794,7 @@ async function loadRep(){fSave('rep');
  await getSet();
  const {data,error}=await sb.rpc('vehicle_report',{p_from:f,p_to:t,p_tz:Intl.DateTimeFormat().resolvedOptions().timeZone});
  if(error)return toast(error.message);
- if(!data||!data.length){rep=[];$('rpK').innerHTML='';['r1','r2','r3','r4'].forEach(id=>charts[id]?.destroy());$('rpT').innerHTML='<p style="padding:12px;color:var(--mut)">No positions recorded in this period.</p>';return toast('No data in this period. Pick a wider period or another day.')}
+ if(!data||!data.length){rep=[];$('rpK').innerHTML='';['r1','r2','r3','r4'].forEach(id=>charts[id]?.destroy());$('rpT').innerHTML='<p style="padding:12px;color:var(--mut)">No positions recorded in this period.</p>';return toast('No data in this period. Pick a wider period or another day.',1)}
  const evs=await fetchAll(()=>sb.from('events').select('vehicle_id,type').gte('recorded_at',f).lte('recorded_at',t));
  const V={},D={},K={harsh_braking:'b',harsh_acceleration:'a',overspeed:'o'};
  data.forEach(r=>{const o=V[r.vehicle_id]??={id:r.vehicle_id,name:r.vehicle_name,km:0,max:0,dr:0,sp:0,b:0,a:0,o:0,os:0};o.km+=+r.km;o.max=Math.max(o.max,+r.max_speed);o.dr+=+r.drive_min;o.sp+=+r.stop_min;o.os+=(+r.over_s||0);D[r.day]=(D[r.day]||0)+ +r.km});
@@ -1814,7 +1887,7 @@ async function loadRules(){const {data}=await sb.from('event_rules').select('*')
  if(SPD&&RULES.dms_fatigue&&(!RULES.gps_lost||!RULES.gps_recovered)&&!WARNED.v31){WARNED.v31=1;
   toast('The Gps lost and Gps recovered rules need the newest schema. Run schema.sql in Supabase (SQL Editor) once; the phone needs its new build as well.')}
  const num=(id,v,w,st)=>`<input type="number" step="${st||'any'}" min="0" id="${id}" value="${v??''}" style="width:${w||58}px">`;
- $('ruleT').innerHTML=`<table><tr><th>Event</th><th>Trigger limit</th>${SPD?'<th>Min speed (km/h) <span class="hp" data-tip="Only the nine driver-camera rules read this: nothing is reported until the vehicle is going faster, because a drowsy-driver or covered-lens alert means nothing while the vehicle is parked. Every other rule stays armed at any speed.">?</span></th>':''}<th>Tolerance (seconds)</th><th>Recorded</th>${CLIPCOL?'<th>Recording <span class="hp" data-tip="Keep a few seconds of the forward camera with each event of this type, so the alert can be watched afterwards. It is a driver-camera switch: only the nine rules that read the cab have a lens to record with, and every other row ignores it. Off still warns the driver, still saves the reading, the place and the duration, and still counts in every report - only the film is not made.">?</span></th>':''}<th>Visual alert</th><th>Buzzer alert</th><th>Buzzer seconds</th><th>Voice alert</th></tr>${list.map(r=>`<tr><td class="nw"><b>${esc(r.label)}</b></td><td class="nw">${NOLIM[r.type]?'<small style="opacity:.5">no limit</small>':num('rt_'+r.type,r.threshold,66,'0.1')+' <small>'+(UNIT[r.type]||'')+'</small>'}${DMS[r.type]&&DMSLIM[r.type]?'<span class="hp" data-tip="'+esc(DMSLIM[r.type])+'">?</span>':''}</td>${SPD?'<td>'+(DMS[r.type]?num('rs_'+r.type,r.speed_min??0,46):'<small style="opacity:.5">—</small>')+'</td>':''}<td>${num('rh_'+r.type,r.hold_s??0)}</td><td><input type="checkbox" id="re_${r.type}" ${r.enabled?'checked':''}></td>${CLIPCOL?'<td>'+(DMS[r.type]?'<input type="checkbox" id="rc_'+r.type+'" title="Record a few seconds of camera with this event"'+(r.clip!==false?' checked':'')+'>':'<small style="opacity:.5">—</small>')+'</td>':''}<td><input type="checkbox" id="ra_${r.type}" ${r.alert?'checked':''}></td><td class="nw"><select id="bt_${r.type}" style="width:126px" onchange="toneSync(this)">${Object.entries(TONES).map(([k,n])=>`<option value="${k}" ${(r.beep_type||'discontinuous')===k?'selected':''}>${n}</option>`).join('')}</select><button type="button" class="play" onclick="tryTone('${r.type}')" title="Play this tone"><i class="fa-solid fa-play"></i></button></td><td class="bd">${num('bd_'+r.type,r.beep_duration??5)}</td><td class="nw"><select id="vl_${r.type}" style="width:96px" onchange="syncPl(this)">${vlOpts(r)}</select><button type="button" class="play" onclick="tryVoice('${r.type}')" title="Speak this message"><i class="fa-solid fa-volume-high"></i></button></td></tr>`).join('')}</table>`;
+ $('ruleT').innerHTML=`<table><tr><th>Event</th><th>Trigger limit</th>${SPD?'<th>Min speed (km/h) <span class="hp" data-tip="Only the nine driver-camera rules read this: nothing is reported until the vehicle is going faster, because a drowsy-driver or covered-lens alert means nothing while the vehicle is parked. Every other rule stays armed at any speed.">?</span></th>':''}<th>Tolerance (seconds)</th><th>Recorded</th>${CLIPCOL?'<th>Recording <span class="hp" data-tip="Keep a few seconds of the forward camera with each event of this type, so the alert can be watched afterwards. It is a driver-camera switch: only the nine rules that read the cab have a lens to record with, and every other row ignores it. Off still warns the driver, still saves the reading, the place and the duration, and still counts in every report - only the film is not made.">?</span></th>':''}<th>Visual alert</th><th>Buzzer alert</th><th>Buzzer seconds</th><th>Voice alert</th></tr>${list.map(r=>`<tr data-t="${esc(r.type)}"><td class="nw"><b>${esc(r.label)}</b></td><td class="nw">${NOLIM[r.type]?'<small style="opacity:.5">no limit</small>':num('rt_'+r.type,r.threshold,66,'0.1')+' <small>'+(UNIT[r.type]||'')+'</small>'}${DMS[r.type]&&DMSLIM[r.type]?'<span class="hp" data-tip="'+esc(DMSLIM[r.type])+'">?</span>':''}</td>${SPD?'<td>'+(DMS[r.type]?num('rs_'+r.type,r.speed_min??0,46):'<small style="opacity:.5">—</small>')+'</td>':''}<td>${num('rh_'+r.type,r.hold_s??0)}</td><td><input type="checkbox" id="re_${r.type}" ${r.enabled?'checked':''}></td>${CLIPCOL?'<td>'+(DMS[r.type]?'<input type="checkbox" id="rc_'+r.type+'" title="Record a few seconds of camera with this event"'+(r.clip!==false?' checked':'')+'>':'<small style="opacity:.5">—</small>')+'</td>':''}<td><input type="checkbox" id="ra_${r.type}" ${r.alert?'checked':''}></td><td class="nw"><select id="bt_${r.type}" style="width:126px" onchange="toneSync(this)">${Object.entries(TONES).map(([k,n])=>`<option value="${k}" ${(r.beep_type||'discontinuous')===k?'selected':''}>${n}</option>`).join('')}</select><button type="button" class="play" onclick="tryTone(this.closest('tr').dataset.t)" title="Play this tone"><i class="fa-solid fa-play"></i></button></td><td class="bd">${num('bd_'+r.type,r.beep_duration??5)}</td><td class="nw"><select id="vl_${r.type}" style="width:96px" onchange="syncPl(this)">${vlOpts(r)}</select><button type="button" class="play" onclick="tryVoice(this.closest('tr').dataset.t)" title="Speak this message"><i class="fa-solid fa-volume-high"></i></button></td></tr>`).join('')}</table>`;
  [...$('ruleT').querySelectorAll('select')].forEach(s=>s.id.startsWith('bt_')?toneSync(s):s.id.startsWith('vl_')&&syncPl(s))}
 async function getSet(){const {data}=await sb.from('app_settings').select('*');SET={};(data||[]).forEach(x=>SET[x.key]=x.value);plLoad();
  const e=$('offH');if(e){e.value=OFFH();e.disabled=!ADMIN}}
@@ -1919,8 +1992,8 @@ function playTone(a,type,dur,vol){if(!a)return;stopTone();if(type==='off')return
   case 'pulse':rep(.8,s=>[600,800,1000,1200].forEach((f,i)=>note(f,s+i*.16,s+i*.16+.12)));break;
   default:rep(.5,s=>note(880,s,s+.25))}}
 function beep(R){R=R||{};if(MUTE)return;try{playTone(actx(),R.beep_type,Math.max(1,+R.beep_duration||5),.15)}catch(e){}}
-function tryTone(k){const t=$('bt_'+k).value;if(t==='off')return toast('Buzzer alert is Off for this event');
- if(MUTE)return toast('Alert sounds are muted on this computer. Press the speaker on the Live Tracking map to hear it.');
+function tryTone(k){const t=$('bt_'+k).value;if(t==='off')return toast('Buzzer alert is Off for this event',1);
+ if(MUTE)return toast('Alert sounds are muted on this computer. Press the speaker on the Live Tracking map to hear it.',1);
  try{playTone(actx(),t,Math.min(4,Math.max(1,+$('bd_'+k).value||3)),.15)}catch(e){}}
 // ---- alert sound switch. A fleet watch screen left open all day needs to be
 // silenced without losing the on-screen alert, so this stops only the buzzer.
@@ -1945,7 +2018,7 @@ const VMSG={
  ckb:{overspeed:'لە خێرایی ڕێپێدراو خێراتر دەڕۆیت. تکایە خێراییەکەت کەم بکەرەوە.',harsh_braking:'بڕانی تۆزگوێزە تۆمارکرا. مەسافەی سەلامەت بپارێزە و بە هێواشی مۆترە بکە.',harsh_acceleration:'خێرابوونەوەی توند تۆمارکرا. تکایە بە هێواشی خێرایی زیاد بکە.',zone_enter:'چوویتەتە ناو ناوچەی قەدەغەکراو.',zone_exit:'لە ناوچەکە دەرچوویت.',zone_overspeed:'لەم ناوچەیەدا لە خێرایی ڕێپێدراو خێراتر دەڕۆیت. تکایە خێراییەکەت کەم بکەرەوە.',dms_fatigue:'ماندوو دەردەکەویت. تکایە پشوو بدە.',dms_distraction:'تکایە سەرنجت لەسەر شەقام بێت.',dms_phone_use:'تکایە لە کاتی شۆفێریکردندا مۆبایل بەکارمەهێنە.',dms_cam_blocked:'کامێرای شۆفێر داخراوە. دیمەنەکە کراوە بپارێزە.',dms_yawning:'کێفت دەکەیت. تکایە پشوو بدە.',dms_talking:'تکایە لە کاتی شۆفێریکردندا قسەکانت کورت بکەرەوە.',dms_eating:'تکایە لە کاتی شۆفێریکردندا خواردن نخۆ.',dms_drinking:'تکایە لە کاتی شۆفێریکردندا خواردەمەنی نخۆ.',dms_smoking:'جەخرەدانە لەناو ئۆتۆمبێلدا قەدەغەیە. تکایە لە جەخرەدانە بوەستە.',cam_off:'کامێرای شۆفێر ڕاگیرا: ئەم گەشتە هیچ ئاگادارکردنەوەیەکی لێ دروست نابێت و هیچێک تۆمار ناکات.',gps_lost:'سیگناڵی GPS ون بوو. شوێنەکەت تۆمارناکرێت. دڵنیابەرەوە کە مۆبایلەکە دەتوانێت ئاسمان ببینێت.',gps_recovered:'سیگناڵی GPS گەڕایەوە. شوێنەکەت دووبارە تۆماردەکرێت.'}};
 let VOC=[];const sv=()=>{try{VOC=(window.speechSynthesis?speechSynthesis.getVoices():[])||[]}catch(e){VOC=[]}};
 sv();if(window.speechSynthesis)speechSynthesis.addEventListener('voiceschanged',sv);
-function say(lg,txt){const S=window.speechSynthesis;if(!S||!window.SpeechSynthesisUtterance)return toast('This browser cannot speak. The phone uses its own voice.');
+function say(lg,txt){const S=window.speechSynthesis;if(!S||!window.SpeechSynthesisUtterance)return toast('This browser cannot speak. The phone uses its own voice.',1);
  if(!VOC.length)sv();const code=(VLANG[lg]||VLANG.en)[1],base=code.split('-')[0];
  // an exact tag first, then any voice for the same language, then one whose name
  // mentions it (many desktop voices report only "Google العربية" style tags). The language
@@ -1956,9 +2029,9 @@ function say(lg,txt){const S=window.speechSynthesis;if(!S||!window.SpeechSynthes
  S.cancel();S.speak(u);
  if(!v&&lg!=='en')toast('This computer has no '+(VLANG[lg]||['that language'])[0]+' voice. Add it in Windows Settings > Time & language > Speech & recognition > Add voices; the phone speaks it anyway.',1)}
 function tryVoice(t){const sel=$('vl_'+t);if(!sel)return;const lg=sel.value;
- if(lg==='off')return toast('Voice alert is Off for this event');
- if(MUTE)return toast('Alert sounds are muted on this computer. Press the speaker on the Live Tracking map to hear it.');
- const m=(VMSG[lg]||VMSG.en)[t];if(!m)return toast('There is no spoken message for this event');say(lg,m)}
+ if(lg==='off')return toast('Voice alert is Off for this event',1);
+ if(MUTE)return toast('Alert sounds are muted on this computer. Press the speaker on the Live Tracking map to hear it.',1);
+ const m=(VMSG[lg]||VMSG.en)[t];if(!m)return toast('There is no spoken message for this event',1);say(lg,m)}
 
 // ---- live alerts. Realtime can silently miss an insert, so evPoll() also
 // fetches anything newer than the last id seen; EVSEEN stops a double alert.
@@ -2004,7 +2077,7 @@ addEventListener('resize',msPos);
 async function loadTrip(){fSave('trip');
  const v=$('tr_v').value,f=new Date($('tr_f').value).toISOString(),t=new Date($('tr_t').value).toISOString();
  tr=ded((await fetchAll(()=>sb.from('positions').select('*').eq('vehicle_id',v).gte('recorded_at',f).lte('recorded_at',t).order('recorded_at'))).filter(okFix));tp=0;
- if(!tr.length)return toast('No data in this period');
+ if(!tr.length)return toast('No data in this period',1);
  const sp=tr.map(r=>r.speed||0),mx=Math.max(...sp),mv=sp.filter(x=>x>0),av=mv.length?mv.reduce((a,b)=>a+b)/mv.length:0,lim=(vehicles.find(x=>x.id===v)||{}).speed_limit||RULES.overspeed?.threshold||100;
  $('trK').innerHTML=tile('bl','fa-database',tr.length,'Records')+tile('or','fa-gauge-high',Math.round(mx)+' km/h','Max speed')+tile('gr','fa-gauge',Math.round(av)+' km/h','Avg moving speed')+tile('gy','fa-mountain',Math.round(Math.max(...tr.map(r=>r.altitude||0)))+' m','Max elevation');
  const k=Math.ceil(tr.length/1500),s=tr.filter((_,i)=>i%k===0),lb=s.map(r=>new Date(r.recorded_at).toLocaleTimeString()),ln=(l,d,c)=>({label:l,data:d,borderColor:c,backgroundColor:c+'22',fill:true,pointRadius:0,borderWidth:1.5,tension:.2});
@@ -2048,7 +2121,7 @@ function plPaint(){[mapL,mapH].forEach(m=>{if(!m)return;const id=m.getContainer(
  const g=L.layerGroup().addTo(m);
  PLACES.forEach((x,i)=>{const mk=L.marker([+x.la,+x.lo],{zIndexOffset:-200,keyboard:false,
    icon:L.divIcon({className:'',html:'<div class="mk pl"><i class="fa-solid fa-bookmark"></i></div>',iconSize:[18,18],iconAnchor:[9,9]})})
-   .bindTooltip(x.n,{direction:'right',offset:[10,0],className:'pltip'});
+   .bindTooltip(esc(x.n),{direction:'right',offset:[10,0],className:'pltip'});
   // pressing a marker reads or opens the name, but never swallows a click the map
   // is waiting for: saving a place, a zone corner, or nothing while a shape is held
   mk.on('click',e=>{if(PLARM){PLARM.h(e);return}if(DRAW){DRAW.click(e);return}if(ZSH)return;
@@ -2112,16 +2185,29 @@ async function geoOne(k){const [la,lo]=k.split(',');
  x=nm(()=>{const c=[o&&o.locality,o&&o.principalSubdivision,o&&o.countryName].filter(Boolean).join(', ');return (o&&(o.city||o.locality))&&c||o&&o.locality});
  if(x)return GC[k]=x,save();
  return ''}
-function save(){if(Object.keys(GC).length>3000)Object.keys(GC).slice(0,1000).forEach(k=>delete GC[k]);localStorage.gc=JSON.stringify(GC)}
+let GSAVED=0;
+// The name cache is one blob, so every answer used to serialize all three thousand of them
+// into local storage again: a drain of six hundred points wrote the growing blob six hundred
+// times over, on the main thread, while the page was being read. One write per two seconds
+// keeps every name that was found, and the queue's last act writes whatever is still held
+// back. A full storage is answered by itself: losing the cache costs a lookup, not the page.
+function save(flush){if(!flush&&Date.now()-GSAVED<2000)return;GSAVED=Date.now();
+ try{if(Object.keys(GC).length>3000)Object.keys(GC).slice(0,1000).forEach(k=>delete GC[k]);
+  localStorage.gc=JSON.stringify(GC)}catch(e){}}
 let GQ=[],GBUSY=false;
 function geoRun(){if(GBUSY)return;GBUSY=true;(async()=>{while(GQ.length){const k=GQ.shift(),nm=await geoOne(k);
  document.querySelectorAll('#trT td[data-gk="'+k+'"]').forEach(td=>td.textContent=nm||'No place name found');
- await new Promise(r=>setTimeout(r,250))}GBUSY=false})()}
+ await new Promise(r=>setTimeout(r,250))}GBUSY=false;save(1)})()}
 // visible rows go first so the page fills in at once, the rest trickle behind
 function geoVis(){const q=[];
  document.querySelectorAll('#trT td.gx').forEach(td=>{if(td.offsetParent!==null&&!(td.dataset.gk in GC))q.push(td.dataset.gk)});
  const rest=tr.slice(0,2000).map(gk).filter(k=>!(k in GC));
- GQ=[...new Set(q.concat(rest))].slice(0,600);geoRun()}
+ // everything on show, plus a short allowance for the rows just under the fold. A month of
+ // one vehicle's log is tens of thousands of points, and six hundred lookups at four free
+ // services for a page nobody has scrolled to is how the queue and the browser's whole
+ // connection pool get tied up behind a table of dashes - the names still arrive as the
+ // table is worked through, because every repaint asks again for what it can see.
+ GQ=[...new Set(q.concat(rest))].slice(0,140);geoRun()}
 // The Position column is the second of driving the supervisor is reading, and the question
 // after it is always where that second happened on the road - so the coordinates open
 // Historical Tracking on this vehicle, framed on the quarter hour around this fix, with the
@@ -2323,10 +2409,19 @@ function tools(el,opt={}){const t=el.querySelector('table');if(!t)return;
   const c=keep.map(i=>[nm[i],i]).filter(x=>x[0]);
   return {head:c.map(x=>x[0]),rows:matched().map(r=>c.map(x=>cv(r.cells[x[1]])))}};
  apply();
+ // A cell that starts with =, +, - or @ is not text to a spreadsheet: Excel and LibreOffice
+ // run it. Every cell in these reports is somebody's typing - an event's own details, a
+ // vehicle name, a driver's note - and a handset can write those, so one planted in a
+ // details field would execute on the controller's machine the moment he opened the export.
+ // Leading space is folded away first because " =cmd" is the same trick wearing a hat.
+ // A lone dash is the app's own "nothing here" placeholder, not a formula, and a spreadsheet
+ // shows the escape quote in front of it - only a dash with something behind it gets one.
+ const saf=v=>{let s=String(v??'');if(/^\s*[=+\-@\t\r]/.test(s)&&!/^\s*[-—–]\s*$/.test(s))s="'"+s;return s};
+ const cell=v=>'"'+saf(v).replace(/"/g,'""')+'"';
  bar.onclick=e=>{const p=e.target.closest('[data-p]');if(p){cur+=p.dataset.p==='n'?1:-1;apply();return}
   const b=e.target.closest('[data-x]');if(!b)return;logAct('Exported report',title+' as '+b.dataset.x.toUpperCase());const {head,rows:R}=data(),m=metaLines(),nm=title.replace(/\W+/g,'_')+'_'+new Date().toISOString().slice(0,10);
-  if(b.dataset.x==='csv'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+[[title],m,[],head,...R].map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\n')],{type:'text/csv'}));a.download=nm+'.csv';a.click()}
-  if(b.dataset.x==='xlsx'){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([[title],[...m],[],head,...R]),'Report');XLSX.writeFile(wb,nm+'.xlsx')}
+  if(b.dataset.x==='csv'){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+[[title],m,[],head,...R].map(r=>r.map(cell).join(',')).join('\n')],{type:'text/csv'}));a.download=nm+'.csv';a.click()}
+  if(b.dataset.x==='xlsx'){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([[title],[...m],[],head,...R].map(r=>r.map(saf))),'Report');XLSX.writeFile(wb,nm+'.xlsx')}
   if(b.dataset.x==='pdf'){const d=new jspdf.jsPDF({orientation:'landscape'});d.setFontSize(13);d.text(title,14,12);d.setFontSize(8);d.text(m.join('   |   '),14,17);d.autoTable({head:[head],body:R,startY:21,styles:{fontSize:7}});d.save(nm+'.pdf')}
   if(b.dataset.x==='print'){const w=window.open('','_blank');w.document.write('<html><head><title>'+esc(title)+'</title><style>body{font-family:sans-serif}table{border-collapse:collapse;width:100%}td,th{border:1px solid #999;padding:4px;font-size:11px}.sub{font-size:12px;margin:0 0 10px;color:#333}.foot{font-size:10px;color:#666;margin-top:8px}</style></head><body><h3 style="margin:0 0 4px">'+esc(title)+'</h3><p class="sub">'+esc(m.join('  |  '))+'</p><table><tr>'+head.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr>'+R.map(r=>'<tr>'+r.map(c=>'<td>'+esc(c)+'</td>').join('')+'</tr>').join('')+'</table><p class="foot">Fleet Tracker Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</p></body></html>');w.document.close();w.print()}}}
 const PN={c1:'Events by Type',c2:'Events per Day',c3:'Violator Drivers',t1:'Speed',t2:'Acceleration',t3:'Elevation',t4:'Ignition',r1:'Distance per vehicle',r2:'Fleet distance per day',r3:'Driving vs Idling',r4:'Fuel'};
