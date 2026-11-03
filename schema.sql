@@ -1083,7 +1083,8 @@ create policy "dms clips clear" on storage.objects for delete to authenticated
 --   dms_drinking   threshold = the percentage of the last second it saw a cup or bottle
 --                  there.
 --   dms_smoking    threshold = the percentage of the last second a bare hand was at the
---                  mouth, over lips the camera could still see.
+--                  mouth: lips the camera still reads as this driver's own skin, with
+--                  the mouth's own dark line gone under them.
 --
 -- Two of these deserve to be said plainly, because an administrator who reads the row
 -- afterwards deserves to know what the machine actually looked at:
@@ -1096,6 +1097,13 @@ create policy "dms clips clear" on storage.objects for delete to authenticated
 -- looks like. It is seeded switched off for exactly that reason, and the Configuration
 -- page says so on its row. Turn it on when you have seen what it does in your own cabs,
 -- and judge the clip it leaves behind before you judge the driver.
+--
+-- The first build of that reading asked only the colour question - are the lips this
+-- driver's own skin colour - and an ordinary closed mouth answers it in a sunlit cab, so
+-- fleets that switched the rule on got a stream of events about drivers doing nothing.
+-- v32 puts the second half of the sign in the phone's own code (the dark line of the
+-- mouth has to have gone under something) and raises this row's two numbers, and both
+-- halves are written below.
 --
 -- Eating and drinking depend on the same second model, and on some handsets that model
 -- cannot report where it saw a thing - a limitation of the reader library, named on the
@@ -1110,7 +1118,7 @@ insert into event_rules (type, label, enabled, threshold, alert, hold_s, speed_m
   ('dms_talking', 'Talking while driving', true, 40, true, 2, 10),
   ('dms_eating',  'Eating while driving',  true, 40, true, 1, 15),
   ('dms_drinking','Drinking while driving', true, 40, true, 1, 15),
-  ('dms_smoking', 'Smoking',            false, 50, true,  2, 15)
+  ('dms_smoking', 'Smoking',            false, 70, true,  3, 15)
   on conflict (type) do nothing;
 
 -- A phone that is offline does not know which build of the rules its own settings copy
@@ -1420,6 +1428,20 @@ create policy "events insert own" on events for insert with check (
                'dms_fatigue','dms_distraction','dms_phone_use','dms_cam_blocked',
                'dms_yawning','dms_talking','dms_eating','dms_drinking','dms_smoking',
                'cam_off','gps_lost','gps_recovered'));
+
+-- ------------------ v32 the hand at the mouth has to leave a mark -------------
+-- The other half of this fix is in the phone's own code: the smoking reading now asks that the
+-- mouth's own dark line has gone as well as that its colour has turned to this driver's skin,
+-- because a plain closed mouth in a sunlit cab answers the colour question and used to raise an
+-- event. This block is the database half of the same complaint, and it is the half that works on
+-- the handsets that are already out there.
+--
+-- Both lines only raise a number that is still at or under the old shipped default, so an
+-- administrator who had already set either one the stricter way keeps what he set: 70 is four
+-- of the five pictures a second rather than three of them, and three seconds is a hand
+-- that stayed at the mouth, not a scratch on the way past.
+update event_rules set threshold = 70 where type = 'dms_smoking' and threshold < 70;
+update event_rules set hold_s = 3 where type = 'dms_smoking' and hold_s < 3;
 
 -- ------------------------------------------------------------- admin seed ----
 -- Promote the owner account. Runs after the tables/policies exist, and is safe
@@ -1861,5 +1883,23 @@ end $$;
 --   Run this BEFORE publishing the phone build that writes them. Until then a handset with the
 --        wait elapsed has its row refused by the database and says so, and the route keeps
 --        looking like a vehicle that simply stopped moving.
+--
+-- v32, on top of the above (the hand at the mouth has to leave a mark):
+--   update event_rules set threshold = 70 where type = 'dms_smoking' and threshold < 70;
+--   update event_rules set hold_s = 3      where type = 'dms_smoking' and hold_s < 3;
+--        -> the smoking rule used to answer one colour question: are these lips this driver's
+--        own skin. A plain closed mouth in a sunlit cab answers that as well, so a fleet that
+--        switched the rule on was handed an event every few seconds about a driver doing
+--        nothing at all, which is the complaint this version exists to end.
+--        -> The other half of the fix is in the phone's own code - the dark line of the mouth
+--        has to have gone too, and only something laid over it takes that away - and that half
+--        needs a rebuilt APK. These two lines are the half that works today: 70 is four of the
+--        five pictures a second rather than three of them, and a three second hold is
+--        a hand that stayed there, not a scratch.
+--        -> Both lines only raise a number that was still at or under the old shipped default,
+--        so a fleet that had already set either one the stricter way keeps its own setting, and
+--        the rule stays seeded switched off.
+--   Run this whenever convenient: no build depends on it, and a project that skips it keeps the
+--   looser numbers on a rule that is off unless somebody ticked it.
 
 -- ============================================================================
