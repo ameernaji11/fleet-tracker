@@ -7,9 +7,23 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- API 34 only grants a camera-type foreground service if this is declared. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CAMERA" />
+    <!-- The same service also keeps a trip's positions on the road once the page has been
+         frozen, and API 34 will not let a location-type foreground service run without
+         this. The location permissions themselves belong to the app: the background
+         watcher plugin already asks for them, and asks for "all the time", which is the
+         only answer that lets a locked phone go on reporting. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- The screen may be off while the vehicle is moving, and the analysis still has
          to run, so the service holds a partial wake lock for as long as it is watching. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- A wake lock keeps the CPU awake while the service runs, but it is Android's own
+         battery saving that puts an app to sleep between trips and defers its uploads.
+         This permission is what lets the app ask the driver, once, to keep this one out
+         of that saving; it is a normal permission, so it is granted at install and never
+         at runtime, and declining it on the settings screen changes nothing here. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.front" android:required="false" />
 
@@ -17,6 +31,6 @@
         <service
             android:name="com.fleet.dms.DmsService"
             android:exported="false"
-            android:foregroundServiceType="camera" />
+            android:foregroundServiceType="camera|location" />
     </application>
 </manifest>
