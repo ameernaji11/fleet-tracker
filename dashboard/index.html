@@ -421,8 +421,14 @@ function mkMap(id,fit,extra){
  // it. A click on a control in a popup is meant for the popup, not for the road behind it:
  // stopping it at the popup leaves the X button and a click outside exactly as they were,
  // which is all that should ever close one.
+ // A control that this page listens for above the map - the camera button on an event -
+ // is answered here before the click is held back, because stopping it at the popup keeps
+ // it from ever reaching that listener, and the button on an event's card did nothing at
+ // all for that reason. The chevrons inside a popup were never affected, because they
+ // carry their own onclick and fire on the button itself.
  m.on('popupopen',e=>{const el=e.popup.getElement();if(!el||el.__own)return;el.__own=1;
-  el.addEventListener('click',ev=>ev.stopPropagation())});
+  el.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('[data-clip]');
+   if(b&&b.dataset.clip)evClip(b.dataset.clip,b.dataset.cid);ev.stopPropagation()})});
  let cur=baseN();let layer=baseL(cur).addTo(m);
  const c=L.control({position:'topright'});
  c.onAdd=()=>{const d=L.DomUtil.create('div','mt');L.DomEvent.disableClickPropagation(d);
@@ -1154,14 +1160,27 @@ let TRIPS=[],TSEL=-1,HEVS=[],PB=null;
 function splitTrips(d,Vh){const gap=GAP_S(Vh)*1000;const out=[];let cur=[];
  d.forEach(p=>{if(cur.length&&tms(p)-tms(cur.at(-1))>gap){out.push(cur);cur=[]}cur.push(p);if(p.ignition===false&&cur.length>1){out.push(cur);cur=[]}});
  if(cur.length)out.push(cur);const f=out.filter(t=>t.length>1);return f.length?f:out.slice(0,1)}
-function tStats(t,Vh){let d=0,dr=0,id=0,fuel=0,max=0,ms=0,mn=0;const fm=+Vh.fuel_moving||0,fi=+Vh.fuel_idle||0,gap=GAP_S(Vh);
+function tStats(t,Vh){let d=0,dr=0,id=0,fuel=0,max=0,ms=0,mn=0,cut=0,cat=0,cutN=0,cutT=0;const fm=+Vh.fuel_moving||0,fi=+Vh.fuel_idle||0,gap=GAP_S(Vh);
  t.forEach(p=>{const s=+p.speed||0;if(s>max)max=s;if(s>0){ms+=s;mn++}});
  // two parked heartbeats an hour apart really were an hour of standing still, so a stopped
  // pair may be as far apart as this vehicle's own wait. A pair with any movement in it is
  // held to three minutes: past that the phone said nothing, and joining the two would draw
  // a straight line over roads no vehicle took straight.
- for(let i=1;i<t.length;i++){const q=t[i-1],p=t[i],dt=(tms(p)-tms(q))/1000;if(dt>(p.speed>0||q.speed>0?180:gap))continue;const dk=km(q,p);d+=dk;if(p.speed>0){dr+=dt;fuel+=dk*fm/100}else{id+=dt;fuel+=dt/3600*fi}}
- return {d,dr,id,fuel,max,avg:mn?ms/mn:0,s:tms(t[0]),e:tms(t.at(-1)),dur:(tms(t.at(-1))-tms(t[0]))/1000}}
+ // The pairs that are thrown away for that reason are the ones an office needs to hear
+ // about, because a vehicle doing eighty for five of those minutes covered several
+ // kilometres nobody has any reading for - and a geofence crossed inside that silence was
+ // crossed while this handset was saying nothing, so no enter or exit row exists for it.
+ // The trip's own distance and duration stay what was measured; the hole is named beside
+ // them instead of being hidden by a line drawn across it.
+ for(let i=1;i<t.length;i++){const q=t[i-1],p=t[i],dt=(tms(p)-tms(q))/1000;
+  if(dt>(p.speed>0||q.speed>0?180:gap)){cutN++;cutT+=dt;if(dt>cut){cut=dt;cat=tms(q)}continue}
+  const dk=km(q,p);d+=dk;if(p.speed>0){dr+=dt;fuel+=dk*fm/100}else{id+=dt;fuel+=dt/3600*fi}}
+ return {d,dr,id,fuel,max,avg:mn?ms/mn:0,s:tms(t[0]),e:tms(t.at(-1)),dur:(tms(t.at(-1))-tms(t[0]))/1000,cut,cat,cutN,cutT}}
+// The one sentence a trip with a hole in it has to say, in the two lengths it is needed:
+// beside the trip in the list, and in full inside its own details.
+const cutTip=S=>'The handset reported nothing at all for '+hms(S.cut)+', the longest silence inside this trip'+
+ (S.cutN>1?' ('+S.cutN+' silences of any length in it, the total '+hms(S.cutT)+')':'')+', starting at '+new Date(S.cat).toLocaleString()+
+ '. The road it covered in that time is not on this map, its distance is not in these figures, and a geofence it crossed then raised no entry or exit - a crossing is only ever seen by a fix that arrives.';
 // Two fixes are a stretch of road, or they are a silence. This is the one question, put
 // in one place, and it is answered by the same bound tStats uses above: three minutes
 // between two samples that show movement, and the vehicle's own parked wait between two
@@ -1345,7 +1364,19 @@ async function loadHist(keep){if(!keep)fSave('hist');pbStop();
  TRIPS=splitTrips(data,Vh).map((pts,i)=>({n:i+1,pts,col:TCOL[i%TCOL.length],on:true,evsOn:true,st:tStats(pts,Vh),ly:L.layerGroup(),ely:L.layerGroup(),evs:[]}));
  hLayer=L.layerGroup().addTo(mapH);
  const ORPH=[];
- HEVS.forEach(x=>{const t=tms(x),T=TRIPS.find(T=>t>=T.st.s-6e4&&t<=T.st.e+6e4);if(T)T.evs.push(x);else ORPH.push(x)});
+ // An event belongs to the trip that was running in the moment it happened. The trip's own
+ // span - measured from the fixes this handset reported - answers that first. The minute
+ // either side is only ever a guess, and it used to be the whole rule, so a breach raised
+ // while the driver was already starting his next trip, whose first fix had not landed yet,
+ // was filed inside the trip that ended a minute before it. A record only exists while a
+ // trip runs, so an event standing in the gap between two of them belongs to the trip that
+ // opens after it, and only within the minute that gap allows; past that it stays on the map
+ // on its own, which is the truth rather than a guess dressed as a measurement.
+ const inT=(T,t)=>t>=T.st.s&&t<=T.st.e;
+ HEVS.forEach(x=>{const t=tms(x),nx=TRIPS.filter(T=>!inT(T,t)&&T.st.s>t).sort((a,b)=>a.st.s-b.st.s)[0],
+  pv=TRIPS.filter(T=>!inT(T,t)&&T.st.e<t).sort((a,b)=>b.st.e-a.st.e)[0],
+  T=TRIPS.find(q=>inT(q,t))||(nx&&nx.st.s-t<=6e4?nx:pv&&t-pv.st.e<=6e4?pv:null);
+  if(T)T.evs.push(x);else ORPH.push(x)});
  evPaint(ORPH,hLayer,hData);
  TRIPS.forEach(T=>{drawTrip(T,Vh);T.ly.addTo(mapH)});
  if(!+Vh.fuel_moving&&!+Vh.fuel_idle)toast('Set the fuel rates on the Vehicles page to see fuel figures');
@@ -1361,13 +1392,15 @@ function tTog(i,on){const T=TRIPS[i];T.on=on;on?T.ly.addTo(mapH):T.ly.remove();
 function tAll(on){TRIPS.forEach((T,i)=>{T.on=!!on;on?T.ly.addTo(mapH):T.ly.remove();(on&&T.evsOn!==false)?T.ely.addTo(mapH):T.ely.remove()});if(!on){TSEL=-1;pbStop()}hStyle();hSide();hKpis();if(on)hFit()}
 function tSel(i){const T=TRIPS[i];if(!T)return;if(!T.on){T.on=true;T.ly.addTo(mapH)}
  if(TSEL!==i){TSEL=i;pbInit()}hStyle();hSide();hKpis();mapH.fitBounds(T.pts.map(p=>[p.lat,p.lng]),{padding:[30,30],maxZoom:17})}
-function tDet(T){const S=T.st;return [['Start',new Date(S.s).toLocaleString()],['End',new Date(S.e).toLocaleString()],['Distance',S.d.toFixed(2)+' km'],['Max Speed',Math.round(S.max)+' km/h'],['Avg moving speed',Math.round(S.avg)+' km/h'],['Driving',hms(S.dr)],['Idling',hms(S.id)],['Duration',hms(S.dur)],['Events',T.evs.length],['Estimated fuel',S.fuel.toFixed(2)+' L'],['Records',T.pts.length]]}
+function tDet(T){const S=T.st,R=[['Start',new Date(S.s).toLocaleString()],['End',new Date(S.e).toLocaleString()],['Distance',S.d.toFixed(2)+' km'],['Max Speed',Math.round(S.max)+' km/h'],['Avg moving speed',Math.round(S.avg)+' km/h'],['Driving',hms(S.dr)],['Idling',hms(S.id)],['Duration',hms(S.dur)],['Events',T.evs.length],['Estimated fuel',S.fuel.toFixed(2)+' L'],['Records',T.pts.length]];
+ if(S.cutN)R.push(['Silence inside',hms(S.cutT)+' in '+S.cutN+' cut'+(S.cutN>1?'s':'')+', longest '+hms(S.cut)]);
+ return R}
 const HHINT='<small style="color:var(--mut);display:block">Click a trip to see its details, print them and play the trip back.</small>';
 function hSide(){const s=$('hside');
  if(!TRIPS.length){s.innerHTML='<p style="color:var(--mut);margin:0">No trips in this period.</p>';return}
  const T=TRIPS[TSEL];
  s.innerHTML=`<div class="od"><b class="fl1"><i class="fa-solid fa-route"></i> Trips (${TRIPS.length})</b><button class="btn gh sm" onclick="tAll(1)" title="Show every trip">All</button><button class="btn gh sm" onclick="tAll(0)" title="Hide every trip">None</button></div>${HHINT}
- <div class="trl">${TRIPS.map((t,i)=>`<div class="trr${i===TSEL?' on':''}" onclick="tSel(${i})" title="Click to see this trip's details and play it back"><input type="checkbox" ${t.on?'checked':''} onclick="event.stopPropagation()" onchange="tTog(${i},this.checked)" title="Show this trip on the map"><span class="sw" style="background:${t.col}"></span><div style="flex:1;min-width:0"><b>Trip ${t.n}</b> <small>${new Date(t.st.s).toLocaleString()} → ${new Date(t.st.e).toLocaleTimeString()} · ${t.st.d.toFixed(1)} km</small></div></div>${i===TSEL?tdBox(t,i):''}`).join('')}</div>`;
+ <div class="trl">${TRIPS.map((t,i)=>`<div class="trr${i===TSEL?' on':''}" onclick="tSel(${i})" title="Click to see this trip's details and play it back"><input type="checkbox" ${t.on?'checked':''} onclick="event.stopPropagation()" onchange="tTog(${i},this.checked)" title="Show this trip on the map"><span class="sw" style="background:${t.col}"></span><div style="flex:1;min-width:0"><b>Trip ${t.n}</b> <small>${new Date(t.st.s).toLocaleString()} → ${new Date(t.st.e).toLocaleTimeString()} · ${t.st.d.toFixed(1)} km${t.st.cutN?` · <b style="color:var(--ord)" title="${esc(cutTip(t.st))}">${hms(t.st.cutT)} not reported</b>`:''}</small></div></div>${i===TSEL?tdBox(t,i):''}`).join('')}</div>`;
  if(T){[['tdS',T.pts[0]],['tdE',T.pts.at(-1)]].forEach(([id,p])=>geoOne(gk(p)).then(nm=>{if($(id))$(id).textContent=nm||'Place name not found'}));
   $('pbR').onchange=e=>{if(PB)PB.rate=+e.target.value};pbShow()}}
 function tdBox(T,i){return `<div class="tbox" style="border-left:4px solid ${T.col};margin-top:2px">
@@ -1579,10 +1612,20 @@ function evClipCell(r){
 // to the name is only the two things an investigator sorts by: who, and when. Spaces are
 // folded into the same underscore as the separators, because a name with both is a name
 // that sorts wrong the first time somebody searches for it in a folder of clips.
-const clipName=x=>[x&&(x.driver_name||x.vehicle_name||'driver'),
- x?new Date(x.recorded_at).toISOString().slice(0,19).replace(/[T:]/g,'-'):'',x?EVX(x.type)[0].toLowerCase().replace(/[^a-z0-9]+/g,'-'):'']
+const clipName=x=>[x&&x.driver_name?x.driver_name:x&&x.vehicle_name?x.vehicle_name:'driver',
+ x&&x.recorded_at?new Date(x.recorded_at).toISOString().slice(0,19).replace(/[T:]/g,'-'):'',
+ x?EVX(x.type)[0].toLowerCase().replace(/[^a-z0-9]+/g,'-'):'']
  .filter(Boolean).join('_').replace(/\s+/g,'_').replace(/[^A-Za-z0-9._-]/g,'')+'.mp4';
-let CLIPURL='';
+// An administrator who works down a list of alerts goes back to the ones he has already
+// opened. Each of those used to cost a fresh signature and a fresh download of every byte,
+// so the last six clips this page pulled in are kept for the rest of the session and
+// reopened at once; the seventh pushes the oldest out, because a clip is a few hundred
+// kilobytes and a shift holds hundreds of them.
+const CLIPC=new Map();
+const clipHit=p=>{const c=CLIPC.get(p);if(!c)return null;CLIPC.delete(p);CLIPC.set(p,c);return c};
+const clipPut=(p,url,size)=>{const old=CLIPC.get(p);if(old)URL.revokeObjectURL(old.url);
+ CLIPC.set(p,{url,size});
+ while(CLIPC.size>6){const k=CLIPC.keys().next().value;URL.revokeObjectURL(CLIPC.get(k).url);CLIPC.delete(k)}};
 // The reading the phone measured belongs beside the picture, not on top of it. This
 // dialog used to carry a five-column table, the event's own sentence and a paragraph
 // about where the words are written, and all of that pushed the film past the bottom
@@ -1594,39 +1637,48 @@ function clipReadSet(on){localStorage.clipRead=on?'1':'0';
  r.classList.toggle('hide',!on);
  b.innerHTML='<i class="fa-solid fa-'+(on?'eye-slash':'eye')+'"></i>'+(on?'Hide the reading':'Show the reading');
  b.title=on?'Leave nothing on screen but the recording and its buttons':'Driver, vehicle, the moment, speed, length and size'}
-async function evClip(path,cid){const x=EVROW[cid]||{clip_path:path},E=EVX(x.type),
+let CLIPSEQ=0;
+async function evClip(path,cid){const x=EVROW[cid]||{clip_path:path},E=EVX(x.type),seq=++CLIPSEQ,
  m=$('modal'),box=h=>`<div class="card" style="width:min(880px,100%)"><div class="dlgT" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span><i class="fa-solid fa-video"></i> <b style="color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</b> · driver camera clip</span><button class="btn gh sm" id="clpT" style="margin-left:auto" onclick="clipReadSet(!clipRead())"></button></div>${h}</div>`;
- // whatever was open before is over, and its bytes belong to the browser no longer
- if(CLIPURL){URL.revokeObjectURL(CLIPURL);CLIPURL=''}
- m.innerHTML=box('<p>Loading the recording…</p>');m.classList.add('on');
- const {data,error}=await sb.storage.from(CLIPB).createSignedUrl(path,300);
- if(error||!data){m.innerHTML=box('<p>This event has no recording on the server, or your account may not open it: '+esc(error&&error.message||'no answer from the server')+'</p>'+dlgClose());return}
- // the bytes are pulled in once and handed to the picture element as a local object
- // url. A signed link is a cross-origin address, and a browser refuses to rename a
- // file fetched across one, so a download button aimed straight at it would open the
- // video in a new tab instead of saving it - and a clip an administrator cannot carry
- // out of this page is a clip that gets described in an email instead of watched.
- let url='',size=0,why='';
- try{const r=await fetch(data.signedUrl);if(!r.ok)throw new Error('the file store answered '+r.status);
-  const bl=await r.blob();size=bl.size;url=CLIPURL=URL.createObjectURL(bl)}catch(e){why=e.message||'the file could not be read'}
- if(!url){m.innerHTML=box('<p>This recording could not be fetched: '+esc(why)+'</p>'+dlgClose());return}
- // muted so it starts by itself: a driver who has to press play first has already missed
- // the second that raised the alert, and these clips carry no sound anyway. Looped,
- // because the thing an administrator is looking for is one movement of a hand.
- m.innerHTML=box(`<video src="${url}" controls autoplay muted loop playsinline preload="auto" style="width:100%;max-height:56vh;border-radius:10px;background:#000"></video>
+ const kb=n=>(n/1024).toFixed(0)+' KB';
+ // The picture is stood on the screen pointing straight at the signed address, which the
+ // browser begins streaming at once, so the wait an administrator feels is the first frame
+ // of the clip and not the whole file arriving first. The bytes are still pulled in behind
+ // it, for two reasons a signed link cannot serve: a download aimed across origins opens
+ // the video in a new tab instead of saving it under the event's own name, and the size of
+ // the recording is only known once it is here.
+ const paint=(url,size,live)=>{m.innerHTML=box(`<video src="${url}" controls autoplay muted loop playsinline preload="auto" style="width:100%;max-height:56vh;border-radius:10px;background:#000"></video>
  <div id="clpR" style="margin-top:8px;font-size:13px">
- <b>${esc(x.driver_name||'-')}</b> · ${esc(x.vehicle_name||'-')} · ${x.recorded_at?new Date(x.recorded_at).toLocaleString():'-'} · ${x.speed!=null?Math.round(x.speed||0)+' km/h':'-'} · ${x.ended_at?hms((new Date(x.ended_at)-new Date(x.recorded_at))/1000):'-'} · ${(size/1024).toFixed(0)} KB
+ <b>${esc(x.driver_name||'-')}</b> · ${esc(x.vehicle_name||'-')} · ${x.recorded_at?new Date(x.recorded_at).toLocaleString():'-'} · ${x.speed!=null?Math.round(x.speed||0)+' km/h':'-'} · ${x.ended_at?hms((new Date(x.ended_at)-new Date(x.recorded_at))/1000):'-'} · <span id="clpS">${size?kb(size):'measuring…'}</span>
  <div style="margin-top:3px">${esc(x.details||EVX(x.type)[0])}</div>
  <div style="margin-top:3px;color:var(--mut);font-size:12px"><i class="fa-solid fa-circle-info"></i> The clock in its top left corner and the small line along the bottom are written into the picture itself, so a download or a forwarded copy carries them.</div></div>
- <div class="dlgB"><a class="btn b sm" href="${url}" download="${esc(clipName(x))}" title="Save this recording to this computer"><i class="fa-solid fa-download"></i>Download</a>
+ <div class="dlgB">${live?`<a class="btn b sm" href="${url}" download="${esc(clipName(x))}" title="Save this recording to this computer"><i class="fa-solid fa-download"></i>Download</a>`:'<span id="clpD"><span class="btn gh sm" style="opacity:.55"><i class="fa-solid fa-hourglass-half"></i> Preparing the download</span></span>'}
  <button class="btn gh sm" onclick="closeClip()"><i class="fa-solid fa-xmark"></i>Close</button></div>`);
- clipReadSet(clipRead())}
-function closeClip(){$('modal').classList.remove('on');if(CLIPURL){URL.revokeObjectURL(CLIPURL);CLIPURL=''}}
+ clipReadSet(clipRead())};
+ const hit=clipHit(path);
+ m.innerHTML=box('<p>'+(hit?'Opening the recording…':'Loading the recording…')+'</p>');m.classList.add('on');
+ if(hit){paint(hit.url,hit.size,true);return}
+ const {data,error}=await sb.storage.from(CLIPB).createSignedUrl(path,300);
+ if(error||!data){m.innerHTML=box('<p>This event has no recording on the server, or your account may not open it: '+esc(error&&error.message||'no answer from the server')+'</p>'+dlgClose());return}
+ paint(data.signedUrl,0,false);
+ let bl=null,why='';
+ try{const r=await fetch(data.signedUrl);if(!r.ok)throw new Error('the file store answered '+r.status);bl=await r.blob()}catch(e){why=e.message||'the file could not be read'}
+ // kept whether or not this dialog is still the one on screen: the bytes are here, and the
+ // next time this clip is opened must not ask the store for them a second time
+ if(bl)clipPut(path,URL.createObjectURL(bl),bl.size);
+ if(seq!==CLIPSEQ)return;
+ const d=$('clpD'),s=$('clpS');if(!d||!s)return;
+ if(!bl){s.textContent='-';d.innerHTML='<span class="btn gh sm" style="opacity:.55" title="'+esc(why)+'"><i class="fa-solid fa-triangle-exclamation"></i> Download not available</span>';return}
+ s.textContent=kb(bl.size);
+ d.innerHTML='<a class="btn b sm" href="'+CLIPC.get(path).url+'" download="'+esc(clipName(x))+'" title="Save this recording to this computer"><i class="fa-solid fa-download"></i>Download</a>'}
+function closeClip(){$('modal').classList.remove('on')}
 const dlgClose=()=>'<div class="dlgB"><button class="btn gh sm" onclick="closeClip()"><i class="fa-solid fa-xmark"></i>Close</button></div>';
 document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('[data-clip]');
  if(b&&b.dataset.clip)evClip(b.dataset.clip,b.dataset.cid)});
-// Closing the dialog any other way - the backdrop, the escape key - still has to give
-// the object url back, or every clip watched in a session keeps its bytes in memory.
+// Closing the dialog any other way - the backdrop, the escape key - goes through the same
+// door, so a clip leaves nothing playing behind it. The bytes themselves stay in the small
+// cache above, which is what makes reopening one instant, and the seventh one out pays for
+// it by giving the oldest back.
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&$('modal').classList.contains('on'))closeClip()});
 function renderEvt(){
  const fx=r=>(!EVF.driver||(r.driver_name||'-')===EVF.driver)&&(!EVF.day||dayOf(r)===EVF.day),base=EVR.filter(fx),rows=base.filter(r=>!EVF.type||r.type===EVF.type),ty=cnt(rows,r=>r.type),K=Object.keys(EV);
@@ -2094,9 +2146,18 @@ function range(k){const n=new Date(),y=n.getFullYear(),m=n.getMonth(),d=n.getDat
  // "Today" runs to midnight, not to the minute the page was opened, so a report
  // built late in the day still includes the fixes taken after that moment
  return {today:[D(y,m,d),D(y,m,d,23,59,59)],yest:[D(y,m,d-1),D(y,m,d-1,23,59,59)],'24h':[new Date(n-864e5),n],lw:(()=>{const o=D(y,m,d).getDay();return [D(y,m,d-o-7),D(y,m,d-o-1,23,59,59)]})(),w:[new Date(n-7*864e5),n],lm:[D(y,m-1,1),D(y,m,0,23,59,59)],m:[new Date(n-30*864e5),n],ly:[D(y-1,0,1),D(y-1,11,31,23,59,59)],y:[new Date(n-365*864e5),n]}[k]}
-function setR(a,b,k){if(k==='custom')return;const r=range(k);$(a)._flatpickr.setDate(r[0],true);$(b)._flatpickr.setDate(r[1],true)}
+// The label above the two boxes used to keep saying "Today" after the dates under it had
+// been changed by hand, so a report read back the next morning did not say which window it
+// covered. An edit to either box of a pair now puts the label to Custom - except while this
+// page is the one writing the dates, because pressing a preset, restoring yesterday's
+// criteria and the seed that opens the page all move the boxes through the same hook and
+// must not talk themselves out of the window they just chose.
+let RSIL=0;
+function setR(a,b,k){if(k==='custom')return;const r=range(k);RSIL++;
+ try{$(a)._flatpickr.setDate(r[0],true);$(b)._flatpickr.setDate(r[1],true)}finally{RSIL--}}
 function initDates(){[['hf','ht','today'],['ev_f','ev_to','today'],['tr_f','tr_t','today'],['rp_f','rp_t','today'],['ac_f','ac_to','today'],['bb_f','bb_t','today',BBPRE]].forEach(([a,b,k,lst])=>{
- const o={enableTime:true,enableSeconds:true,time_24hr:true,dateFormat:'Y-m-d\\TH:i:S',altInput:true,altFormat:'d/m/Y H:i:S',disableMobile:true};flatpickr('#'+a,o);flatpickr('#'+b,o);
+ const o={enableTime:true,enableSeconds:true,time_24hr:true,dateFormat:'Y-m-d\\TH:i:S',altInput:true,altFormat:'d/m/Y H:i:S',disableMobile:true,
+  onChange:()=>{if(RSIL)return;const s=$('pr_'+a);if(s&&s.value!=='custom')s.value='custom'}};flatpickr('#'+a,o);flatpickr('#'+b,o);
  $(a).closest('.field').insertAdjacentHTML('beforebegin',`<div class="field"><label>Period</label><select id="pr_${a}" onchange="setR('${a}','${b}',this.value)">${(lst||PRE).map(p=>`<option value="${p[0]}" ${p[0]===k?'selected':''}>${p[1]}</option>`).join('')}</select></div>`);
  setR(a,b,k)});
  const l=document.querySelector('[name=license_expiry]');if(l)flatpickr(l,{dateFormat:'Y-m-d',altInput:true,altFormat:'d/m/Y',disableMobile:true});
