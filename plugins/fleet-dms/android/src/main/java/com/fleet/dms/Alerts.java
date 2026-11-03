@@ -63,7 +63,7 @@ class Alerts {
         FALLBACK.put(TALK, "Please keep conversations short while driving.");
         FALLBACK.put(EAT, "Please do not eat while driving.");
         FALLBACK.put(DRINK, "Please do not drink while driving.");
-        FALLBACK.put(SMOKE, "Please keep your hands on the wheel.");
+        FALLBACK.put(SMOKE, "Smoking in the car is not allowed. Please stop.");
     }
 
     private final Context ctx;

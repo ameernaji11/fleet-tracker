@@ -91,6 +91,16 @@ class Rules {
     private static final double MOUTH_PART = 3;
     /** The share of the strip over the lips that has to be this driver's own skin. */
     private static final double LIP_SKIN = 50;
+    /**
+     * The most of that same strip that may still be dark.
+     *
+     * Skin alone is not the sign of a hand: a bare face is skin too, and a driver whose
+     * lips happen to read close to his own cheek colour would else be smoking all day.
+     * What a hand takes away, and nothing else can, is the dark line of the mouth itself
+     * - the lips, the gap between them, the shadow under the upper one. A mouth that is
+     * showing none of it has something laid over it.
+     */
+    private static final double LIP_DARK = 12;
 
     /** Where the phone is, as this frame saw it. {@link #AT_NONE} when it did not see one. */
     private static final int AT_NONE = 0, AT_FRONT = 1, AT_EAR_L = 2, AT_EAR_R = 3;
@@ -271,8 +281,15 @@ class Rules {
         // A hand at the mouth that is not holding anything the model can name, over a
         // mouth that is not open wide enough to be talking or yawning. The last of the
         // four and the one that is left over on purpose.
+        //
+        // Both halves of the lip reading are needed, and this is the reason the rule
+        // used to write events about drivers doing nothing at all: colour alone says
+        // only that this driver's lips are close to his own cheek colour, which is true
+        // of a plain closed mouth in a bright cab. The mouth's own dark line going, on
+        // top of the strip turning to skin, is what a hand laid over it looks like.
         boolean hand = r.face && r.seeing && !food && !drink && where == AT_NONE
-                && mouth < MOUTH_WIDE && 100 * r.lipSkin >= LIP_SKIN;
+                && mouth < MOUTH_WIDE && 100 * r.lipSkin >= LIP_SKIN
+                && 100 * r.lipDark <= LIP_DARK;
         phoneWin.add(now, 0, where != AT_NONE);
         foodWin.add(now, 0, food);
         drinkWin.add(now, 0, drink);
