@@ -627,7 +627,17 @@ public class DmsService extends Service implements LifecycleOwner {
             // alert of a trip started a second later still has its seconds before it in
             // the file, but nothing is measured, warned about or filed against a driver
             // who has not started a trip.
-            if (judged) rules.frame(reader.read(b, now), kmh, cfg);
+            // A speed the page has not repeated for longer than a fix may be trusted is not a
+            // speed at all. The feed stops the moment the receiver loses its lock, and while
+            // Android has the WebView asleep, and the number the service is left holding is
+            // the last one the wheels turned at: that armed a lens pointed at a man standing
+            // in his office and filed his yawn as a driving breach, which is exactly what the
+            // fleet was told it had. So a stale feed says the vehicle is standing, and every
+            // rule the Configuration page leaves armed above a speed floor falls silent with
+            // it until the page reports a number again. A fleet that sets a rule to 0 km/h
+            // still means that rule to judge a stationary vehicle, and it keeps doing that.
+            if (judged) rules.frame(reader.read(b, now),
+                    (now - fedAt) / 1000L > FIX_STALE_S ? 0 : kmh, cfg);
             Host h = host;
             // the driver decides whether he wants to see himself; the dashboard only
             // decides what that choice is when the trip begins
