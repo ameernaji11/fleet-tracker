@@ -27,7 +27,7 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 #map{height:260px;border-radius:14px;border:1px solid var(--line);margin:10px 0;position:relative}.mapb{position:absolute;z-index:999;right:8px;top:8px;width:auto;padding:0 10px;font-weight:700;font-size:12px}
 .mk{width:34px;height:34px;border-radius:50%;border:3px solid #fff;box-shadow:0 1px 6px #0006;display:grid;place-items:center;color:#fff}
 #alert{position:fixed;top:env(safe-area-inset-top);left:8px;right:8px;background:var(--rd);color:#fff;padding:14px;border-radius:12px;font-weight:700;z-index:9999;text-align:center}
-.err{color:var(--rd);font-weight:600;min-height:20px}.foot{font-size:11px;color:var(--mut);text-align:center;margin:14px 0}
+.err{color:var(--rd);font-weight:600;min-height:20px}.err.good{color:var(--gr)}.err.warn{color:var(--or)}.foot{font-size:11px;color:var(--mut);text-align:center;margin:14px 0}
 .eye{position:absolute;right:6px;top:10px;border:0;background:none;color:var(--mut);width:40px;height:36px}
 .step{display:flex;gap:10px;align-items:center}.step i{width:24px;color:var(--bl);text-align:center}
 #app.screen{display:flex;flex-direction:column;height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));padding:8px 12px;gap:6px;overflow:hidden}#app.hide{display:none}
@@ -111,8 +111,8 @@ input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);borde
 <button class="btn b" onclick="pAsk()"><i class="fa-solid fa-check"></i>Allow permissions</button>
 <div class="card step"><i class="fa-solid fa-location-crosshairs"></i><div>Location: "Allow all the time"<br><small>Opens settings. Tap Permissions → Location → Allow all the time.</small></div></div>
 <button class="btn o" onclick="CapPlugins.BG.openSettings()"><i class="fa-solid fa-gear"></i>Open location settings</button>
-<div class="card step"><i class="fa-solid fa-battery-full"></i><div>Battery: "Unrestricted"<br><small>Opens settings. Tap Battery → Unrestricted, so Android never stops tracking.</small></div></div>
-<button class="btn o" onclick="CapPlugins.BG.openSettings()"><i class="fa-solid fa-gear"></i>Open battery settings</button>
+<div class="card step" id="igcard"><i class="fa-solid fa-battery-full"></i><div>Battery: "Unrestricted"<br><small>Android stops apps it thinks nobody is using, and a stopped app cannot report a trip. Answer Allow once and this one keeps working with the screen locked.</small></div></div>
+<button class="btn o" id="igask" onclick="igAsk()"><i class="fa-solid fa-battery-bolt"></i>Allow unrestricted battery use</button>
 <div class="card step" id="camcard"><i class="fa-solid fa-video"></i><div>Driver camera<br><small>Opens the forward lens on your own phone: while a trip is running it watches automatically if your fleet turns driver alerts on, and at any other time the video button on the map starts and stops it. Either way the phone looks at your face for tiredness, distraction or a phone in your hand and warns you. The judgement happens on this phone; only the warnings themselves are filed, and nothing goes anywhere without a signal.</small></div></div>
 <button class="btn o" id="camask" onclick="camAsk()"><i class="fa-solid fa-camera"></i>Allow the camera</button>
 <div class="card step"><i class="fa-solid fa-bell"></i><div>Alerts with the screen off<br><small>Keep Battery "Unrestricted" and notifications allowed: the buzzer and the voice are then produced by Android itself, so both work with the screen locked or another app open. Test them with the bell button once the trip has started. The speaker button at the top of the map silences every sound without losing the on-screen warning.</small></div></div>
@@ -180,13 +180,23 @@ const outCount=()=>new Promise(res=>{const s=outSt('readonly');
  if(!s)return res(MEMQ.length);
  try{const c=s.count();c.onsuccess=()=>res(c.result+MEMQ.length);c.onerror=()=>res(MEMQ.length)}catch(e){res(MEMQ.length)}});
 const mk=r=>supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storage:r?localStorage:sessionStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'implicit'}});
-try{if(!/^https:\/\/[a-z0-9]{15,30}\.supabase\.co$/.test(SUPABASE_URL)||!String(SUPABASE_KEY).startsWith('eyJ'))throw new Error('config.js has a wrong address or key');sb=mk(REM)}catch(e){$('err').textContent='Setup error: '+(e.message||e)}
+try{if(!/^https:\/\/[a-z0-9]{15,30}\.supabase\.co$/.test(SUPABASE_URL)||!String(SUPABASE_KEY).startsWith('eyJ'))throw new Error('the address or key built into this app is not a fleet server');sb=mk(REM)}catch(e){$('err').textContent='This app cannot reach the office, so it cannot start a trip or send positions. Tell your office so they can rebuild it. ('+(e.message||e)+')'}
 const show=s=>{['wt','lg','pm','app'].forEach(x=>$(x).classList.toggle('hide',x!==s));
  // one error line, two homes: inside the trip screen it takes a row above the trip button,
  // everywhere else it stays the fixed line the wait and sign-in screens have always used.
  // Every writer can keep calling it by the same id.
  try{const e=$('err'),a=$('app'),t=$('trow');if(e&&a&&t){if(s==='app'){if(e.parentNode!==a)a.insertBefore(e,t)}else if(e.parentNode===a)document.body.appendChild(e)}}catch(x){}
  if(s==='app'&&map)setTimeout(()=>map.invalidateSize(),100)};
+// ---- one status line, three colours. Writing to it plainly means "something broke".
+// note() is how the app delivers good news or a warning without borrowing the error red,
+// and since the colour is decided on every single write, an earlier note can never leave
+// the line painted green when a real error lands in it.
+const note=(()=>{const el=$('err'),p=Object.getOwnPropertyDescriptor(Node.prototype,'textContent');
+ let k='';
+ if(el&&p&&p.get&&p.set)Object.defineProperty(el,'textContent',{configurable:true,
+  get(){return p.get.call(el)},
+  set(v){p.set.call(el,v);el.className='err'+(v&&k?' '+k:'');k=''}});
+ return(m,c)=>{k=c==='ok'?'good':c==='warn'?'warn':'';if(el)el.textContent=m||''}})();
 function eye(){const i=$('pw');i.type=i.type==='password'?'text':'password';$('eyei').className='fa-solid '+(i.type==='password'?'fa-eye':'fa-eye-slash')}
 // ---- signing in with no signal. The server cannot be reached from a basement, a
 // tunnel or a dead spot, so the phone keeps its own way of checking the driver's
@@ -228,8 +238,12 @@ function noNet(e){try{if(!e||e.statusCode||e.code)return false;
 function dupCid(e){try{if(!e)return false;const s=String(e.message||e)+' '+(e.details||'');
  return (String(e.code||'')==='23505'||/duplicate key/i.test(s))&&/events_cid/i.test(s)}catch(x){return false}}
 // used when the server could not be reached: the same local check the no-signal
-// path uses, so nobody waits for a "Failed to fetch" that never resolves
-async function localEnter(){const c=await credCheck($('pw').value);
+// path uses, so nobody waits for a "Failed to fetch" that never resolves. A phone on
+// dead Wi-Fi says it is online and never reaches the no-signal branch below, so the
+// shut-after-five promise is kept here as well - otherwise the one path that has no
+// server to say "no" would also be the one path with no count.
+async function localEnter(){offAge();if(OFFFAIL>=LOCK_AT)throw Object.assign(new Error(offFail()),{soft:1});
+ const c=await credCheck($('pw').value);
  if(!c)throw new Error(credKnown()?offFail():'The server did not answer, and this phone has not signed in as '+($('em').value.trim()||'that user')+' before. Sign in once while the server can be reached, then the phone can let you in without it.');
  offClear();
  await init(1,{id:c.i,email:c.e})}
@@ -347,6 +361,9 @@ async function claimOut(d){if(CLDOWN)return;CLDOWN=true;const msg=claimWhy(d);
   // not answering. The camera and his pictures are put away under the same rule.
   if(watcher||SRT||tripRead()){try{await outWait(stop(1),TRIP_MS)}catch(e){}}
   await outWait(senOff());
+  // the runner goes before the camera and before its queue is wiped: a trip this handset is
+  // losing may still be holding points it could not send, and they are this driver's records
+  await outWait(trkStop());
   await outWait((async()=>{try{if(dmsHas()){await CapPlugins.Dms.stop();await dmsDrain();await CapPlugins.Dms.clear()}}catch(e){}})());
   await outWait(logAct('Account now running on another phone',msg.slice(0,140)));
   // the same rule as signing out by hand: this handset must not keep a session it can
@@ -441,7 +458,12 @@ function outLocal(){try{const q=sb&&sb.auth&&sb.auth.stopAutoRefresh();if(q&&q.c
  // tokens and leaving this copy would still end with "sign out does nothing". The zones,
  // rules and settings in the same cache belong to the fleet and stay for the next handset.
  try{const c=JSON.parse(localStorage.cfg||'null');if(c&&c.who){delete c.who;localStorage.cfg=JSON.stringify(c)}}catch(e){}}
-async function signOut(){try{sessStop()}catch(e){}
+async function signOut(){
+ // standing up from the seat with a trip running cuts that trip short: the office gets
+ // the route up to this moment and nothing after it. The icon is small and easy to tap
+ // by mistake, so ending a drive has to be the driver's own answer, not a side effect
+ if(SRT&&!confirm('A trip is still running. Signing out ends it now and sends the office the route so far. Sign out anyway?'))return;
+ try{sessStop()}catch(e){}
  // The three things that still want his session go out together, under one deadline:
  // the audit row, the watcher that listens for a vehicle moving, and standing up from
  // the seat so the next handset is not left outside for the two minutes it would
@@ -449,15 +471,20 @@ async function signOut(){try{sessStop()}catch(e){}
  // pictures this phone kept of him are deleted rather than left for the next driver of
  // the same handset.
  await outWait(Promise.all([logAct('Signed out','Phone'),senOff(),claimGive(),
-  (async()=>{try{if(dmsHas()){await CapPlugins.Dms.stop();await dmsDrain();await CapPlugins.Dms.clear()}}catch(e){}})()]));
+  // the runner gives back its unsent points before the service is stopped and its phone-side
+  // queue deleted, or the trip's last minutes would be erased with the session
+  (async()=>{try{await trkStop();if(dmsHas()){await CapPlugins.Dms.stop();await dmsDrain();await CapPlugins.Dms.clear()}}catch(e){}})()]));
  // asked last, because it is what takes the token these other calls are written with
  try{await outWait(sb&&sb.auth.signOut())}catch(e){}
  outLocal();location.reload()}
 let PWFORCE=0;
 // force=1 opens the panel and takes the Cancel button away: a password the
 // administrator set for somebody else is only ever temporary, so the driver who
-// signed in with it has to replace it before the app carries on.
-function pwUi(force){const c=$('pwcard');const open=force?true:c.classList.contains('hide');
+// signed in with it has to replace it before the app carries on. A panel standing
+// under that order does not close when the key icon is tapped again — the ways out
+// are to choose a new password, or to sign out — or the temporary password would
+// keep working and the whole panel would be decoration.
+function pwUi(force){const c=$('pwcard');const open=force||!c.classList.contains('hide')&&PWFORCE?true:c.classList.contains('hide');
  PWFORCE=open?1:0;c.classList.toggle('hide',!open);
  // this panel takes the map's place on the screen, so a full-screen map steps back first
  if(open&&document.fullscreenElement)document.exitFullscreen().catch(()=>{});
@@ -474,10 +501,14 @@ async function changePw(){if(!sb)return;const a=$('np1').value,b=$('np2').value,
  if(error)return $('err').textContent='Error: '+(error.message||error);
  // put down the "this password was set for you" flag; the database lets an account
  // clear only that flag about itself, and only through this function
- await sb.rpc('clear_pw_flag');
+ const {error:ce}=await sb.rpc('clear_pw_flag');
  // the offline copy has to be the one that matches the new password
  await credSave(a);
- pwUi();$('err').textContent='Password changed.';logAct('Changed own password',was?'after an administrator reset':'')}
+ // the flag lives on the database row: if it stayed standing the panel would open again
+ // at the next sign-in, which reads as though this change had never been taken
+ note(ce?'Password changed, but the office still sees the "set a new password" mark on this account: '+ce.message:'Password changed.',ce?'warn':'ok');
+ // the order is what keeps the panel shut, so hand it back before closing
+ PWFORCE=0;pwUi();logAct('Changed own password',was?'after an administrator reset':'')}
 // Audit trail for the admin-only Activity Log. Silently ignored if the table is
 // not there yet, because a logging failure must never stop a driver's trip.
 function logAct(action,details,duration_s){if(!me)return;(async()=>{
@@ -494,6 +525,10 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){sessStop()
  // and push whatever the phone saved in the meantime - including the warnings the
  // driver camera raised while this page was frozen
  toneEnd();outUi();if(PEND)flush();maybeResume();dmsDrain();
+ // the runner kept reporting while this page slept, but it slept without a sign-in to send
+ // with: the fresh one goes over now, and one look tells the driver whether the trip was
+ // being reported at all in the meantime
+ trkTok();trkPoll();
  // a page that was behind another app may have slept past its own seat: proved again from
  // the front of the screen, before anything else this phone does for this driver
  claimGo(!!(watcher||SRT));
@@ -607,16 +642,19 @@ async function init(fresh,who){
 // ---- the outbox at work: open it, carry over anything the older build left in
 // localStorage, and push again whenever the phone hears from the network
 async function outInit(){
- if(!await outOpen())$('err').textContent='This phone cannot keep a queue between sessions; records are held until the app closes.';
+ if(!await outOpen())note('This phone cannot keep a queue between sessions; records are held until the app closes.','warn');
  try{const old=JSON.parse(localStorage.q||'[]');
   if(old.length){old.forEach(p=>outAdd({t:'pos',p}));localStorage.removeItem('q');flush()}}catch(e){}
  outUi()}
-addEventListener('online',async()=>{netUi();lgHint();banner('<i class="fa-solid fa-cloud-arrow-up"></i> Back online: sending '+(PEND||0)+' saved records',5000);flush();bbAnswer();
+addEventListener('online',async()=>{netUi();lgHint();banner('<i class="fa-solid fa-cloud-arrow-up"></i> Back online: sending '+((PEND||0)+TQ)+' saved records',5000);flush();bbAnswer();
  // an app that opened with no signal may be running on the phone's own copy of the
  // sign-in: the server has to accept it again before anything can be uploaded
  if(OFFL){const s=await askSession(4000);
   if(s&&s.user){me=s.user;OFFL=false;$('err').textContent='';outUi()}
-  else $('err').textContent='Signal is back. The trip and every record are safe on this phone until you sign in again.'}
+  else note('Signal is back. The trip and every record are safe on this phone until you sign in again.','ok')}
+ // the runner collects while the signal is down and can only post with a sign-in it was
+ // lent, so the one the server has just accepted goes over on this same breath
+ trkTok();
  // the seat is proved again on the same path: a phone that drove through a dead spot where
  // another handset took the account over must find that out here, not two hours later
  claimGo(!!(watcher||SRT));
@@ -748,7 +786,7 @@ function playTone(k,dur){stopTone();if(!k||k==='off'||TONEK.indexOf(k)<0)return;
 function toneEnd(){if(TO&&Date.now()>TEND)stopTone()}
 async function askNotif(){await logAct('Allowed permissions');
  try{const p=await CapPlugins.LN.requestPermissions(),s=[p.display,p.alert,p.sound,p.badge].filter(Boolean);
- if(s.includes('denied')&&!s.includes('granted'))$('err').textContent='Notifications are blocked, so alerts only vibrate. Enable them in Android settings.'}catch(e){}
+ if(s.includes('denied')&&!s.includes('granted'))note('Notifications are blocked, so alerts only vibrate. Enable them in Android settings.','warn')}catch(e){}
  if(CHAN)return;
  // Android writes a channel's sound and loudness when it is created and never lets the
  // app change them again, so these ids are new: the silent "fleet" channel that earlier
@@ -888,7 +926,7 @@ function zDraw(){if(!map)return;if(zLayer){zLayer.remove();zLayer=null}
  if(!ZONES.length)return;zLayer=L.layerGroup().addTo(map);
  ZONES.forEach(z=>{if(!z.pts||z.pts.length<3)return;
   L.polygon(z.pts,{color:z.color||'#2f7fe6',weight:2,fillOpacity:.08,dashArray:'6 4'})
-   .bindTooltip(z.name+(z.speed_limit?' · '+z.speed_limit+' km/h':''),{permanent:false}).addTo(zLayer)})}
+   .bindTooltip(esc(z.name)+(z.speed_limit?' · '+z.speed_limit+' km/h':''),{permanent:false}).addTo(zLayer)})}
 function zEv(type,z,loc,kmh){if(!ON[type])return;
  // a zone change is a moment, not a breach that grows: nothing ever comes back to
  // close it, so the row carries its own end time one second after the instant of the
@@ -957,7 +995,7 @@ function hold(type,bad,loc,kmh,val,t){if(!ON[type])return;
   if(ANN[type]){lastNotify[type]=n;notify(type,kmh,lvl)}
   // the dashboard needs the fix that opened the breach on the map straight away,
   // so it is pushed and flushed instead of waiting for the next sampling tick
-  lastLoc=loc;outAdd({t:'pos',p:row(loc,Math.round(kmh),true)});flush();
+  lastLoc=loc;trkFix(loc,Math.round(kmh));
   // A hard launch and a panic stop are peaks, not states that go on being broken: both are
   // over inside a second or two. The tolerance window exists so that one noisy fix cannot
   // become an overspeed record, and applying it here meant the phone buzzed the driver for a
@@ -1007,7 +1045,7 @@ function endEv(type,t){const b=VS[type];if(!b)return;VS[type]=null;
    details:evTxt(type,b.kmh,b.val,peak,lvl,dur)+(b.bor||'')}})}
  RST[type]=null;
  // and the fix that closed it, so the breach has an end point on the map too
- if(b.loc)lastLoc=b.loc,outAdd({t:'pos',p:row(b.loc,Math.round(b.kmh),true)}),flush()}
+ if(b.loc)lastLoc=b.loc,trkFix(b.loc,Math.round(b.kmh))}
 
 // called when a trip ends: every open breach gets its end time and closing readings
 function closeAll(t){Object.keys(VS).forEach(k=>endEv(k,t))}
@@ -1219,6 +1257,135 @@ function dmsFeed(loc,kmh){if(CAMOFF||!CAMON)return;
   heading:loc.bearing,kmh,at:Date.now()});if(p&&p.catch)p.catch(()=>{})}catch(e){}}
 function dmsUi(){if(!dmsHas())return;
  try{const p=CapPlugins.Dms.ui({visible:!document.hidden});if(p&&p.catch)p.catch(()=>{})}catch(e){}}
+// ---- the trip that keeps reporting with the screen locked.
+// Everything above this line is JavaScript, and Android stops JavaScript the moment a driver
+// locks his handset or picks up another app: the watcher's callback, the recording interval
+// that runs inside it, the queue and the send all go to sleep with the page. That is the whole
+// of why a trip drawn across a locked screen ends in one straight line and a red
+// "00:07:57 not reported". So a trip is handed to the camera's own service, which is a
+// foreground service holding a wake lock and stays awake: it asks the phone for positions by
+// itself, applies the fleet's two recording intervals, and posts the rows to the positions
+// table with the sign-in this page lends it.
+// What this page keeps: the sign-in, which is the one thing that never goes on disk, because
+// Android can restart that service long after this driver has gone home; the events it is
+// still awake enough to detect; and every row the service could not send, which comes back
+// here into the same out-of-coverage queue the rest of the app uses and is filed against the
+// session this page holds. The page also carries on writing positions whenever the service is
+// not doing it - an old build, a phone that refused the service, or a satellite provider the
+// driver switched off at a fuel stop must never leave a trip with nobody reporting it.
+let TRUN=false,TQ=0,trkT=0,TRKERR=false;
+const trkHas=()=>dmsHas()&&typeof CapPlugins.Dms.trackStart==='function';
+// Everything the runner needs about this trip, in the shape it reads. Never a token: the
+// settings belong on the phone so a service Android restarts mid-shift wakes up with the
+// fleet's own intervals, and a sign-in on the phone is a key that outlives the driver who was
+// lent it. The limits go over in the units the runner works in - km/h, and m/s² with braking
+// still negative - which are the page's own, so nothing is converted here.
+function trkOrder(){const v=asg?.vehicles||{},d=asg?.drivers||{};
+ return{url:SUPABASE_URL,anon:SUPABASE_KEY,movingS:MOV,parkedS:STP,
+  speedLimit:+LIM.speed||0,buffer:+LIM.buf||0,accelLimit:+LIM.accel||0,brakeLimit:+LIM.brake||0,
+  ids:{user_id:me?me.id:'',vehicle_id:asg?.vehicle_id||'',driver_id:asg?.driver_id||'',
+   vehicle_name:v.name||'',driver_name:d.name||''},
+  rules:['overspeed','harsh_acceleration','harsh_braking'].map(t=>RUL[t]).filter(Boolean)}}
+// Hand the trip over, or hand it over again. The settings are re-read every five minutes and
+// whenever the office changes them, and a runner that kept the old intervals would go on
+// reporting at the wrong beat for the rest of the driver's shift.
+async function trkGo(){if(!trkHas()||!me||!asg?.vehicle_id)return;let r=null;
+ try{r=await CapPlugins.Dms.trackStart({cfg:trkOrder()})}catch(e){r=null}
+ TRUN=!!(r&&r.started===true&&r.running!==false);
+ trkUi(r&&r.status);
+ clearInterval(trkT);trkT=setInterval(trkPoll,15000);
+ // whether the phone really took the order is not answerable from this call: a service that
+ // had to be started comes back a second or two later. This look is what finds out.
+ setTimeout(()=>{if(SRT||watcher)trkPoll()},4000);
+ if(TRUN)trkTok()}
+// The page's own sign-in, lent to the runner as often as the page can see it. It is also the
+// only thing that lets a runner Android restarted by itself send again: that one has never
+// heard of a token, and it spends the whole of a dead-spot stretch collecting.
+async function trkTok(){if(!trkHas()||!me||!sb)return;
+ try{const s=await sb.auth.getSession();const tk=s&&s.data&&s.data.session;
+  if(!tk||!tk.access_token)return;
+  const r=await CapPlugins.Dms.trackToken({token:tk.access_token});if(r&&r.ran)trkUi(r.status)}catch(e){}}
+// The service answers on its own clock, so the page asks after it on one of its own. This is
+// the only way a runner that died, a sign-in that ran out, or a phone whose satellites went
+// off mid-shift is found while the trip is still running rather than two hours later in the
+// office's report - and the only way a breach the runner recorded behind the driver's back
+// gets handed back before the page opens a second row for the same corner.
+function trkPoll(){if(!trkHas()||(!SRT&&!watcher))return;let p=null;
+ try{p=CapPlugins.Dms.trackStatus({})}catch(e){return}
+ if(!p||!p.then)return;
+ p.then(r=>{const st=r&&r.status;
+  // the service itself is gone: nothing is sampling this trip, so whatever it was holding
+  // comes back here and the page reports again in its own words until a fresh order
+  // - the page's own writes take over at once, which is why TRUN goes false before the ask
+  if(r&&r.service===false){TRUN=false;TQ=0;outUi();trkBack();if(r.wanted)trkGo();return}
+  TRUN=!!(r&&r.running);
+  trkUi(st);
+  if(!TRUN)return;
+  if(st&&st.sending===false)trkTok();
+  trkAdopt(st&&st.open)}).catch(()=>{})}
+// The breaches the runner opened while this page was asleep, taken over the moment it wakes:
+// the page has the peak maths, the words the Events table prints, and the closing update the
+// office reads as the end of the breach. `claim` is what stops the runner finishing a row the
+// page has just taken in hand, and the row's own name travels with it so the end lands on it.
+function trkAdopt(a){if(!a||!a.length)return;const ids=[];
+ for(const o of a){if(!o||!o.cid||!o.type||VS[o.type])continue;
+  const at=Math.max(0,+o.start||0),fin=Number.isFinite(+o.lat)&&Number.isFinite(+o.lng);
+  const L=fin?{latitude:+o.lat,longitude:+o.lng,accuracy:+o.acc,altitude:+o.alt,
+   bearing:+o.hdg,time:at||Date.now()}:lastLoc||GOOD||{};
+  VS[o.type]={t:(at||Date.now())/1000,loc:L,kmh:+o.kmh||0,val:+o.val||0,
+   peak:Math.abs(+o.peak||+o.val||0)>=Math.abs(+o.val||0)?+o.peak||+o.val:+o.val};
+  if(!isSp(o.type))lastA=(+o.val||0)/3.6;
+  // the row exists already, and a breach that is already reported is never announced twice
+  RST[o.type]=o.cid;ANN[o.type]=true;ids.push(o.type);
+  if(at>(lastNotify[o.type]||0))lastNotify[o.type]=at}
+ if(!ids.length||!trkHas())return;
+ try{const p=CapPlugins.Dms.trackClaim({types:ids});if(p&&p.catch)p.catch(()=>{})}catch(e){}}
+// The point an alert happened at. While the runner is reporting, it holds a fix one second
+// old and its own way of putting it on the server - and a page that writes a copy of the same
+// second on top of it is how one bend gets two points on the map. The queue is still flushed:
+// the alert's own row is the page's business either way.
+function trkFix(loc,speed){if(TRUN){trkNow();flush();return}
+ outAdd({t:'pos',p:row(loc,speed,true)});flush()}
+function trkNow(){if(!trkHas())return;
+ try{const p=CapPlugins.Dms.trackNow({});if(p&&p.catch)p.catch(()=>{})}catch(e){}}
+// The trip is over, for the runner as well as for this page. Answers with whether the runner
+// was the one reporting, which is what decides whose job the closing point was. This has to
+// come before the camera stop: that one takes the service down, and a runner with no service
+// can write nothing at all.
+async function trkStop(){clearInterval(trkT);trkT=0;const was=TRUN;TRUN=false;TQ=0;
+ if(!trkHas())return was;
+ try{await CapPlugins.Dms.trackStop({})}catch(e){}
+ await trkBack();outUi();return was}
+// Everything the runner could not put on the server, taken back into this page's queue and
+// filed against the session this page holds. The names on each row are rewritten here for the
+// same reason the camera's are (see dmsDrain): the service was told who was driving when the
+// trip began, and the row guards have to see whoever holds the sign-in now.
+async function trkBack(){if(!trkHas())return;let items=null;
+ try{const r=await CapPlugins.Dms.trackDrain({});items=r&&r.items}catch(e){return}
+ if(!items||!items.length)return;
+ const v=asg?.vehicles||{},d=asg?.drivers||{};
+ for(const p of items){if(!p||!p.recorded_at||!Number.isFinite(+p.lat)||!Number.isFinite(+p.lng))continue;
+  if(me)p.user_id=me.id;
+  if(asg){p.vehicle_id=asg.vehicle_id;p.driver_id=asg.driver_id;
+   p.vehicle_name=v.name||null;p.driver_name=d.name||null}
+  outAdd({t:'pos',p})}
+ flush()}
+// the two things the runner tells this page about itself, and the one line it has to say
+function trkUi(st){if(!st)return;
+ TQ=Math.max(0,+st.queued||0);
+ // A warning the runner sounded with the screen off has already buzzed this driver. The page
+ // keeps the same 60 second guard the runner uses, seeded from the runner's own clock, so the
+ // phone coming back to the front never shouts about a breach he was told about minutes ago.
+ (st.sounded||[]).forEach(x=>{if(!x||!x.type)return;const t=Math.max(0,+x.at||0);
+  if(t>(lastNotify[x.type]||0))lastNotify[x.type]=t});
+ outUi();
+ // Why this trip is not being reported, on the strip the camera uses for its own refusals -
+ // and only ever clearing the line this wrote, so it never erases what the camera said. The
+ // runner's `why` is only worth a driver's attention while it is not listening at all.
+ const bad=String(st.error||'')||(!st.running?String(st.why||''):'');
+ const e=$('err');if(!e)return;
+ if(bad){e.textContent='Background reporting: '+bad;TRKERR=true;return}
+ if(TRKERR){e.textContent='';TRKERR=false}}
 // the warning, when the driver is looking at this screen: the service stays quiet so
 // the same breach never sounds twice. Behind his back, Android posts and speaks it.
 // A breach that reaches this page after he pressed stop is a message from a lens he closed:
@@ -1372,7 +1539,9 @@ async function dwTog(){
 // open over a driver in a pocket and covers itself.
 async function dwReap(){if(!dmsHas()||CAMON)return;
  try{const s=await CapPlugins.Dms.status();
-  if(s&&s.running&&!s.trip&&!tripRead())await CapPlugins.Dms.stop()}catch(e){}}
+  // a runner that still holds a trip keeps this service alive on its own, so an idle service
+  // is only a stray lens when nothing behind it is still reporting a trip
+  if(s&&s.running&&!s.trip&&!tripRead()&&!(s.track&&s.track.wanted))await CapPlugins.Dms.stop()}catch(e){}}
 // the setup row for the lens: a build that cannot watch, or a phone that already
 // allowed it, has nothing left to say here. It never asks on its own: the driver
 // should decide when the camera starts being part of his app
@@ -1387,16 +1556,36 @@ async function camAsk(){const b=$('camask'),c=$('camcard');if(!dmsHas()){if(b)b.
  try{const p=await CapPlugins.Dms.checkPermissions();st=p&&p.camera||''}catch(e){}
  if(st==='granted'){camGranted();return}
  try{const r=await CapPlugins.Dms.requestPermissions();if(r&&r.camera==='granted')camGranted();
-  else $('err').textContent='The camera was not allowed. Driver alerts cannot work until it is.'}catch(e){
-  $('err').textContent='This build has no driver camera: rebuild the APK with the latest build-apk.yml.'}}
+  // both of these have to say who can put it right and how, because a driver reading a
+  // build instruction can do nothing with it and simply stops trusting the app
+  else note('The camera was not allowed on this phone. Tap the camera button again and choose Allow - without it the driver alerts cannot work.','warn')}catch(e){
+  note('This installation has no driver camera in it yet. Your office has to rebuild and reinstall the app with the camera included before alerts can work.','warn')}}
 function camGranted(){const b=$('camask');if(b){b.classList.add('hide')}
  const c=$('camcard');if(c)c.classList.add('hide');logAct('Camera allowed','Driver monitoring')}
+// Android's own battery saving is the one thing outside this app that can leave a trip
+// unreported: it defers the uploads of a phone that slept in a yard, and on some handsets it
+// closes the service outright. The question is asked once, on this page, and never again on a
+// phone that has already been told to leave this app alone. An app built before this one has
+// no question to ask, so its driver is sent to the phone's own settings instead.
+const igHas=()=>dmsHas()&&typeof CapPlugins.Dms.ignoreAsk==='function';
+async function igAsk(){if(!igHas()){try{await CapPlugins.BG.openSettings()}catch(e){}return}
+ let r=null;try{r=await CapPlugins.Dms.ignoreAsk({})}catch(e){}
+ if(r&&r.asked)banner('<i class="fa-solid fa-battery-bolt"></i> Choose Allow on the next question: one answer, and the trip keeps reporting with the screen locked',9000);
+ else if(!r||!r.exempt)banner('<i class="fa-solid fa-battery-bolt"></i> This phone has no battery question to ask: set the app to Unrestricted in its own battery settings',9000);
+ igUi()}
+async function igUi(){const b=$('igask'),c=$('igcard');if(!b||!c||!igHas())return;
+ try{const s=await CapPlugins.Dms.ignoreState({});if(s&&s.exempt){b.classList.add('hide');c.classList.add('hide')}}catch(e){}}
 function pickUi(){const s=$('pk');if(!s)return;
  $('vn').textContent=asg?.vehicles?.name||'No vehicle linked';$('dn').textContent=asg?.drivers?.name||'No driver linked';
  if(ASGS.length<2){s.classList.add('hide');s.replaceChildren();return}
  s.classList.remove('hide');s.replaceChildren(...ASGS.map(x=>{const o=document.createElement('option');o.value=x.vehicle_id;o.textContent=x.vehicles?.name||'Vehicle';o.selected=x.vehicle_id===PICK;return o}))}
-function pickV(){PICK=$('pk').value;localStorage.pick=PICK;if(watcher||SRT)stop();
- $('err').textContent='';logAct('Switched vehicle',$('pk').selectedOptions[0]?.textContent||PICK);loadRules();showLast()}
+function pickV(){const s=$('pk'),to=s.value,nm=s.selectedOptions[0]?.textContent||'the other vehicle',
+ om=(s.querySelector('option[value="'+PICK+'"]')||{}).textContent||'this vehicle';
+ // choosing another vehicle with a trip still running ends that trip and starts the
+ // office's record of it here, which is more than a driver means by tapping the box
+ if(to!==PICK&&(watcher||SRT)&&!confirm('A trip is still running on '+om+'. Move to '+nm+' and end that trip now?')){s.value=PICK;return}
+ PICK=to;localStorage.pick=PICK;if(watcher||SRT)stop();
+ $('err').textContent='';logAct('Switched vehicle',nm||PICK);loadRules();showLast()}
 // The setup - which vehicle this login drives, the limits, the voice, the zones - is
 // copied into localStorage every time it is read successfully, because a driver in a
 // basement, a tunnel or a dead spot still has to be warned with the limits he was
@@ -1462,6 +1651,10 @@ function applyCfg(a,r,t,g){
  // the camera runs Android's own copy of this setup, because the page may be frozen
  // by the time the next frame is judged: hand every read of it over
  dmsSync();camPaint(CAMD);
+ // the runner works from the copy of this setup it was handed, so a change the office makes
+ // mid-trip goes over now: an interval moved from 30 to 60 seconds has to move on the phone
+ // with it, not wait for the driver's next trip
+ if((watcher||SRT)&&trkHas())trkGo();
  // an administrator who switches the camera off mid-trip takes the lens away now,
  // not at the end of the trip - a stop the driver pressed himself is already CAMON false,
  // so nothing here can restart a lens he closed
@@ -1530,14 +1723,33 @@ function clipFail(m){CLIPWHY=m;
  // the status line is the one place the camera says anything, and a trip that is
  // running must not have it overwritten every time a picture is tried
  if(Date.now()-CLIPTOLD<18e4)return;CLIPTOLD=Date.now();
- $('err').textContent='Driver camera: '+m}
+ note('Driver camera: '+m,'warn')}
+// A recording comes out of the camera service a piece at a time. Asking for the whole file
+// in one string is what used to end a trip: the service answers in base64, which costs two
+// bytes of text for every three bytes of film, and the handset is already holding a lens, a
+// face model and a second model that names what the driver is holding - so one two-megabyte
+// clip once asked it for five and a half megabytes it did not have, and the driver read the
+// allocator's own words in red above the map. A piece at a time costs a phone half a
+// megabyte, which is a number nobody on a moving vehicle has ever run out of.
+async function clipBytes(cid){
+ const parts=[];let at=0;
+ // the service refuses a file bigger than 32 MB, so this loop cannot be led along forever
+ for(let n=0;n<256;n++){
+  const d=await CapPlugins.Dms.clipData({cid,at});
+  if(!d||d.missing||!d.b64)break;
+  const u=oget(d.b64);if(!u.length)break;
+  parts.push(u);at+=u.length;
+  if(d.eof||at>=(+d.total||0))break}
+ if(!parts.length)return null;
+ if(parts.length===1)return parts[0];
+ const all=new Uint8Array(at);let o=0;for(const u of parts){all.set(u,o);o+=u.length}
+ return all}
 async function clipPut(cid){
  if(!cid||!dmsHas()||!me||!sb||!navigator.onLine)return '';
  const p=String(me.id)+'/'+cid+'.mp4';
  try{
-  const d=await CapPlugins.Dms.clipData({cid});
-  if(!d||d.missing||!d.b64)return '';
-  const u8=Uint8Array.from(atob(d.b64),c=>c.charCodeAt(0));
+  const u8=await clipBytes(cid);
+  if(!u8||!u8.length)return '';
   // no upsert: replacing an object the server already holds asks for rights a clip does
   // not need. A path already taken is this same picture from an earlier attempt at sending
   // this row, which is the file being where it belongs rather than a failure.
@@ -1661,9 +1873,9 @@ async function flush(){if(fl||!me)return;fl=true;
   OFFL=!navigator.onLine;netUi(why)}
  finally{fl=false;outUi()}}
 // the two tiles that tell the driver whether the phone is talking to the server
-function outUi(){return outCount().then(n=>{PEND=n;const t=$('v_sent');if(t)t.textContent=SENT+(n?' (+'+n+')':'')})}
+function outUi(){return outCount().then(n=>{PEND=n;const w=n+TQ,t=$('v_sent');if(t)t.textContent=SENT+(w?' (+'+w+')':'')})}
 function netUi(why){const t=$('v_sent');if(!t)return;
- if(!navigator.onLine){t.textContent='⚠ '+(PEND||0);t.title='No internet - '+PEND+' records waiting on the phone';return}
+ if(!navigator.onLine){const w=(PEND||0)+TQ;t.textContent='⚠ '+w;t.title='No internet - '+w+' records waiting on the phone';return}
  if(why)t.title=why;outUi()}
 // a trip the phone never got to finish: kept so that opening the app again after a
 // crash, an update, a phone call or a swipe-away resumes tracking instead of waiting
@@ -1907,7 +2119,14 @@ async function start(quiet,auto){
  // is reported just as loudly as one that loses it halfway through a tunnel
  LASTFIX=Date.now();GLOST=null;clearInterval(gpsT);gpsT=setInterval(gpsTick,10000);
  try{
- await loadRules();pollBat();batT=setInterval(pollBat,30000);cfgT=setInterval(loadRules,300000);prev=null;pp=null;HSENT=null;ODOM=quiet?Math.max(0,+(tripRead()?.o||0)):0;TS_TRIP=0;Object.keys(VS).forEach(k=>VS[k]=0);Object.keys(RST).forEach(k=>RST[k]=null);
+ // The driver gets his trip on the settings this phone already holds. The network copy is
+ // waited for, but only as long as a finger will look at a spinner: loadRules applies what
+ // it finds when it lands, the same way the five minute refresh does mid-trip, and on a
+ // dead line it falls back to the offline copy instead of failing the start. Before this,
+ // pressing Start on a weak signal meant standing at the door of the vehicle for up to
+ // nine seconds with the app already knowing everything it needed.
+ await Promise.race([loadRules(),new Promise(r=>setTimeout(r,1500))]);
+ pollBat();batT=setInterval(pollBat,30000);cfgT=setInterval(loadRules,300000);prev=null;pp=null;HSENT=null;ODOM=quiet?Math.max(0,+(tripRead()?.o||0)):0;TS_TRIP=0;Object.keys(VS).forEach(k=>VS[k]=0);Object.keys(RST).forEach(k=>RST[k]=null);
  // a phone Android restarted mid-trip comes back into the trip exactly as the driver left it,
  // his camera stop included; a trip that starts fresh starts watched, whatever the last one did
  camRestore(quiet);
@@ -1964,8 +2183,14 @@ async function start(quiet,auto){
    // it is what empties a queue an offline stretch filled: an hour of standing must not
    // cost a driver the alerts he recorded before the signal went
    if(!moving&&PEND&&n-lastTry>60000){lastTry=n;flush()}
-   return}FIRSTRUN=false;lastSent=n;if(hd!=null)HSENT=hd;
-  lastLoc=loc;outAdd({t:'pos',p:row(loc,moving?kmh:0,true)});
+   return}const FSR=FIRSTRUN;FIRSTRUN=false;lastSent=n;if(hd!=null)HSENT=hd;
+  lastLoc=loc;
+  // The page's own writer stands down while the service is reporting the trip - but never on
+  // the fix that opens it: the office has to put the driver's Start press where he actually
+  // pressed it, and the runner's own first point can be a second or two behind. Two fixes a
+  // second apart at the start of a trip cost a report nothing, and a trip that appears to
+  // have begun a minute after the driver set off costs the office an argument with him.
+  if(!TRUN||FSR)outAdd({t:'pos',p:row(loc,moving?kmh:0,true)});
   // try the server again every minute while records are waiting, so a phone that
   // regains signal in a tunnel pushes without waiting for the next sampled point
   if(PEND>=Math.ceil(5/MOV)||!moving||n-lastTry>60000){lastTry=n;flush()}});
@@ -1974,6 +2199,9 @@ async function start(quiet,auto){
  logAct(quiet?'Resumed trip':auto?'Started trip automatically':'Started trip',(asg?.vehicles?.name||'')+
   ' · records every '+MOV+' s moving, '+STP+' s parked'+(auto?' · started by speed, not by hand':''));
  await askNotif();
+ // the runner takes the trip before the camera does: it is the one that keeps reporting
+ // when this page is frozen, so it has to be told the settings while the page can still speak
+ await trkGo();
  // the driver camera opens with the trip, after the settings it is told to watch for
  // have been read and handed over by loadRules above
  dmsListen();await dmsStart();
@@ -1985,13 +2213,18 @@ async function stop(auto){SGEN++;FIRSTRUN=false;stopTone();clearInterval(batT);c
  gpsTripEnd();
  // the camera ends with the trip: a breach still open on the phone gets its end time
  // there and comes back here before anything is pushed
+ // the runner ends first: stopping the camera tears down the service that hosts it, and a
+ // runner killed mid-teardown never writes the closing point of the trip it was reporting
+ const tr=await trkStop();
  await dmsStop();
  // the driver's own stop dies with the trip it stopped: the unwatched stretch gets its end
  // time here, so the office sees it as far as it reaches and no longer
  if(CAMOFF){CAMOFF=false;camOffEv(false)}
  await dmsDrain();
  Object.keys(VS).forEach(k=>VS[k]=0);tripClear();
- if(lastLoc)outAdd({t:'pos',p:row(lastLoc,0,false)});flush();
+ // the runner already wrote this trip's last point from the phone's own queue; only when
+ // there was no runner does the page's own copy of the place close the trip
+ if(!tr&&lastLoc)outAdd({t:'pos',p:row(lastLoc,0,false)});flush();
  logAct(auto?'Ended trip automatically':'Ended trip',(asg?.vehicles?.name||'')+(lastLoc?' at '+lastLoc.latitude.toFixed(5)+', '+lastLoc.longitude.toFixed(5):''));
  if(watcher){await CapPlugins.BG.removeWatcher({id:watcher});watcher=null}
  // the trip's watcher is gone, so the one that waits for the next start takes its place -
@@ -2003,7 +2236,13 @@ async function stop(auto){SGEN++;FIRSTRUN=false;stopTone();clearInterval(batT);c
  $('go').classList.remove('hide');$('stp').classList.add('hide');const c=$('stc');c.textContent='Parking';c.style.background='var(--bll)';c.style.color='var(--bl)';$('sp').textContent='0'}
 async function openDash(){const {data:{session}}=await sb.auth.getSession();if(!session)return;
  logAct('Opened dashboard from app',(asg?.vehicles?.name||''));
- const u=DASH+'#access_token='+session.access_token+'&refresh_token='+session.refresh_token+'&expires_in=3600&token_type=bearer';
+ // the hour-long key only, never the one that mints new keys: this string is handed to the
+ // system browser, so it lives in that browser's address bar, in its history and in any
+ // history sync on a handset that is not the office's. The dashboard strips the fragment
+ // from its own address once it has read it, but a record already kept cannot be unkept -
+ // and a refresh token outlives the access token's hour by weeks. When this one runs out,
+ // the driver presses the button again and gets a fresh one.
+ const u=DASH+'#access_token='+session.access_token+'&expires_in=3600&token_type=bearer';
  try{await CapPlugins.Browser.open({url:u})}catch(e){window.open(u,'_blank')}}
 muteUi();
 // The pages, the map library and the sounds all travel inside the APK, so the only
@@ -2020,7 +2259,7 @@ if(localStorage.user){$('em').value=localStorage.user;$('rem').checked=true}
 const hasWho=()=>{try{const s=REM?localStorage:sessionStorage;
  if(Object.keys(s).some(k=>/^sb-.+-auth-token$/.test(k)&&String(s[k]||'').length>40))return true}catch(e){}
  return !navigator.onLine&&!!cachedWho()};
-if(localStorage.perm!=='1'){show('pm');camPermUi()}else show(hasWho()?'wt':'lg');
+if(localStorage.perm!=='1'){show('pm');camPermUi();igUi()}else show(hasWho()?'wt':'lg');
 // A driver who signed in before has nothing to type, so he must not be shown an empty form
 // while the phone asks the server about the sign-in it kept. The opening screen stays up
 // until that answer arrives: the app when the sign-in is still good, the form only when it
