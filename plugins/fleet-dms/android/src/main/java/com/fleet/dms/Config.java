@@ -166,11 +166,31 @@ public class Config {
     }
 
     /** A rule nobody has configured: it exists, and it never fires. */
-    private static Rule off(String type) {
+    static Rule off(String type) {
         Rule r = new Rule();
         r.type = type;
         r.on = false;
         return r;
+    }
+
+    /**
+     * One rule written back out in exactly the shape {@link Rule#of} reads, so a copy of a
+     * rule can be kept on disk and installed again without a page ever having to speak.
+     * The vehicle's own three rules - which this plugin's camera has no business with, but
+     * the trip runner does - are written the same way as the nine face rules.
+     */
+    static JSONObject ruleJson(Rule r) {
+        JSONObject j = new JSONObject();
+        try {
+            j.put("type", r.type).put("enabled", r.on).put("clip", r.clip)
+                    .put("threshold", r.threshold).put("hold_s", r.holdS)
+                    .put("speed_min", r.speedMin).put("alert", r.alert).put("beep", r.beep)
+                    .put("beep_duration", r.beepDur).put("beep_type", r.beepType)
+                    .put("voice", r.voice).put("voice_lang", r.voiceLang);
+        } catch (Exception ignore) {
+            // JSONObject only throws on a null key, and none of these are null
+        }
+        return j;
     }
 
     /** A rule always exists by the time a frame is judged, even an unseeded one. */
@@ -193,12 +213,7 @@ public class Config {
             j.put("ids", new JSONObject().put("user_id", userId).put("vehicle_id", vehicleId)
                     .put("driver_id", driverId).put("vehicle_name", vehicleName).put("driver_name", driverName));
             JSONArray rs = new JSONArray();
-            for (String t : TYPES) rs.put(new JSONObject().put("type", t)
-                    .put("enabled", rule(t).on).put("clip", rule(t).clip)
-                    .put("threshold", rule(t).threshold).put("hold_s", rule(t).holdS)
-                    .put("speed_min", rule(t).speedMin).put("alert", rule(t).alert).put("beep", rule(t).beep)
-                    .put("beep_duration", rule(t).beepDur).put("beep_type", rule(t).beepType)
-                    .put("voice", rule(t).voice).put("voice_lang", rule(t).voiceLang));
+            for (String t : TYPES) rs.put(ruleJson(rule(t)));
             j.put("rules", rs);
         } catch (Exception ignore) {
             // JSONObject only throws on a null key, and none of these are null

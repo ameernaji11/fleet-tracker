@@ -11,7 +11,8 @@ import android.media.MediaCodecList;
 import android.media.MediaFormat;
 import android.media.MediaMuxer;
 
-import java.io.ByteArrayOutputStream;
+import com.getcapacitor.Logger;
+
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
@@ -69,6 +70,9 @@ class Clip {
     private final ExecutorService enc = Executors.newSingleThreadExecutor();
 
     private int fw, fh, fps = 5;
+    // the picture the lens is turned into the encoder's bytes through, kept between
+    // frames rather than made again for every one of them; the analysis thread's own
+    private int[] px;
     private final int colour;
     private final boolean semi;
     private final List<Capture> runs = new ArrayList<>();
@@ -294,22 +298,64 @@ class Clip {
         return out;
     }
 
-    // A clip is a few seconds at 320x240, which is tens of kilobytes; anything far
-    // beyond that is not a clip this code wrote, and reading it into memory would be
-    // the phone's last act anyway.
-    private static final long MAX_READ = 4L * 1024 * 1024;
+    // A clip crosses the bridge to the page as text, and text costs twice what the film
+    // it stands for costs: base64 needs four characters for three bytes and a character
+    // is two bytes, so a whole file in one string asks the heap for two and three-quarters
+    // times its own size - and Capacitor copies that string again on its way out. That is
+    // how a driver came to read the allocator's own words in red over his trip screen. A
+    // piece this size is a quarter of a megabyte of film and half a megabyte of text,
+    // which is small enough that the phone never has to choose between a recording and
+    // the face model that is holding the lens open.
+    static final int MAX_CHUNK = 196608;
 
-    /** The whole file, or null when this phone no longer has it. */
-    byte[] read(String cid) {
+    // ... and a folder of clips is not a place for anything else. A file far beyond what
+    // this code writes is not a clip, and the page is never going to be given it.
+    private static final long MAX_CLIP = 32L * 1024 * 1024;
+
+    /** The clip file, only when this phone really has a clip of its own making. */
+    private File clipFile(String cid) {
         if (!ownName(cid)) return null;
         File f = fileFor(cid);
-        if (!f.isFile() || f.length() <= 0 || f.length() > MAX_READ) return null;
+        long n = f.length();
+        return f.isFile() && n > 0 && n <= MAX_CLIP ? f : null;
+    }
+
+    /** How many bytes a clip is on this phone, or 0 when this phone no longer has it. */
+    long size(String cid) {
+        File f = clipFile(cid);
+        return f == null ? 0 : f.length();
+    }
+
+    /**
+     * `len` bytes of a clip starting at `at`, or null when this phone no longer has it.
+     *
+     * The page loops this until the answer says the end of the file, so no build of this
+     * app ever holds more than one piece of a recording in memory at a time. Asking for
+     * more than a piece is refused rather than answered: the only caller that would is a
+     * page that has not been told clips travel in pieces.
+     */
+    byte[] read(String cid, long at, int len) {
+        File f = clipFile(cid);
+        if (f == null || at < 0 || len <= 0 || len > MAX_CHUNK || at >= f.length()) return null;
         try (java.io.InputStream in = new java.io.FileInputStream(f)) {
-            ByteArrayOutputStream out = new ByteArrayOutputStream((int) f.length());
-            byte[] buf = new byte[16384];
-            int n;
-            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
-            return out.toByteArray();
+            long skip = at;
+            while (skip > 0) {
+                long s = in.skip(skip);
+                if (s <= 0) return null;   // shorter than the size it was opened with
+                skip -= s;
+            }
+            byte[] b = new byte[len];
+            int n = 0;
+            while (n < len) {
+                int r = in.read(b, n, len - n);
+                if (r <= 0) break;
+                n += r;
+            }
+            if (n == 0) return null;
+            if (n == len) return b;
+            byte[] cut = new byte[n];
+            System.arraycopy(b, 0, cut, 0, n);
+            return cut;
         } catch (Throwable t) {
             // a file the phone will not give up costs an event its picture only
             return null;
@@ -448,7 +494,8 @@ class Clip {
             if (tmp.exists()) tmp.delete();
             // named rather than swallowed, because a fleet whose camera has quietly
             // stopped making pictures has no other way of finding that out
-            lastError = c.cid + ": " + (t.getMessage() == null ? t.getClass().getSimpleName() : t.getMessage());
+            lastError = c.cid + ": " + brief(t);
+            Logger.error("clip " + c.cid + " failed", t);
         } finally {
             if (cap != null) cap.close();
             if (mx != null) {
@@ -488,6 +535,27 @@ class Clip {
         }
     }
 
+    /**
+     * What a failed recording is, in a sentence a driver can read.
+     *
+     * This text goes onto the strip above his map, which is the same line the warnings
+     * use. The allocator's own words - "Failed to allocate a 5715472 byte allocation with
+     * 3456224 free bytes and 3375KB until OOM, target footprint 1268435456, growth limit
+     * 268435456" - are exact, useful to whoever wrote this code, and nothing at all to a
+     * man at the wheel, who read them as a crash he could not stop. The full exception
+     * still goes to the log for the build's own reader.
+     */
+    private static String brief(Throwable t) {
+        if (t instanceof OutOfMemoryError) return "the phone had no room left for the picture";
+        String m = t.getMessage();
+        if (m == null || m.isEmpty()) return t.getClass().getSimpleName();
+        // a codec that dislikes a frame answers in a line of native text with a dozen
+        // numbers in it; the first line is the part that names the failure
+        int cut = m.indexOf('\n');
+        if (cut > 0) m = m.substring(0, cut);
+        return m.length() > 140 ? m.substring(0, 140) : m;
+    }
+
     // ---- picture to YUV, and back
 
     /**
@@ -501,7 +569,13 @@ class Clip {
         if (w0 < 16 || h0 < 16) return null;
         fw = w0;
         fh = h0;
-        int[] px = new int[w0 * h0];
+        // One picture of colours for the whole trip rather than one for every frame.
+        // Only the analysis thread ever converts a frame, so this array has one owner,
+        // and an eight-hour shift at five pictures a second is thirty thousand of them:
+        // a heap that fills up while the face model is trying to read a driver is how a
+        // recording starts failing with the allocator's own words on the screen.
+        int need = w0 * h0;
+        if (px == null || px.length < need) px = new int[need];
         b.getPixels(px, 0, w0, 0, 0, w0, h0);
         return pack(px, w0, w0, h0);
     }

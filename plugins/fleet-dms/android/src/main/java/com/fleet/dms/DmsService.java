@@ -1,11 +1,13 @@
 package com.fleet.dms;
 
+import android.Manifest;
 import android.app.Notification;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.content.pm.ServiceInfo;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Matrix;
@@ -114,6 +116,9 @@ public class DmsService extends Service implements LifecycleOwner {
     private Clip clip;
     private Outbox outbox;
     private Alerts alerts;
+    // The trip's own position runner: the part of this service that has nothing to do with
+    // a camera, and is the only reason a trip keeps reporting once the page is frozen.
+    private Track track;
     private PowerManager.WakeLock wake;
 
     private volatile Config cfg = new Config();
@@ -177,6 +182,10 @@ public class DmsService extends Service implements LifecycleOwner {
         clip.age(cfg.keepD);
         reader = new FaceReader(this);
         rules = new Rules(this);
+        // The trip's own runner is made before anything else that could refuse to start,
+        // because a phone whose fleet has the camera switched off still has to report where
+        // it is: this service is that trip's only heartbeat once the page is frozen.
+        track = new Track(this);
         // the second model is only worth eight milliseconds of a frame if some rule the
         // driver's page has switched on needs to know what he is holding
         reader.wantObjects(Rules.needsObjects(cfg));
@@ -220,8 +229,11 @@ public class DmsService extends Service implements LifecycleOwner {
         hold(intent != null ? intent.getBooleanExtra(EXTRA_TRIP, false) : tripWanted(this));
         // Android may hand back a null intent when it has had to restart this service
         // after a kill. Whether it should be running again is then the page's own last
-        // instruction, which is what the trip flag on disk records.
-        if (intent == null && (!tripWanted(this) || !cfg.on)) stopSelf();
+        // instruction, which is what the trip flag on disk records - and since the trip's
+        // positions are kept here too, a fleet that has the driver camera switched off is no
+        // longer a service with nothing left to do: it is the only thing still reporting
+        // where the vehicle is.
+        if (intent == null && !Track.wanted(this) && (!tripWanted(this) || !cfg.on)) stopSelf();
         return START_STICKY;
     }
 
@@ -236,6 +248,11 @@ public class DmsService extends Service implements LifecycleOwner {
         tripSet(this, false);
         closeCamera();
         alerts.stopVoice();
+        // The runner goes down with the service it lives in, and the wish that started it
+        // stays on disk: a trip Android interrupted is a trip that should carry on reporting
+        // when the service comes back, not one whose positions were thrown away with the
+        // process. Everything not yet sent is already in the queue file.
+        if (track != null) track.closeDown();
         if (wake != null && wake.isHeld()) wake.release();
         lc.handleLifecycleEvent(Lifecycle.Event.ON_STOP);
         lc.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY);
@@ -335,7 +352,11 @@ public class DmsService extends Service implements LifecycleOwner {
         if (dead) return;
         if (wake != null && !wake.isHeld()) wake.acquire();
         if (cfg.on && !cameraOn) openCamera();
-        foreground(!cfg.on ? "Driver monitoring is switched off"
+        // The notice is the one thing a driver can read with his screen off, so it says what
+        // this service is doing for his trip rather than only what its camera is doing: a
+        // fleet with the lens switched off still has its positions reported from here.
+        foreground(!cfg.on ? (track != null && track.isRunning()
+                ? "Reporting this trip to the office" : "Driver monitoring is switched off")
                 : tripping ? "Watching the driver" : "Driver camera open, no trip running");
     }
 
@@ -413,6 +434,7 @@ public class DmsService extends Service implements LifecycleOwner {
     void clearAll() {
         outbox.clear();
         clip.clearAll();
+        if (track != null) track.clearDown();
         ExecutorService e = analysis;
         if (e == null) {
             rules.reset();
@@ -445,7 +467,10 @@ public class DmsService extends Service implements LifecycleOwner {
                     // the two numbers that turn "there is no video" from a mystery into a
                     // sentence the driver can read: how many alerts were refused a
                     // picture, and what the encoder said about the last one
-                    .put("clipDropped", clip.dropped()).put("clipError", str(clip.lastError()));
+                    .put("clipDropped", clip.dropped()).put("clipError", str(clip.lastError()))
+                    // and the trip's own runner, so the page can see what kept reporting
+                    // while it was frozen, and what it has still not managed to send
+                    .put("track", track == null ? new JSONObject() : track.status());
         } catch (Exception ignore) {
             // JSONObject only throws on a null key, and none of these are null
         }
@@ -754,8 +779,22 @@ public class DmsService extends Service implements LifecycleOwner {
         try {
             Notification n = alerts.tripNotification(detail);
             if (Build.VERSION.SDK_INT >= 29) {
-                ServiceCompat.startForeground(this, NOTICE_TRIP, n,
-                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA);
+                // Android 14 wants to be told which kind of background work this service is
+                // doing, and refuses one whose type it has not been allowed: a camera type
+                // with no camera permission is a SecurityException, and so is a location type
+                // with the handset's location switched off. So the type says what this
+                // instance really holds - which is what lets a fleet that has the driver
+                // camera switched off run its trip reporter here anyway.
+                int type = 0;
+                if (granted(Manifest.permission.CAMERA)) {
+                    type |= ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA;
+                }
+                if (granted(Manifest.permission.ACCESS_FINE_LOCATION)
+                        || granted(Manifest.permission.ACCESS_COARSE_LOCATION)) {
+                    type |= ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION;
+                }
+                if (type == 0) type = ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA;
+                ServiceCompat.startForeground(this, NOTICE_TRIP, n, type);
             } else {
                 startForeground(NOTICE_TRIP, n);
             }
@@ -773,10 +812,39 @@ public class DmsService extends Service implements LifecycleOwner {
         }
     }
 
+    private boolean granted(String permission) {
+        try {
+            return ContextCompat.checkSelfPermission(this, permission)
+                    == PackageManager.PERMISSION_GRANTED;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     // ---- helpers shared with Rules
 
     Config cfg() {
         return cfg;
+    }
+
+    Track track() {
+        return track;
+    }
+
+    /** Set in onDestroy: the answer every thread gives on its way in. */
+    boolean isDead() {
+        return dead;
+    }
+
+    /** The last moment the page handed a reading over, good or not. */
+    long fedMs() {
+        return fedAt;
+    }
+
+    /** False when the driver's page is not the screen he is looking at. */
+    boolean pageAsleep() {
+        Host h = host;
+        return h == null || !h.uiVisible();
     }
 
     Clip clip() {
@@ -886,7 +954,7 @@ public class DmsService extends Service implements LifecycleOwner {
     }
 
     /** The charge on the phone at the moment of the event, from the system's own copy. */
-    private double[] battery() {
+    double[] battery() {
         try {
             Intent i = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
             if (i == null) return null;

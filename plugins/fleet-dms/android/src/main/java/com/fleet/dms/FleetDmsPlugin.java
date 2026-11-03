@@ -4,6 +4,9 @@ import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
+import android.net.Uri;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.util.Base64;
 
 import androidx.core.content.ContextCompat;
@@ -292,6 +295,202 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
         });
     }
 
+    // ---- the trip's own position runner
+
+    /**
+     * Hand the trip to the part of this app that Android does not freeze.
+     *
+     * The order carries the server, the vehicle and the two recording intervals, and never a
+     * sign-in: {@link #trackToken} is the only method that takes one, and it is only ever
+     * kept in memory. A service that has to be started by this call is given the order on
+     * disk instead, which is how a trip Android had to bring back by itself starts taking
+     * positions again before the page has woken up - collecting, and sending nothing until a
+     * page that can see itself hands over a token again.
+     */
+    @PluginMethod
+    public void trackStart(PluginCall call) {
+        safe(call, () -> {
+            JSONObject order = call.getObject("cfg");
+            DmsService s = DmsService.get();
+            Track t = s == null ? null : s.track();
+            JSObject r = new JSObject();
+            if (t == null) {
+                Track.holdOrder(getContext(), order);
+                String why = launch(true);
+                DmsService again = DmsService.get();
+                r.put("started", why.isEmpty());
+                r.put("running", again != null);
+                if (!why.isEmpty()) r.put("reason", why);
+                call.resolve(r);
+                return;
+            }
+            t.start(order);
+            r.put("started", true);
+            r.put("running", t.isRunning());
+            r.put("status", t.status());
+            call.resolve(r);
+        });
+    }
+
+    /** The page's own sign-in, refreshed as often as the page can see it. Never written to disk. */
+    @PluginMethod
+    public void trackToken(PluginCall call) {
+        safe(call, () -> {
+            DmsService s = DmsService.get();
+            Track t = s == null ? null : s.track();
+            if (t != null) t.token(call.getString("token", ""));
+            JSObject r = new JSObject();
+            r.put("ran", t != null);
+            r.put("status", t == null ? new JSONObject() : t.status());
+            call.resolve(r);
+        });
+    }
+
+    /** An alert the page raised: the point it happened at goes now, not at the next beat. */
+    @PluginMethod
+    public void trackNow(PluginCall call) {
+        safe(call, () -> {
+            DmsService s = DmsService.get();
+            Track t = s == null ? null : s.track();
+            if (t != null) t.now();
+            JSObject r = new JSObject();
+            r.put("ran", t != null);
+            call.resolve(r);
+        });
+    }
+
+    /**
+     * The page has taken these breaches in hand. It writes their rows from here, and the
+     * runner must not write a second row for the stretch it has just handed over - which is
+     * how one bend ends up with two overspeed records and a driver twice over the count.
+     */
+    @PluginMethod
+    public void trackClaim(PluginCall call) {
+        safe(call, () -> {
+            DmsService s = DmsService.get();
+            Track t = s == null ? null : s.track();
+            JSONArray types = call.getArray("types");
+            if (t != null) t.claim(types);
+            JSObject r = new JSObject();
+            r.put("ran", t != null);
+            call.resolve(r);
+        });
+    }
+
+    /** The trip ended: stop asking where the vehicle is, and keep whatever has not been sent. */
+    @PluginMethod
+    public void trackStop(PluginCall call) {
+        safe(call, () -> {
+            DmsService s = DmsService.get();
+            Track t = s == null ? null : s.track();
+            if (t != null) t.stop();
+            else Track.dropOrder(getContext());
+            JSObject r = new JSObject();
+            r.put("ran", t != null);
+            r.put("status", t == null ? new JSONObject() : t.status());
+            call.resolve(r);
+        });
+    }
+
+    /**
+     * What this phone could not send, given back to the page and cleared from the runner, so
+     * the page can put it into the same out-of-coverage queue the rest of the app uses and
+     * file it against the session it holds rather than one this service ever saw.
+     */
+    @PluginMethod
+    public void trackDrain(PluginCall call) {
+        safe(call, () -> {
+            DmsService s = DmsService.get();
+            Track t = s == null ? null : s.track();
+            JSONArray items = t != null ? t.drain() : Track.peek(getContext());
+            JSObject r = new JSObject();
+            r.put("items", items);
+            call.resolve(r);
+        });
+    }
+
+    /** What the runner is doing, and why it may not be doing it. */
+    @PluginMethod
+    public void trackStatus(PluginCall call) {
+        safe(call, () -> {
+            DmsService s = DmsService.get();
+            Track t = s == null ? null : s.track();
+            JSObject r = new JSObject();
+            if (t != null) {
+                r.put("running", t.isRunning());
+                r.put("service", true);
+                r.put("status", t.status());
+            } else {
+                r.put("running", false);
+                r.put("service", false);
+                r.put("wanted", Track.wanted(getContext()));
+            }
+            call.resolve(r);
+        });
+    }
+
+    // ---- the phone's own battery saving
+
+    /** Whether Android has already been told to leave this app alone when it saves battery. */
+    @PluginMethod
+    public void ignoreState(PluginCall call) {
+        safe(call, () -> {
+            JSObject r = new JSObject();
+            r.put("exempt", ignoring());
+            call.resolve(r);
+        });
+    }
+
+    /**
+     * Ask the driver, in Android's own words, to keep this app out of its battery saving. The
+     * wake lock covers a trip while it runs; it is this saving that defers the uploads of a
+     * phone that sat in a yard for two hours, and on the handsets this fleet drives that is
+     * what strands a queue until the driver opens the app again. Declining is a plain answer
+     * and costs nothing but the delay.
+     */
+    @PluginMethod
+    public void ignoreAsk(PluginCall call) {
+        safe(call, () -> {
+            boolean free = ignoring();
+            JSObject r = new JSObject();
+            r.put("exempt", free);
+            if (free) {
+                call.resolve(r);
+                return;
+            }
+            // The direct ask is one dialog with an Allow in it. Not every handset answers it,
+            // and one that does not is sent to the list screen instead, where the driver has to
+            // find this app himself - slower, but the same decision.
+            try {
+                Intent i = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                i.setData(Uri.fromParts("package", getContext().getPackageName(), null));
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(i);
+                r.put("asked", true);
+            } catch (Throwable t) {
+                try {
+                    Intent i = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    getContext().startActivity(i);
+                    r.put("asked", true).put("list", true);
+                } catch (Throwable t2) {
+                    r.put("asked", false).put("reason", name(t2));
+                }
+            }
+            call.resolve(r);
+        });
+    }
+
+    /** What Android itself says about this app and its battery saving. */
+    private boolean ignoring() {
+        try {
+            PowerManager p = (PowerManager) getContext().getSystemService(Context.POWER_SERVICE);
+            return p != null && p.isIgnoringBatteryOptimizations(getContext().getPackageName());
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
     // ---- the clips an alert left on this phone
 
     /**
@@ -320,22 +519,38 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
     }
 
     /**
-     * One clip as text small enough to travel the bridge. The page is the only thing in
-     * this app holding a session, so it is the page that puts the file where an
+     * A piece of one clip as text small enough to travel the bridge. The page is the only
+     * thing in this app holding a session, so it is the page that puts the file where an
      * administrator can watch it - and nothing uploads from here.
+     *
+     * It asks for a piece at a time because the whole file in one string is what used to
+     * end a trip: base64 costs two bytes of char for every three bytes of film, Capacitor
+     * copies the answer again on its way to the page, and a two-megabyte recording asked
+     * a phone that was already holding a camera and two models for room it did not have.
      */
     @PluginMethod
     public void clipData(PluginCall call) {
         safe(call, () -> {
             String cid = call.getString("cid", "");
-            byte[] b = clipNow().read(cid);
+            long at = call.getLong("at", 0L);
+            Clip c = clipNow();
+            long total = c == null ? 0 : c.size(cid);
             JSObject r = new JSObject();
-            if (b == null) {
+            r.put("total", total);
+            r.put("at", at);
+            if (c == null || total == 0) {
+                r.put("missing", true);
+                call.resolve(r);
+                return;
+            }
+            byte[] b = c.read(cid, at, Clip.MAX_CHUNK);
+            if (b == null || b.length == 0) {
                 r.put("missing", true);
                 call.resolve(r);
                 return;
             }
             r.put("bytes", b.length);
+            r.put("eof", at + b.length >= total);
             r.put("b64", Base64.encodeToString(b, Base64.NO_WRAP));
             call.resolve(r);
         });
