@@ -1443,6 +1443,202 @@ create policy "events insert own" on events for insert with check (
 update event_rules set threshold = 70 where type = 'dms_smoking' and threshold < 70;
 update event_rules set hold_s = 3 where type = 'dms_smoking' and hold_s < 3;
 
+-- ------------------ v33 the doors an anonymous caller could still push ----------
+-- Nothing here changes what either app does on a normal day. Each line closes one way to
+-- ask the database for something the page that asks is not entitled to ask for, and each
+-- was checked against what both pages actually call, so no working screen loses a door.
+
+-- (1) The wrong-password count is put down only by a sign-in that already worked, and a
+--     sign-in that worked holds a token. Until now a caller with nothing but the anon key
+--     that ships inside every handset could POST rpc/login_ok with any address and zero
+--     that account's count, so five guessed passwords could be followed by five more with
+--     the lockout wiped between the rounds, and the Users page would read "no attempts"
+--     the whole time. v28 wrote this lesson down for the device seat and it is the same
+--     here: revoking from the pseudo-role `public` leaves the separate `anon` grant
+--     standing. login_gate and login_fail keep their anon grant because the sign-in box
+--     genuinely calls them before it has a session; login_ok has no such excuse.
+revoke execute on function login_ok(text) from anon;
+grant execute on function login_ok(text) to authenticated;
+
+-- (2) Two functions neither page asks while it is still anonymous. Both are SECURITY
+--     DEFINER and login_gate reaches them from inside itself, so closing them off from
+--     outside costs a driver nothing at his sign-in box. Left open, an unauthenticated
+--     stranger could read the fleet's own lockout windows and run the sweep on demand,
+--     ageing a lock out a minute early.
+revoke all on function login_cfg(), login_sweep() from public, anon;
+grant execute on function login_sweep() to authenticated;
+
+-- (3) A blackbox pull is the office's request and the handset's answer, and the update
+--     policy lets a phone answer a pull for its own vehicle - correctly. What it never
+--     said was which columns the answer may touch, so a handset could mark a pull 'sent'
+--     with n_rows 99999 without uploading one byte, and could rewrite the window, the
+--     asker and the request time on the administrator's own record. This is guard_events()
+--     from v15 applied to the other two-party row in the file: everything that made the
+--     request is pinned, everything that answers it stays free, and an administrator's own
+--     edit passes straight through.
+create or replace function guard_bb() returns trigger language plpgsql as $$
+begin
+  if is_admin() then return new; end if;
+  if new.id           is distinct from old.id
+  or new.vehicle_id   is distinct from old.vehicle_id
+  or new.vehicle_name is distinct from old.vehicle_name
+  or new.from_ts      is distinct from old.from_ts
+  or new.to_ts        is distinct from old.to_ts
+  or new.requested_by is distinct from old.requested_by
+  or new.requested_at is distinct from old.requested_at
+  then raise exception 'a handset may answer a blackbox request, not rewrite it';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists bb_guard on bb_requests;
+create trigger bb_guard before update on bb_requests for each row execute function guard_bb();
+
+-- (4) user_activity is the log an administrator reads to see who did what. The insert
+--     policy already insists that an account may only write about itself, but the NAME
+--     printed on the row was whatever the caller typed, so a handset could file an entry
+--     that read as another person's and the Activity Log would print it. Same rule as
+--     stamp_names() in v15: do not argue with the label, rewrite it from the account the
+--     row is really about. An address with no profile row keeps what it sent, because a
+--     missing profile is a schema that has not caught up and is not a reason to lose an
+--     entry.
+create or replace function stamp_activity() returns trigger language plpgsql as $$
+declare n text;
+begin
+  select case when p.email like '%@fleet.local' then split_part(p.email, '@', 1) else p.email end
+    into n from profiles p where p.id = new.user_id;
+  if n is not null then new.user_name := n; end if;
+  return new;
+end $$;
+
+drop trigger if exists activity_stamp on user_activity;
+create trigger activity_stamp before insert on user_activity for each row execute function stamp_activity();
+
+-- (5) recorded_at is written by the handset, so until now it was the handset's to choose.
+--     A row filed with last March's stamp, or next week's, lands inside the trip
+--     splitter's gap window and is read as a vehicle that drove through a silence it never
+--     crossed - which is exactly the shape an investigation is trying to see. A trigger
+--     rather than another copy of the insert policies, because those have been rewritten
+--     five times over and this file's last word has to stay the type list, not this.
+--     Neither app is affected: the blackbox holds fourteen days of fixes, the offline
+--     outbox is flushed within hours of a signal returning, and both sit inside this
+--     window with room to spare. The two hours ahead is clock skew and a phone that woke
+--     up in a different timezone, not a licence to file a trip in the future.
+create or replace function guard_time() returns trigger language plpgsql as $$
+begin
+  if new.recorded_at is null then new.recorded_at := now(); return new; end if;
+  if new.recorded_at < now() - interval '45 days' or new.recorded_at > now() + interval '2 hours'
+  then raise exception 'a record dated outside the last 45 days or more than two hours ahead is refused';
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists time_guard on positions;
+create trigger time_guard before insert on positions for each row execute function guard_time();
+drop trigger if exists time_guard on events;
+create trigger time_guard before insert on events for each row execute function guard_time();
+
+-- (6) clear_pw_flag() is the one write an ordinary account is allowed to make about
+--     itself, and it is the only one it can make without a screen in the way: the
+--     "this password was set for you" flag is a promise to the office rather than a
+--     wall, and a caller who knows the address can put it down with curl. Two things
+--     follow, neither of which touches a working screen. It is no longer answerable by a
+--     caller that holds nothing but the anon key shipped inside every handset - the flag
+--     is put down after a password has actually been changed, and that needs a session.
+--     And when it does come down, the database writes its own line in the Activity Log,
+--     which is the report the administrator reads: a flag that went down with no
+--     'Changed own password' entry beside it is now visible as exactly that. The line is
+--     written only for an account that really was carrying the flag, so a driver who
+--     changes his own password for no reason leaves no second entry behind.
+revoke execute on function clear_pw_flag() from anon;
+grant execute on function clear_pw_flag() to authenticated;
+
+create or replace function clear_pw_flag() returns void
+language plpgsql security definer set search_path = public as $$
+declare n int;
+begin
+  update profiles set must_change = false, fails = 0, fails_at = null
+   where id = auth.uid() and must_change
+    returning 1 into n;
+  if n is not null then
+    insert into user_activity (user_id, action, details)
+    values (auth.uid(), 'Temporary password put down',
+      'the flag an administrator raised was cleared for this account');
+  end if;
+end $$;
+
+-- ------------------ v34 the two reads that got slower every week --------------
+-- Live Tracking opens with one question: where is each phone right now. The view that
+-- answered it walked the whole positions index and kept the newest row of every group,
+-- which is nothing at all on a project's first week and a table scan by its first year -
+-- so the busiest page in the fleet used to get heavier every single day without one byte
+-- of the settings changing. The answer is a pointer the database keeps for itself: one
+-- row per phone, always the newest of its positions, so the read costs as much as the
+-- fleet has vehicles rather than as much as it has history. The page does not change:
+-- latest_positions keeps its name, its columns and its row-for-row rights.
+create table if not exists latest_pos (
+  user_id uuid primary key,
+  pos_id  bigint not null,
+  latest_at timestamptz not null);
+alter table latest_pos enable row level security;
+-- The pointer says only which row is somebody's newest; the position itself is still read
+-- through positions' own policies, which is what keeps a driver's Live Tracking to his own
+-- vehicles exactly as the old view did.
+drop policy if exists "latest read" on latest_pos;
+create policy "latest read" on latest_pos for select to authenticated using (true);
+
+-- The writer is a trigger, not another copy of the insert path, because three different
+-- pieces of software write positions - the page, the handset's own runner and the
+-- blackbox push - and all three must land the pointer. A newer recorded_at always wins,
+-- which matters for the phone that drove a dead spot for an hour and then flushed its
+-- queue oldest-first: the burst ends on the newest fix, like every other writer.
+create or replace function stamp_latest() returns trigger language plpgsql as $$
+begin
+  if new.user_id is not null and new.id is not null then
+    insert into latest_pos (user_id, pos_id, latest_at)
+         values (new.user_id, new.id, new.recorded_at)
+      on conflict (user_id) do update
+        set pos_id = excluded.pos_id, latest_at = excluded.latest_at
+      where excluded.latest_at > latest_pos.latest_at;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists latest_stamp on positions;
+create trigger latest_stamp after insert on positions for each row execute function stamp_latest();
+
+-- The pointers a project already owes are filled in once, here, by the one expensive
+-- read this version exists to stop doing on every page open. Re-running this file on a
+-- project that has already done it costs nothing, and a project that never had a
+-- position written still gets a table of its own rather than an error.
+do $$ begin
+  if not exists (select 1 from latest_pos) then
+    insert into latest_pos (user_id, pos_id, latest_at)
+    select distinct on (user_id) user_id, id, recorded_at from positions
+      where user_id is not null
+      order by user_id, recorded_at desc
+    on conflict (user_id) do update set pos_id = excluded.pos_id, latest_at = excluded.latest_at
+      where excluded.latest_at > latest_pos.latest_at;
+  end if;
+end $$;
+
+drop view if exists latest_positions;
+create or replace view latest_positions with (security_invoker = true) as
+  select p.* from positions p join latest_pos l on l.pos_id = p.id;
+
+-- (2) Two reports read a period and nothing else - the Events page before a vehicle is
+--     picked, and the fleet-wide daily charts - and both used to plan a full scan because
+--     every index on these two tables leads with a vehicle, a user or a type. A plain
+--     time index is what a date range wants.
+do $$ begin
+  if not exists (select 1 from pg_indexes where schemaname='public' and tablename='positions' and indexdef ilike '%(recorded_at%desc%') then
+    create index positions_time on positions (recorded_at desc);
+  end if;
+  if not exists (select 1 from pg_indexes where schemaname='public' and tablename='events' and indexdef ilike '%(recorded_at%desc%') then
+    create index events_time on events (recorded_at desc);
+  end if;
+end $$;
+
 -- ------------------------------------------------------------- admin seed ----
 -- Promote the owner account. Runs after the tables/policies exist, and is safe
 
@@ -1901,5 +2097,35 @@ end $$;
 --        the rule stays seeded switched off.
 --   Run this whenever convenient: no build depends on it, and a project that skips it keeps the
 --   looser numbers on a rule that is off unless somebody ticked it.
+--
+-- v33, on top of the above (the doors an anonymous caller could still push):
+--   all of it is in the body above, so re-running this file is the whole step. Nothing is
+--   seeded and no row is rewritten.
+--        -> four functions lose a grant they never needed (login_ok and clear_pw_flag stop
+--        answering the anon key; login_cfg and login_sweep stop answering a stranger), and no
+--        screen in either app loses a door: both pages ask those four only after a sign-in has
+--        handed them a token.
+--        -> three triggers add the invariants the policies could not say: a handset may answer
+--        a blackbox request without rewriting it, an Activity Log entry is stamped with the
+--        name of the account it is really about, and a position or event dated further back
+--        than the fleet's own fourteen day blackbox - or more than two hours into the future -
+--        is refused instead of silently splitting a trip that never happened.
+--        -> The one thing to know before running it on a project with old data: a manual import
+--        of history older than 45 days will be refused by that last trigger. Import first, or
+--        run this version after the import, and nothing else about the fleet changes.
+--
+-- v34, on top of the above (the two reads that got slower every week):
+--   all of it is in the body above; re-running this file is the whole step. One new table
+--   (latest_pos), one trigger on positions, one rebuilt view and two indexes.
+--        -> Live Tracking asks the database the same question as always and gets the same rows
+--        back with the same rights, but from a pointer table the size of the fleet instead of
+--        a walk of the size of its history. Nothing in either app changes, so no build is
+--        owed alongside it and none is locked out by running it.
+--        -> The first run backfills the pointers with the one full read this version exists to
+--        stop repeating: on a project with years of positions that paste takes a few seconds
+--        in the SQL Editor and never runs again.
+--        -> If the optional history purge has ever deleted a vehicle's very newest position,
+--        that vehicle has no marker until its phone reports again. It had none under the old
+--        view either, and a driver whose handset is working fills the pointer on his next fix.
 
 -- ============================================================================
