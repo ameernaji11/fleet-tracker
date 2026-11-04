@@ -1261,10 +1261,32 @@ const hms=x=>{x=Math.max(0,Math.round(x||0));return p2(Math.floor(x/3600))+':'+p
 const tms=p=>new Date(p.recorded_at).getTime();
 const brg=(a,b)=>{const r=x=>x*Math.PI/180,y=Math.sin(r(b.lng-a.lng))*Math.cos(r(b.lat)),x=Math.cos(r(a.lat))*Math.sin(r(b.lat))-Math.sin(r(a.lat))*Math.cos(r(b.lat))*Math.cos(r(b.lng-a.lng));return (Math.atan2(y,x)*180/Math.PI+360)%360};
 const TCOL=['#2f7fe6','#e8590c','#27a46a','#9b51e0','#d6336c','#0b9fb3','#c99a00','#5c7cfa','#7a5c3e','#2b8a3e'];
-let TRIPS=[],TSEL=-1,HEVS=[],PB=null;
+let TRIPS=[],TSEL=-1,HEVS=[],PB=null,HREST=[];
 function splitTrips(d,Vh){const gap=GAP_S(Vh)*1000;const out=[];let cur=[];
- d.forEach(p=>{if(cur.length&&tms(p)-tms(cur.at(-1))>gap){out.push(cur);cur=[]}cur.push(p);if(p.ignition===false&&cur.length>1){out.push(cur);cur=[]}});
- if(cur.length)out.push(cur);const f=out.filter(t=>t.length>1);return f.length?f:out.slice(0,1)}
+ const down=p=>p.ignition===false,up=p=>p.ignition!==false;
+ d.forEach(p=>{if(cur.length&&tms(p)-tms(cur.at(-1))>gap){out.push(cur);cur=[]}
+ // A handset reports all day now, and a vehicle that is standing still has nothing new to
+ // say except that it is still there. Two of those rest points are never further apart than
+ // this vehicle's own parked wait, so the gap above joins them - and that join used to make a
+ // trip of every parked evening, filling the list with one-hour "trips" of 0 km for a vehicle
+ // nobody drove. A run is a trip only once something in it says the vehicle was driven; an old
+ // row that never carried an ignition answer still counts, because it said nothing either way.
+ // A rest point is kept out of the drive on both sides of it too. It used to be the trip's own
+ // last point, so a drive that ended at eight showed as lasting until midnight - and the hour
+ // between the last moving fix and the first parked heartbeat read as a silence, in red,
+ // accusing the handset of saying nothing when in fact it was reporting a vehicle stood still.
+ // The same point opening a run would have joined an hour of standing to the first fix of the
+ // next drive. Rows written before the ignition answer exist match neither rule, so every trip
+ // on the server so far splits exactly as it did before this file learned about rest points.
+ if(down(p)&&cur.some(up)){out.push(cur);cur=[]}
+ if(up(p)&&cur.length&&cur.every(down)){out.push(cur);cur=[]}
+ cur.push(p);if(down(p)&&cur.length>1){out.push(cur);cur=[]}});
+ if(cur.length)out.push(cur);
+ const moved=t=>t.some(up);
+ const f=out.filter(t=>t.length>1&&moved(t));
+ if(f.length)return f;
+ const s=out.slice(0,1);
+ return s.length&&moved(s[0])?s:[]}
 function tStats(t,Vh){let d=0,dr=0,id=0,fuel=0,max=0,ms=0,mn=0,cut=0,cat=0,cutN=0,cutT=0;const fm=+Vh.fuel_moving||0,fi=+Vh.fuel_idle||0,gap=GAP_S(Vh);
  t.forEach(p=>{const s=+p.speed||0;if(s>max)max=s;if(s>0){ms+=s;mn++}});
  // two parked heartbeats an hour apart really were an hour of standing still, so a stopped
@@ -1465,13 +1487,23 @@ async function loadHist(keep){if(!keep)fSave('hist');pbStop();
  if(hLayer)hLayer.remove();TRIPS.forEach(t=>{t.ly.remove();t.ely.remove()});TRIPS=[];TSEL=-1;HEVS=[];hData=data;
  // the pins this page stood are gone, so the spot groups they pointed at must go with them
  ECL.length=0;EIX.length=0;
- if(!data.length){$('hstat').innerHTML='';hSide();return toast('No data in this period.',1)}
+ if(!data.length){$('hstat').innerHTML='';HREST=[];hSide();return toast('No data in this period.',1)}
  HEVS=(await fetchAll(()=>sb.from('events').select('*').eq('vehicle_id',vid).gte('recorded_at',hf).lte('recorded_at',ht).order('recorded_at'))).filter(x=>EV[x.type]&&okFix(x));
  await evBorrow(HEVS);
  const Vh=vehicles.find(x=>x.id===vid)||{};
  TRIPS=splitTrips(data,Vh).map((pts,i)=>({n:i+1,pts,col:TCOL[i%TCOL.length],on:true,evsOn:true,st:tStats(pts,Vh),ly:L.layerGroup(),ely:L.layerGroup(),evs:[]}));
  hLayer=L.layerGroup().addTo(mapH);
  const ORPH=[];
+ // A day with no trip in it is not a day with nothing to show, and a drive is not the whole
+ // of a vehicle's day either: the handset keeps saying where the vehicle stood between them.
+ // Those standstill reports are never joined into a trip - no road was taken while they were
+ // written - so they are drawn here as grey dots, on a day of only parking and beside the
+ // trips of a day that had some. The office sees a vehicle that reported, not a blank map.
+ const used=new Set();TRIPS.forEach(t=>t.pts.forEach(p=>used.add(p)));
+ HREST=hData.filter(p=>!used.has(p)&&p.ignition===false);
+ HREST.forEach(p=>L.circleMarker([+p.lat,+p.lng],{radius:3,color:'#9aa5b1',weight:1.5,
+  fillColor:'#9aa5b1',fillOpacity:.5}).bindPopup('Standstill report · '+new Date(p.recorded_at).toLocaleString()+
+  ' · ignition off').addTo(hLayer));
  // An event belongs to the trip that was running in the moment it happened. The trip's own
  // span - measured from the fixes this handset reported - answers that first. The minute
  // either side is only ever a guess, and it used to be the whole rule, so a breach raised
@@ -1507,9 +1539,13 @@ function tDet(T){const S=T.st,R=[['Start',new Date(S.s).toLocaleString()],['End'
  return R}
 const HHINT='<small style="color:var(--mut);display:block">Click a trip to see its details, print them and play the trip back.</small>';
 function hSide(){const s=$('hside');
- if(!TRIPS.length){s.innerHTML='<p style="color:var(--mut);margin:0">No trips in this period.</p>';return}
+ // The grey dots this page stands are the vehicle saying it stood still. A period that held
+ // nothing else held no trip, and the manager is told that in words - with a count of what did
+ // arrive - rather than being handed an empty panel to wonder about.
+ if(!TRIPS.length){s.innerHTML='<p style="color:var(--mut);margin:0">No trips in this period.'+
+  (hData.length?'<br><small>'+(HREST.length===hData.length?'Every one of the '+hData.length+' points this vehicle reported was written with the ignition down: it stood still.':'Of the '+hData.length+' points this vehicle reported, '+HREST.length+' say the ignition was down and none says the vehicle was driven.')+' The grey dots on the map are where it stood. A trip begins at the first point that says it was driven.</small>':'')+'</p>';return}
  const T=TRIPS[TSEL];
- s.innerHTML=`<div class="od"><b class="fl1"><i class="fa-solid fa-route"></i> Trips (${TRIPS.length})</b><button class="btn gh sm" onclick="tAll(1)" title="Show every trip">All</button><button class="btn gh sm" onclick="tAll(0)" title="Hide every trip">None</button></div>${HHINT}
+ s.innerHTML=`<div class="od"><b class="fl1"><i class="fa-solid fa-route"></i> Trips (${TRIPS.length})</b><button class="btn gh sm" onclick="tAll(1)" title="Show every trip">All</button><button class="btn gh sm" onclick="tAll(0)" title="Hide every trip">None</button></div>${HHINT}${HREST.length?`<small style="color:var(--mut);display:block">${HREST.length} standstill report${HREST.length===1?'':'s'} in this period, drawn as grey dots: the vehicle parked here and kept reporting.</small>`:''}
  <div class="trl">${TRIPS.map((t,i)=>`<div class="trr${i===TSEL?' on':''}" onclick="tSel(${i})" title="Click to see this trip's details and play it back"><input type="checkbox" ${t.on?'checked':''} onclick="event.stopPropagation()" onchange="tTog(${i},this.checked)" title="Show this trip on the map"><span class="sw" style="background:${t.col}"></span><div style="flex:1;min-width:0"><b>Trip ${t.n}</b> <small>${new Date(t.st.s).toLocaleString()} → ${new Date(t.st.e).toLocaleTimeString()} · ${t.st.d.toFixed(1)} km${t.st.cutN?` · <b style="color:var(--ord)" title="${esc(cutTip(t.st))}">${hms(t.st.cutT)} not reported</b>`:''}</small></div></div>${i===TSEL?tdBox(t,i):''}`).join('')}</div>`;
  if(T){[['tdS',T.pts[0]],['tdE',T.pts.at(-1)]].forEach(([id,p])=>geoOne(gk(p)).then(nm=>{if($(id))$(id).textContent=nm||'Place name not found'}));
   $('pbR').onchange=e=>{if(PB)PB.rate=+e.target.value};pbShow()}}
@@ -1616,7 +1652,7 @@ function pbShow(){if(!PB)return;const {tl,c,T}=PB,P=T.pts;let i=Math.min(Math.ma
  const v=$('pbV');if(v)v.innerHTML=V.map(x=>`<div><small>${x[0]}</small><b>${esc(x[1])}</b></div>`).join('')}
 function hKpis(){const S=TRIPS.filter(t=>t.on),sm=k=>S.reduce((a,t)=>a+t.st[k],0);let ms=0,mn=0;S.forEach(t=>t.pts.forEach(p=>{if(p.speed>0){ms+=+p.speed;mn++}}));
  const ev=S.reduce((a,t)=>a+t.evs.length,0)+HEVS.length-TRIPS.reduce((a,t)=>a+t.evs.length,0);
- $('hstat').innerHTML=tile('bl','fa-route',S.length+' / '+TRIPS.length,'Trips shown')+tile('bl','fa-location-dot',S.reduce((a,t)=>a+t.pts.length,0),'Points')+tile('gr','fa-road',sm('d').toFixed(1)+' km','Distance')+tile('or','fa-gauge-high',Math.round(S.reduce((a,t)=>Math.max(a,t.st.max),0))+' km/h','Max speed')+tile('gy','fa-gauge',Math.round(mn?ms/mn:0)+' km/h','Avg moving speed')+tile('gr','fa-road-circle-check',hms(sm('dr')),'Driving')+tile('or','fa-hourglass-half',hms(sm('id')),'Idling')+tile('bl','fa-clock',hms(sm('dur')),'Duration')+tile('rd','fa-triangle-exclamation',ev,'Events')+tile('or','fa-gas-pump',sm('fuel').toFixed(1)+' L','Estimated fuel')}
+ $('hstat').innerHTML=tile('bl','fa-route',S.length+' / '+TRIPS.length,'Trips shown')+tile('bl','fa-location-dot',hData.length,'Points reported')+tile('gr','fa-road',sm('d').toFixed(1)+' km','Distance')+tile('or','fa-gauge-high',Math.round(S.reduce((a,t)=>Math.max(a,t.st.max),0))+' km/h','Max speed')+tile('gy','fa-gauge',Math.round(mn?ms/mn:0)+' km/h','Avg moving speed')+tile('gr','fa-road-circle-check',hms(sm('dr')),'Driving')+tile('or','fa-hourglass-half',hms(sm('id')),'Idling')+tile('bl','fa-clock',hms(sm('dur')),'Duration')+tile('rd','fa-triangle-exclamation',ev,'Events')+tile('or','fa-gas-pump',sm('fuel').toFixed(1)+' L','Estimated fuel')}
 function hKpiSet(){const off=localStorage.hk==='0';$('hstat').classList.toggle('hide',off);$('hkB').innerHTML=`<i class="fa-solid ${off?'fa-eye':'fa-eye-slash'}"></i>${off?'Show summary':''}`;$('hkB').title=off?'Show the summary':'Hide the summary';if(mapH)setTimeout(()=>mapH.invalidateSize(),50)}
 function hKpi(){localStorage.hk=localStorage.hk==='0'?'1':'0';hKpiSet()}
 hKpiSet();
