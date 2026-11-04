@@ -244,7 +244,7 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <div class="card kpi gr click" data-f="go" onclick="setF('go')"><div class="ic"><i class="fa-solid fa-gauge-high"></i></div><div><b id="k_go">0</b><span>Moving</span></div></div>
 <div class="card kpi or click" data-f="idle" onclick="setF('idle')"><div class="ic"><i class="fa-solid fa-hourglass-half"></i></div><div><b id="k_idle">0</b><span>Idling</span></div></div>
 <div class="card kpi bl click" data-f="park" onclick="setF('park')"><div class="ic"><i class="fa-solid fa-square-parking"></i></div><div><b id="k_park">0</b><span>Parking</span></div></div>
-<div class="card kpi gy click" data-f="off" onclick="setF('off')"><div class="ic"><i class="fa-solid fa-plug-circle-xmark"></i></div><div><b id="k_off">0</b><span>Offline &middot; after <input id="offH" type="number" min="0.5" step="0.5" onclick="event.stopPropagation()" onchange="saveOff()"  title="Hours without a signal before a vehicle counts as offline"> h<span class="hp" data-tip="This tile counts every vehicle whose phone has sent nothing for longer than the number in this box - 24 hours unless the office has changed it. A vehicle parked in the yard is not in it: while the app runs it still reports a heartbeat every few minutes, so a silence this long means the phone is off, out of coverage, or signed out. A vehicle that has never reported at all is counted under Parking instead. Click the tile to list the ones it counted.">?</span></span></div></div></div>
+<div class="card kpi gy click" data-f="off" onclick="setF('off')"><div class="ic"><i class="fa-solid fa-plug-circle-xmark"></i></div><div><b id="k_off">0</b><span>Offline &middot; after <input id="offH" type="number" min="0.5" step="0.5" onclick="event.stopPropagation()" onchange="saveOff()"  title="Hours without a signal before a vehicle counts as offline"> h<span class="hp" data-tip="This tile counts every vehicle whose phone has sent nothing for longer than the number in this box - 24 hours unless the office has changed it. A vehicle parked in the yard is not in it: while the app runs it still reports a heartbeat every few minutes, so a silence this long means the phone is off, out of coverage, or signed out. A vehicle record that has never sent a single position is counted here too, and its row reads No position received yet - that is a record nobody has driven yet, not a phone that lost signal. Click the tile to list the ones it counted.">?</span></span></div></div></div>
 <div class="card lscope"><b style="font-weight:800"><i class="fa-solid fa-list-check"></i> Track</b><div id="lv_v" style="flex:1;min-width:220px"></div><small>Choose one vehicle, several of them, or Select all. An empty choice tracks the whole fleet.</small></div>
 <div class="split"><div class="card panel"><div class="field"><input id="q" placeholder="Search vehicle or driver" oninput="renderList()"></div><div class="list" id="liveList"></div></div><div class="map" id="mapLive"></div></div></section>
 <section id="hist"><div class="card hbar">
@@ -302,7 +302,7 @@ aside{width:64px;overflow:hidden;transition:width .2s;flex:none}aside:hover,asid
 <div class="field"><label>Type</label><select name="type"><option value="">-</option><option>Sedan</option><option>Hatchback</option><option>SUV</option><option>Pickup</option><option>Van</option><option>Minibus</option><option>Bus</option><option>Truck</option><option>Heavy Truck</option><option>Tanker</option><option>Taxi</option><option>Ambulance</option><option>Motorbike</option><option>Tractor</option><option>Trailer</option><option>Equipment</option><option>Car</option></select></div>
 <div class="field"><label>Make / model</label><input name="make_model"></div><div class="field"><label>Year</label><input name="year" type="number" min="1980" max="2100"></div><div class="field"><label>VIN / chassis</label><input name="vin"></div>
 <div class="field"><label>Fuel</label><select name="fuel_type"><option value="">-</option><option>Petrol</option><option>Diesel</option><option>Hybrid</option><option>Electric</option></select></div>
-<div class="field"><label>Speed limit (km/h) <span class="hp" data-tip="Leave empty to use the fleet default speed limit from the Configuration page for overspeed alerts. A number here applies to this vehicle only.">?</span></label><input name="speed_limit" type="number" min="10" max="250"></div><div class="field"><label>Fuel moving (L/100 km)</label><input name="fuel_moving" type="number" step="0.1" min="0"></div><div class="field"><label>Fuel idling (L/hour)</label><input name="fuel_idle" type="number" step="0.1" min="0"></div><div class="field"><label>Notes</label><input name="notes"></div><button class="btn g"><i class="fa-solid fa-plus"></i>Add vehicle</button></form></div><div class="tw" id="vehT"></div>
+<div class="field"><label>Speed limit (km/h) <span class="hp" data-tip="Leave empty to use the fleet default speed limit from the Configuration page for overspeed alerts. A number here applies to this vehicle only.">?</span></label><input name="speed_limit" type="number" min="10" max="250"></div><div class="field"><label>Fuel moving (L/100 km)</label><input name="fuel_moving" type="number" step="0.1" min="0"></div><div class="field"><label>Fuel idling (L/hour)</label><input name="fuel_idle" type="number" step="0.1" min="0"></div><div class="field"><label>Notes</label><input name="notes"></div><button class="btn g"><i class="fa-solid fa-plus"></i>Add vehicle</button></form><div id="vehDup" class="hide" style="margin:10px 0 0;padding:8px 10px;border-radius:8px;background:var(--orl);color:var(--ord);font-size:13px"></div></div><div class="tw" id="vehT"></div>
 <div class="card"><div class="csh"><i class="fa-solid fa-box-archive"></i><div><b>Blackbox download <span class="hp" data-tip="Each phone keeps the fixes it takes while the vehicle is above the speed on the Configuration page - about one per second of driving - in its own storage, and never uploads that stream. Pick the vehicle and the period around an incident and press Download: the request reaches the phone over realtime (or on its next minute-long poll), and the phone then pushes exactly the stored fixes in that window, each stamped with the moment it was taken. They appear in Historical Tracking and the Tacho report as Blackbox rows. A phone that is switched off or out of coverage answers as soon as it is back. Every second exists once on the phone and is uploaded once: a request for a period that was already downloaded, or one that overlaps an earlier request, pushes only the seconds the server does not have, and a pull that stops halfway resumes where it left off.">?</span></b><small>Ask one vehicle for its stored 1-per-second fixes for a period — for accident investigation.</small></div><button class="btn gh sm" onclick="bbTable()" title="Check whether the phone has answered yet"><i class="fa-solid fa-rotate"></i>Refresh</button></div>
 <div class="frow mt10"><div class="field"><label>Vehicle</label><select id="bb_v"></select></div>
 <div class="field"><label>From</label><input id="bb_f" type="text"></div><div class="field"><label>To</label><input id="bb_t" type="text"></div>
@@ -971,6 +971,14 @@ async function refs(){
  msel('lv_v',vehicles,'All vehicles',mselVal('lv_v'));if(!LVW){LVW=1;$('lv_v').addEventListener('change',lvChg)}
  msel('ev_v',vehicles,'All vehicles',mselVal('ev_v'));msel('ev_d',drivers,'All drivers',mselVal('ev_d'));msel('ev_t',Object.keys(EV).map(k=>({id:k,name:EV[k][0]})),'All events',mselVal('ev_t'));
  $('tr_v').innerHTML=$('hv').innerHTML;$('bb_v').innerHTML=$('hv').innerHTML;$('vehT').innerHTML=tbl(vehicles,['name','type','make_model','year','speed_limit','fuel_moving','fuel_idle'],'vehicles');$('drvT').innerHTML=tbl(drivers,['name','phone','license_no','license_expiry'],'drivers');tools($('vehT'));tools($('drvT'));
+ // every page counts vehicle records, so a plate entered twice is two vehicles on Live
+ // Tracking, in every report and in the alert rules - and an office that typed it once more
+ // than they meant to keeps asking why the fleet looks bigger than it is. Say it here, where
+ // the records are edited, and put the way out behind the ? like every other long note.
+ const nm={};vehicles.forEach(v=>{const n=(v.name||'').trim(),k=n.toLowerCase();if(k)(nm[k]=nm[k]||{name:n,n:0}).n++});
+ const dups=Object.values(nm).filter(x=>x.n>1);
+ $('vehDup').innerHTML=dups.length?`<i class="fa-solid fa-triangle-exclamation"></i> ${dups.length} vehicle name${dups.length==1?' is':'s are'} held by more than one record: ${dups.slice(0,6).map(x=>`${esc(x.name)} &times;${x.n}`).join(', ')}${dups.length>6?', …':''} <span class="hp" data-tip="These are separate records in the Vehicles table that happen to carry the same name, so Live Tracking, the reports and the alert rules each treat them as their own vehicle. If a record was added by mistake, press Delete on the extra row. If these really are two of the same model, give each one its own name or plate so the fleet reads the way it looks outside.">?</span>`:'';
+ $('vehDup').classList.toggle('hide',!dups.length);
  // rebuilding the pickers above wipes whatever was chosen, so the last criteria go
  // back in straight after it
  fApply()}
@@ -1003,8 +1011,9 @@ async function users(){
  // the sweep first, because it is what puts the counts right, then the three reads at once
  const [pf,ag,dv]=await Promise.all([sb.from('profiles').select('*').order('email'),sb.from('assignments').select('*'),
   // A database that has not run v28 has no such table: the read comes back empty and this
-  // page shows nobody a phone, which is the honest answer rather than an error.
-  sb.from('device_claim').select('*').catch(()=>({data:null}))]);
+  // page shows nobody a phone, which is the honest answer rather than an error. The read
+  // itself is not a Promise - it only has then(), so the guard goes through then() too.
+  Promise.resolve(sb.from('device_claim').select('*')).then(r=>r&&r.error?{data:null}:r)]);
  const ps=pf.data,as=ag.data,dcs=dv.data;
  USRS=ps||[];
  DC={};(dcs||[]).forEach(c=>DC[c.user_id]=c);
@@ -1171,11 +1180,19 @@ function lvChg(){renderList();fitAll()}
 // on the map or in the list is what selects it.
 function selLive(uid){SELV=uid;const p=last[uid];if(!p)return;if(PINV)mapL.panTo([p.lat,p.lng]);markers[uid]&&markers[uid].openPopup();document.querySelectorAll('#liveList .veh').forEach(r=>r.classList.toggle('on',r.dataset.u===uid))}
 function pinV(){if(PINV){PINV=null;mapL._btn.pin&&mapL._btn.pin.classList.remove('on');return toast('Pin off — the map no longer follows the vehicle')}
- const uid=SELV||(Object.keys(last).length===1?Object.keys(last)[0]:null);
+ const uid=SELV&&last[SELV]?SELV:(lvRows().length===1?lvRows()[0].user_id:null);
  if(!uid||!last[uid])return toast('Select a vehicle on the map or in the list first, then press Pin');
  PINV=uid;mapL.setView([last[uid].lat,last[uid].lng],Math.max(mapL.getZoom(),17));mapL._btn.pin&&mapL._btn.pin.classList.add('on');toast('Pinned to '+(last[uid].vehicle_name||'vehicle')+' — the map follows it',1)}
 function setF(f){FILT=f;document.querySelectorAll('#live .kpi.click').forEach(k=>k.classList.toggle('on',k.dataset.f===f));renderList();fitAll()}
-function fitAll(){const a=Object.values(last).filter(shown);if(a.length)mapL.fitBounds(a.map(p=>[p.lat,p.lng]),{maxZoom:15,padding:[40,40]})}
+// Two accounts can be given the same vehicle, and the server keeps one latest row per
+// account, so a shared truck would otherwise stand in this list twice, count twice on the
+// tiles and drop a second pin on the same road. A vehicle is shown once, by its freshest row.
+const lvKey=p=>p.vehicle_id||('u'+p.user_id);
+// the row that stands for a vehicle: a usable fix beats a report the map cannot pin,
+// and between two of the same kind the newer one wins
+const lvBest=(a,b)=>!a?b:!b?a:okFix(a)!==okFix(b)?(okFix(a)?a:b):(new Date(a.recorded_at)>=new Date(b.recorded_at)?a:b);
+function lvRows(){const m={};Object.values(last).forEach(p=>{const k=lvKey(p);m[k]=lvBest(m[k],p)});return Object.values(m)}
+function fitAll(){const a=lvRows().filter(shown);if(a.length)mapL.fitBounds(a.map(p=>[p.lat,p.lng]),{maxZoom:15,padding:[40,40]})}
 async function loadLive(){(await fetchAll(()=>sb.from('latest_positions').select('*'))).filter(okFix).forEach(upsert);renderList();fitAll()}
 // The whole fleet's list, its five tiles and every marker's icon are rebuilt by one
 // renderList, so a point arriving from each of forty phones every ten seconds used to
@@ -1184,16 +1201,43 @@ async function loadLive(){(await fetchAll(()=>sb.from('latest_positions').select
 let RLT=0;
 function rlSoon(){if(RLT)return;RLT=setTimeout(()=>{RLT=0;renderList()},400)}
 function upsert(p){last[p.user_id]=p;const ll=[p.lat,p.lng];
- if(p.accuracy!=null&&+p.accuracy<=0)return;if(markers[p.user_id])markers[p.user_id].setLatLng(ll).setIcon(icon(p));else markers[p.user_id]=L.marker(ll,{icon:icon(p)}).addTo(mapL).bindPopup(()=>pop(last[p.user_id])).on('click',()=>selLive(p.user_id));
+ if(p.accuracy!=null&&+p.accuracy<=0)return;
+ // a pin is only placed when this account's row is the one that represents its vehicle;
+ // the other handset on a shared truck updates its own row silently and stays off the map,
+ // and its old pin goes the moment the fresher report lands, without waiting for the tick
+ let m=markers[p.user_id];
+ if(m)m.setLatLng(ll).setIcon(icon(p));
+ else markers[p.user_id]=m=L.marker(ll,{icon:icon(p)}).bindPopup(()=>pop(last[p.user_id])).on('click',()=>selLive(p.user_id));
+ const win=lvRows().some(x=>x.user_id===p.user_id);
+ if(win)Object.keys(last).forEach(u=>{if(u!==p.user_id&&lvKey(last[u])===lvKey(p)&&markers[u])markers[u].remove()});
+ win&&shown(p)?m.addTo(mapL):m.remove();
+ // the follow stays with the vehicle rather than with the handset that happened to be pinned:
+ // when the other account's report becomes the freshest one, the map moves with it
+ if(PINV&&PINV!==p.user_id&&last[PINV]&&lvKey(last[PINV])===lvKey(p))PINV=p.user_id;
  if(PINV===p.user_id)mapL.panTo(ll);rlSoon()}
 function renderList(){
- const all=Object.values(last),n={go:0,idle:0,park:0,off:0},rp=new Set(all.map(p=>p.vehicle_id));
- all.forEach(p=>{n[st(p)]++;const m=markers[p.user_id];if(!m)return;m.setIcon(icon(p));shown(p)?m.addTo(mapL):m.remove()});
- vehicles.forEach(v=>{if(!rp.has(v.id))n.park++});
+ const all=lvRows(),keep=new Set(all.map(p=>p.user_id)),n={go:0,idle:0,park:0,off:0},rp=new Set(all.map(p=>p.vehicle_id));
+ Object.values(last).forEach(p=>{const m=markers[p.user_id];if(!m)return;m.setIcon(icon(p));keep.has(p.user_id)&&shown(p)?m.addTo(mapL):m.remove()});
+ all.forEach(p=>n[st(p)]++);
+ // a vehicle record this office has never received one position for is not standing in a
+ // parking spot - nobody has ever heard from it at all, which is what Offline means on this
+ // page. It used to land in Parking, so the tile promised a vehicle at rest that the list
+ // below could not show and the server had never seen.
+ const nr=vehicles.filter(v=>!rp.has(v.id));n.off+=nr.length;
  $('k_all').textContent=vehicles.length||all.length;$('k_go').textContent=n.go;$('k_idle').textContent=n.idle;$('k_park').textContent=n.park;$('k_off').textContent=n.off;
- const q=$('q').value.toLowerCase();
- $('liveList').innerHTML=all.filter(p=>shown(p)&&((p.vehicle_name||'')+(p.driver_name||'')).toLowerCase().includes(q)).sort((a,b)=>(a.vehicle_name||'').localeCompare(b.vehicle_name||'')).map(p=>{const s=st(p);
- return `<div class="veh" data-u="${p.user_id}" onclick="mapL.setView([${p.lat},${p.lng}],16);selLive('${p.user_id}');markers['${p.user_id}'].openPopup()"><div class="av" style="background:${COL[s]}"><i class="fa-solid ${vt(p)}"></i></div><div class="t"><b>${esc(p.vehicle_name||'Unassigned')}</b><br><small>${esc(p.driver_name||'-')} · ${agoTxt(p.recorded_at)}</small></div><div class="taR"><b>${spd(p)}</b> <small>km/h</small><br><span class="chip" style="background:${COL[s]}22;color:${COL[s]}">${LBL[s]}</span></div></div>`}).join('')||'<p style="color:var(--mut);padding:8px">No vehicles to show.</p>'}
+ const q=$('q').value.toLowerCase(),sc=SCOPE();
+ const rows=all.filter(p=>shown(p)&&((p.vehicle_name||'')+(p.driver_name||'')).toLowerCase().includes(q))
+  .map(p=>{const s=st(p);return{n:p.vehicle_name||'',h:`<div class="veh" data-u="${p.user_id}" onclick="mapL.setView([${p.lat},${p.lng}],16);selLive('${p.user_id}');markers['${p.user_id}'].openPopup()"><div class="av" style="background:${COL[s]}"><i class="fa-solid ${vt(p)}"></i></div><div class="t"><b>${esc(p.vehicle_name||'Unassigned')}</b><br><small>${esc(p.driver_name||'-')} · ${agoTxt(p.recorded_at)}</small></div><div class="taR"><b>${spd(p)}</b> <small>km/h</small><br><span class="chip" style="background:${COL[s]}22;color:${COL[s]}">${LBL[s]}</span></div></div>`}});
+ // lvRows is built out of position reports, so a record the server has never once heard from
+ // has no row to draw - and the Offline tile above would be counting vehicles the list below
+ // cannot show. Each is drawn from the record itself, under the same vehicle picker, status
+ // filter and search box, in the same name order. There is no position to fly to, so pressing
+ // one does nothing but hold the line.
+ rows.push(...nr.filter(v=>(!sc.length||sc.includes(String(v.id)))&&(FILT==='all'||FILT==='off')&&
+  ((v.name||'')+(v.make_model||'')).toLowerCase().includes(q))
+  .map(v=>({n:v.name||'',h:`<div class="veh"><div class="av" style="background:${COL.off}"><i class="fa-solid ${TI[v.type]||'fa-location-dot'}"></i></div><div class="t"><b>${esc(v.name||'Vehicle')}</b><br><small>No position received yet</small></div><div class="taR"><span class="chip" style="background:${COL.off}22;color:${COL.off}">${LBL.off}</span></div></div>`})));
+ rows.sort((a,b)=>a.n.localeCompare(b.n));
+ $('liveList').innerHTML=rows.map(r=>r.h).join('')||'<p style="color:var(--mut);padding:8px">No vehicles to show.</p>'}
 // ---- history: the period is split into trips (a silence longer than this vehicle's own
 // parked heartbeat, or an ended trip, starts a new one), each with its own colour, layer,
 // details and playback
@@ -1757,23 +1801,16 @@ function renderEvt(){
  const fx=r=>(!EVF.driver||(r.driver_name||'-')===EVF.driver)&&(!EVF.day||dayOf(r)===EVF.day),base=EVR.filter(fx),rows=base.filter(r=>!EVF.type||r.type===EVF.type),ty=cnt(rows,r=>r.type),K=Object.keys(EV);
  const tb=evTb(),ch=Object.entries(EVF).filter(x=>x[1]).map(x=>`<span class="chip chipB">${x[0]}: ${esc(x[0]==='type'?EVX(x[1])[0]:x[1])}</span>`).join(' ');
  // an Events table with no camera icons beside it looks like a camera that recorded
- // nothing, and the one thing an administrator has to be able to tell apart is "no
- // alert happened" from "the handset has not brought its picture in yet". A rule whose
- // own Recording switch is off is a third thing again, and it is not a shortage: its
- // rows are counted out of this before it is ever said. The two numbers here split the
- // remainder the same way the Clip column of each row does, so the summary and the rows
- // can never disagree about how many films are simply still on their way.
+ // nothing, and the one thing an administrator has to be able to tell apart is "no alert
+ // happened" from "the handset has not brought its picture in yet". A rule whose own
+ // Recording switch is off is a third thing again, and it is not a shortage: its rows are
+ // counted out of this before it is ever said. This says only the films still travelling;
+ // the per-row Clip column remains the authority on any single event.
  const cam=rows.filter(r=>DMS[r.type]),film=cam.filter(r=>!(RULES[r.type]&&RULES[r.type].clip===false)),
   ago=r=>Date.now()-new Date(r.recorded_at).getTime(),
-  noClip=film.filter(r=>!r.clip_path&&ago(r)>CLIPWAIT).length,
   waitClip=film.filter(r=>!r.clip_path&&ago(r)<=CLIPWAIT).length,
-  cn=noClip?`<span class="chip chipO">${noClip} of ${film.length} camera events have no recording <span class="hp" data-tip="A recording is made on the handset and travels out with that driver's own events, so it reaches the server only when his phone next has a signal - and a phone that stayed out of signal past a quarter of an hour is a phone this page has stopped counting as still uploading. It is also missing from an event raised by an older build of the app, which kept its pictures on the phone and never sent them, and from an alert fired before the lens had given a single picture. Nothing here is a reason to drop the event: the reading in its Details column stands on its own.">?</span></span>`:'',
-  cw=waitClip?`<span class="chip chipB"><i class="fa-solid fa-hourglass-half"></i> ${waitClip} recording${waitClip==1?'':'s'} still on the handset</span>`:'',
-  // the switch that judges the driver's face is the one setting this table cannot show a
-  // row for: with it off no handset looks at anything, and the empty Events list then
-  // reads the same as a fleet that drives carefully - or as a camera nobody installed.
-  off=SET.dms_on==='1'?'':`<span class="chip chipO"><i class="fa-solid fa-video-slash"></i> Driver camera is switched off for this fleet <span class="hp" data-tip="No handset watches the driver while this stays off: no fatigue, distraction, phone, yawning, eating, drinking, smoking, blocked-camera alert and no recording will ever appear here, however the nine rules below are set. It ships off on purpose - a build that has just learned to look at a face must not start looking at every fleet the moment it updates - so switch it on yourself under &lt;b&gt;Configuration &gt; Driver camera&lt;/b&gt; once the drivers have been told. The phone says the same thing to the driver when a trip starts unwatched.">?</span> <button class="btn gh sm" onclick="switchTab('cfg')">Turn it on</button></span>`;
- $('evFl').innerHTML=[off,tb,ch,cw,cn,rows.length>1000?'<span class="chip chipO"><i class="fa-solid fa-filter-circle-xmark"></i> Showing the newest 1000 of '+rows.length+' events in this period: the search, the page numbers and the exports cover these rows only, so shorten the period to reach the rest.</span>':''].filter(Boolean).join(' ')+((tb||ch)?' <button class="btn gh sm" onclick="evReset()"><i class="fa-solid fa-rotate-left"></i>Reset filter</button>':'');
+  cw=waitClip?`<span class="chip chipB"><i class="fa-solid fa-hourglass-half"></i> ${waitClip} recording${waitClip==1?'':'s'} still on the handset</span>`:'';
+ $('evFl').innerHTML=[tb,ch,cw,rows.length>1000?'<span class="chip chipO"><i class="fa-solid fa-filter-circle-xmark"></i> Showing the newest 1000 of '+rows.length+' events in this period: the search, the page numbers and the exports cover these rows only, so shorten the period to reach the rest.</span>':''].filter(Boolean).join(' ')+((tb||ch)?' <button class="btn gh sm" onclick="evReset()"><i class="fa-solid fa-rotate-left"></i>Reset filter</button>':'');
  // the tiles count without the type filter, so every type stays clickable
  const bt=cnt(base,r=>r.type),ct=(c,i,v,l,js,on)=>tile(c,i,v,l).replace('class="card kpi ',`onclick="${js}" title="Click to show only these" class="card kpi click${on?' on':''} `);
  $('evK').innerHTML=ct('gy','fa-bell',base.length,'Total events',"EVF.type=undefined;renderEvt()",!EVF.type)+K.map(k=>ct(EV[k][3],EV[k][1],bt[k]||0,EV[k][0],`evSet('type','${k}')`,EVF.type===k)).join('');
