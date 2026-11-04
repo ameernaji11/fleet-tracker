@@ -62,17 +62,25 @@ import java.util.Map;
  * same file, the page drains what a refused or expired sign-in left there, and nothing is
  * dropped for a reason the phone could have waited out.
  *
- * The page stays the only writer of *events*. Zones, GPS outages and the camera's own
- * breaches are its business, and the tolerance windows and closing updates that go with
- * them are not copied here - two writers of one breach is how a trip ends up with two
- * overspeed records for one corner. What this adds is the three vehicle warnings a driver
- * would otherwise not hear with his screen off, said out loud only, and only while the page
- * is not there to say them itself.
+ * The page stays the writer of events while the driver is looking at it, and this takes over
+ * the ones it cannot see: a zone the vehicle crossed behind a locked screen, and the three
+ * vehicle warnings a driver would otherwise not hear until he unlocks the phone. Said out
+ * loud only, and only while the page is not there to say them itself. Every one of them is
+ * handed back the moment the page wakes - see {@link #openRows} and {@link #insideZones} - so
+ * two writers of one corner never leave a trip with two overspeed records for one bend.
  */
 class Track {
 
-    /** How often the handset is asked. The page's own watcher speaks about this often too. */
+    /** How often the handset is asked while the vehicle is being driven. The page's own
+     *  watcher speaks about this often too. */
     private static final long SAMPLE_MS = 1000;
+    /** How often the handset is asked when nothing is being driven and no trip is open. The
+     *  queue is still written at the fleet's parked interval - this number only decides how
+     *  long the phone's receiver stays warm, and a floor of a second an hour would not notice
+     *  a drive starting for that same hour, which is the failure this whole runner exists to
+     *  end. The distance below is what answers the moment the vehicle actually moves. */
+    private static final long IDLE_MS = 15000;
+    private static final float IDLE_M = 15f;
     /** As many rows as one request. The page's own queue sends this many at a time. */
     private static final int BATCH = 200;
     /** A phone that never comes back for a signal is a broken phone; newest rows kept. */
@@ -91,14 +99,18 @@ class Track {
 
     private static final String PREFS = "fleet.track";
     private static final String K_SENT = "sent", K_MOV = "moving", K_PARK = "parked",
-            K_URL = "url", K_ANON = "anon", K_SET = "settings", K_WANT = "want", K_PEND = "pending";
+            K_URL = "url", K_ANON = "anon", K_SET = "settings", K_WANT = "want", K_PEND = "pending",
+            K_TRIP = "trip", K_ZONE = "zones";
 
-    /** The three vehicle rules this may speak about - the ones a locked screen cannot. */
+    /** The rules this may speak about: the vehicle's own three, and the zone's three. */
     private static final List<String> RULES = new ArrayList<>();
     static {
         RULES.add("overspeed");
         RULES.add("harsh_acceleration");
         RULES.add("harsh_braking");
+        RULES.add("zone_overspeed");
+        RULES.add("zone_enter");
+        RULES.add("zone_exit");
     }
 
     private final DmsService svc;
@@ -130,6 +142,8 @@ class Track {
     private volatile int movingS = 10, parkedS = 3600;
     private volatile double speedLimit, buf, accelLimit, brakeLimit;
     private final Map<String, Config.Rule> rules = new HashMap<>();
+    /** The shapes the office drew, with the vehicle's state inside each one. */
+    private final List<Zone> zones = new ArrayList<>();
 
     // ---- what this is doing
 
@@ -137,6 +151,16 @@ class Track {
     private LocationManager lm;
     private final List<String> providers = new ArrayList<>();
     private volatile boolean running;
+    /** Whether a trip is open on this phone. See {@link #trip}. */
+    private volatile boolean trip;
+    /** Whether the last fix said the wheels were turning. Decides the beat and the wake lock. */
+    private volatile boolean isMoving;
+    /** Consecutive fixes on each side of the moving line, so one drifting satellite cannot
+     *  decide that the vehicle has started being driven. */
+    private int hotStreak, coldStreak;
+    /** The last moment the beat was changed, so a vehicle crawling in a queue cannot re-tune
+     *  the handset's receiver every second. */
+    private long lastBeat;
     /** Whether {@link #tick} is posted right now. Never more than one clock per trip. */
     private volatile boolean scheduled;
     // True only while a page in this process has handed over a token. Android can restart
@@ -184,7 +208,9 @@ class Track {
         anon = sp.getString(K_ANON, "");
         sent = sp.getLong(K_SENT, 0);
         want = sp.getBoolean(K_WANT, false);
+        trip = sp.getBoolean(K_TRIP, false);
         readSettings(sp.getString(K_SET, null));
+        readZones(sp.getString(K_ZONE, null));
         take(sp.getString(K_PEND, null));
         sp.edit().remove(K_PEND).apply();
         load();
@@ -209,10 +235,16 @@ class Track {
     // ---- the page's commands
 
     /**
-     * Start, or keep, the runner for this trip. Everything the page knows about the
+     * Start, or keep, the runner for this phone. Everything the page knows about the
      * vehicle's own settings arrives here, because a service Android restarts mid-shift has
      * to be sampling at the right intervals before the page has had a chance to speak.
      * Never call this with a token in it - see {@link #token}.
+     *
+     * The order is standing whenever a driver is signed in with a vehicle, not only while a
+     * trip is open: the fleet's two intervals are what the office agreed to be told by, and a
+     * handset that only ever reported during a trip went quiet for the whole of a drive that
+     * began with nobody pressing Start. `trip` is what tells the two apart, and it decides
+     * both the beat and the `ignition` column the office's trip list is cut from.
      */
     void start(JSONObject j) {
         if (j == null) j = new JSONObject();
@@ -228,6 +260,9 @@ class Track {
         buf = j.optDouble("buffer", buf);
         accelLimit = j.optDouble("accelLimit", accelLimit);
         brakeLimit = j.optDouble("brakeLimit", brakeLimit);
+        // an order that says nothing about the trip leaves the flag as this runner holds it,
+        // so a settings re-read cannot quietly end a trip that is being driven
+        if (j.has("trip")) trip = j.optBoolean("trip", trip);
         JSONObject ids = j.optJSONObject("ids");
         if (ids != null) {
             uid = ids.optString("user_id", uid);
@@ -245,9 +280,12 @@ class Track {
                 if (RULES.contains(t)) rules.put(t, Config.Rule.of(t, r));
             }
         }
+        // as with the page's own copy of the shapes: no array is not an empty fleet
+        readZones(j.optJSONArray("zones"));
         sp.edit().putInt(K_MOV, movingS).putInt(K_PARK, parkedS)
                 .putString(K_URL, url).putString(K_ANON, anon)
-                .putString(K_SET, rulesJson()).putBoolean(K_WANT, true).apply();
+                .putString(K_SET, rulesJson()).putString(K_ZONE, zonesJson())
+                .putBoolean(K_WANT, true).putBoolean(K_TRIP, trip).apply();
         want = true;
         if (uid.isEmpty() || vid.isEmpty()) {
             why = "this phone has not been told which vehicle it is driving";
@@ -258,6 +296,7 @@ class Track {
         // the driver and the page both need to hear while it is true.
         if (hostOk(url)) why = "";
         resume();
+        beat();
     }
 
     /**
@@ -274,10 +313,17 @@ class Track {
         trySend();
     }
 
-    /** The trip ended. Stop asking for a position; keep whatever has not been sent. */
-    void stop() {
-        want = false;
-        sp.edit().putBoolean(K_WANT, false).apply();
+    /**
+     * The trip ended. `keep` is the difference between that and this phone going quiet: a
+     * driver who parks has not asked the office to stop seeing his vehicle, so with the flag
+     * up the runner drops the trip and carries on reporting at the fleet's parked interval.
+     * Either way the last point of the trip is written, and nothing that has not been sent is
+     * thrown away.
+     */
+    void stop(boolean keep) {
+        want = keep;
+        trip = false;
+        sp.edit().putBoolean(K_WANT, keep).putBoolean(K_TRIP, false).apply();
         // The last point of a trip is where the office draws its end, and it is the one
         // point the fleet's interval would otherwise hold back for an hour: a driver who
         // stops at the yard gates wants the trip to finish at the gates.
@@ -299,11 +345,21 @@ class Track {
         // as a breach still happening while the driver is at home.
         closeOpen(System.currentTimeMillis());
         latest = null;
+        if (keep) {
+            // The listeners stay where they are; only the beat they are asked on changes, and
+            // the wake lock the trip was holding comes back to Android. A phone that reports
+            // an hourly point all day has no business holding the CPU awake all day.
+            beat();
+            trySend(true);
+            return;
+        }
         running = false;
         close();
         // Urgent: the page has stopped being able to wait on this, and a trip that ends with
         // a batch still on the phone is the gap the office then reads as "not reported".
         trySend(true);
+        DmsService s = svc;
+        if (s != null) s.reporting();
     }
 
     /** Everything still waiting on this phone, given back to the page, and the queue emptied. */
@@ -358,11 +414,12 @@ class Track {
         running = false;
         close();
         want = false;
+        trip = false;
         allowed = false;
         token = "";
         open.clear();
         bad.clear();
-        sp.edit().putBoolean(K_WANT, false).remove(K_PEND).apply();
+        sp.edit().putBoolean(K_WANT, false).putBoolean(K_TRIP, false).remove(K_PEND).remove(K_ZONE).apply();
         synchronized (rows) {
             empty();
         }
@@ -378,7 +435,26 @@ class Track {
         return want;
     }
 
-    /** Whether a trip asked for this runner and has not been told to let go of it. */
+    /** Whether the page has a trip open, as opposed to this phone only keeping the office told. */
+    boolean isTripping() {
+        return trip;
+    }
+
+    /** Whether the last fix said the wheels were turning. */
+    boolean isMoving() {
+        return isMoving;
+    }
+
+    /** The zones this runner has the vehicle inside, for a page that wakes and has to agree. */
+    JSONArray insideZones() {
+        JSONArray a = new JSONArray();
+        for (Zone z : zones) {
+            if (z.known && z.inside) a.put(z.id);
+        }
+        return a;
+    }
+
+    /** Whether this phone was told to keep reporting and has not been given back. */
     static boolean wanted(Context c) {
         try {
             return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(K_WANT, false);
@@ -453,13 +529,49 @@ class Track {
     private void add(String p) {
         if (providers.contains(p) || lm == null) return;
         try {
-            lm.requestLocationUpdates(p, SAMPLE_MS, 0f, onFix, Looper.getMainLooper());
+            lm.requestLocationUpdates(p, hot() ? SAMPLE_MS : IDLE_MS, hot() ? 0f : IDLE_M,
+                    onFix, Looper.getMainLooper());
             providers.add(p);
         } catch (SecurityException e) {
             error = "the trip is not allowed to know where it is: allow location \"all the time\"";
         } catch (Exception e) {
             // a provider that refuses one handset answers the next one
         }
+    }
+
+    /** Whether this phone needs its receiver warm: a trip open, or the wheels genuinely turning. */
+    private boolean hot() {
+        return trip || isMoving;
+    }
+
+    /** Take the listeners off without touching the clock that renews them. */
+    private void drop() {
+        if (lm == null) return;
+        try {
+            lm.removeUpdates(onFix);
+        } catch (Exception ignore) {
+            // as in close()
+        }
+        providers.clear();
+    }
+
+    /**
+     * Re-ask the handset at the beat its own state now says, and tell the service whether it
+     * still needs the CPU. The points the office is given are still cut by the fleet's two
+     * intervals - this only decides how long the phone's receiver stays warm and its sleep
+     * held off, which is what makes reporting an hourly heartbeat around the clock something
+     * a driver's handset can be asked to do. Rate-limited, because a queue at a junction
+     * crosses the moving line every few seconds and each re-subscribe costs more than it saves.
+     */
+    private void beat() {
+        long n = System.currentTimeMillis();
+        if (running && n - lastBeat > 20000) {
+            lastBeat = n;
+            drop();
+            listen();
+        }
+        DmsService s = svc;
+        if (s != null) s.reporting();
     }
 
     private void close() {
@@ -554,7 +666,22 @@ class Track {
         double acc = loc.hasAccuracy() ? loc.getAccuracy() : Double.NaN;
         double hd = loc.hasBearing() ? loc.getBearing() : Double.NaN;
         lastFixAt = SystemClock.elapsedRealtime();
-        boolean moving = kmh >= MOVING_KMH;
+        // Three readings on one side of the line before this says the vehicle started, or
+        // stopped, being driven. A handset left on a seat reads a satellite drift of 4 km/h
+        // now and then, and a runner that believed each one of them would report at the
+        // driving interval all day, hold the phone's CPU awake for a vehicle that had not
+        // moved, and - the part an office would notice - cut a trip out of the drift.
+        if (kmh >= MOVING_KMH) {
+            hotStreak++;
+            coldStreak = 0;
+        } else {
+            coldStreak++;
+            hotStreak = 0;
+        }
+        boolean was = isMoving;
+        if (!isMoving && hotStreak >= 3) isMoving = true;
+        else if (isMoving && coldStreak >= 3) isMoving = false;
+        if (isMoving != was) beat();
 
         // The camera judges frames with the screen off and the page asleep, and it can only
         // say where a breach happened, or how fast the vehicle was going, from the reading it
@@ -585,17 +712,18 @@ class Track {
         }
         double lim = speedLimit + buf;
         watch("overspeed", lim > 0 && kmh > lim, kmh, loc, at);
+        zoneCheck(loc, kmh, at);
 
-        JSONObject p = row(loc, at, kmh, acc, moving);
+        JSONObject p = row(loc, at, kmh, acc, isMoving);
         if (p == null) return;
         latest = p;
         latestAt = at;
 
-        double every = (moving ? movingS : parkedS) * 1000.0;
+        double every = (isMoving ? movingS : parkedS) * 1000.0;
         long n = System.currentTimeMillis();
         double turn = Double.isNaN(hd) || Double.isNaN(heading) ? 0
                 : Math.min(Math.abs(hd - heading), 360 - Math.abs(hd - heading));
-        boolean corner = moving && turn >= TURN_DEG && n - lastSent > 1200;
+        boolean corner = isMoving && turn >= TURN_DEG && n - lastSent > 1200;
         if (!first && n - lastSent < every - 500 && !corner) return;
         first = false;
         lastSent = n;
@@ -627,7 +755,11 @@ class Track {
             // keeps saying 4 km/h is how a trip reads as a slow crawl across a depot
             p.put("speed", moving ? (double) Math.round(kmh) : 0);
             p.put("recorded_at", Outbox.iso(at));
-            p.put("ignition", true);
+            // The column the office's trip list is cut from. A point taken while a trip is open
+            // says the vehicle is being driven even when it is standing at a light; a rest
+            // heartbeat outside a trip says neither, so it reaches the map and the live list
+            // without becoming a trip of its own.
+            p.put("ignition", trip || moving);
             if (!Double.isNaN(acc)) p.put("accuracy", round1(acc));
             if (loc.hasAltitude()) p.put("altitude", round1(loc.getAltitude()));
             if (loc.hasBearing()) p.put("heading", (double) Math.round(loc.getBearing()));
