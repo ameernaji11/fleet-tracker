@@ -44,15 +44,29 @@ import java.util.concurrent.Executors;
  * is here instead, in a service of type camera, which is the one form of background
  * work Android allows an app that holds the lens to do at all.
  *
- * The page is still the only thing in this app that talks to the database. What it
- * gets back from here is the same out-of-coverage queue the vehicle's own alerts
- * already use, so the driver's rights and the row guards on the events table are what
- * decide what is stored, and a phone with no signal loses nothing.
+ * Most of the talking to the database is still done by the page, and everything this service
+ * decides for itself goes into the same out-of-coverage queue the vehicle's own alerts already
+ * use, so the driver's rights and the row guards on the events table are what decide what is
+ * stored, and a phone with no signal loses nothing. It is the page, and only the page, that
+ * asks for the lens: an order that wants only this vehicle's positions never binds a camera,
+ * and neither does an Android restart that carries no ask of its own.
  */
 public class DmsService extends Service implements LifecycleOwner {
 
     public static final String ACTION_START = "com.fleet.dms.START";
     public static final String ACTION_STOP = "com.fleet.dms.STOP";
+    /**
+     * Positions and the vehicle's own warnings only. Nothing in this start asks for a lens,
+     * and nothing on this road opens one: a phone that keeps the office told where the vehicle
+     * is stands no driver in front of a camera.
+     */
+    public static final String ACTION_TRACK = "com.fleet.dms.TRACK";
+    /**
+     * Put the lens away and stay alive. This is what a trip end and a driver's own camera
+     * button both ask for on a handset that still owes the office its positions: the watch
+     * ends, the reporting does not.
+     */
+    public static final String ACTION_LENS = "com.fleet.dms.LENS";
     // Which of the page's two reasons for opening the lens this start is: a trip, or the
     // driver's own watch. See tripWanted.
     public static final String EXTRA_TRIP = "com.fleet.dms.TRIP";
@@ -142,6 +156,11 @@ public class DmsService extends Service implements LifecycleOwner {
     // judges every frame and turns what it sees into a warning, a row and a clip; a watch
     // is a mirror held up to a man who may be parked in his own yard, and files nothing.
     private volatile boolean judged;
+    // Whether the page has asked for the lens and not taken that ask back. A settings order
+    // can arrive at any minute of the day, and the office switching the watch on for a whole
+    // fleet is not a driver asking for a camera over his own seat: only this flag lets a
+    // config change bind a lens.
+    private volatile boolean lensAsked;
     // Set in onDestroy, before anything is put down. Every thread but this one is
     // stopped by it, because it is the answer the frame callback gives on its way in.
     private volatile boolean dead;
@@ -222,18 +241,26 @@ public class DmsService extends Service implements LifecycleOwner {
             stopSelf();
             return START_NOT_STICKY;
         }
-        // The page has two reasons to ask for the lens: a trip, whose frames are judged
-        // and turned into warnings, rows and clips, and the driver's own watch, which is
-        // only a picture for him. Android's restart carries neither, so the last
-        // instruction on disk decides it.
-        hold(intent != null ? intent.getBooleanExtra(EXTRA_TRIP, false) : tripWanted(this));
-        // Android may hand back a null intent when it has had to restart this service
-        // after a kill. Whether it should be running again is then the page's own last
-        // instruction, which is what the trip flag on disk records - and since the trip's
-        // positions are kept here too, a fleet that has the driver camera switched off is no
-        // longer a service with nothing left to do: it is the only thing still reporting
-        // where the vehicle is.
-        if (intent == null && !Track.wanted(this) && (!tripWanted(this) || !cfg.on)) stopSelf();
+        // The page has four reasons to be here: a trip, whose frames are judged and turned
+        // into warnings, rows and clips; the driver's own watch, which is only a picture for
+        // him; putting either of those away on a phone that still has to report positions; and
+        // the positions themselves, which this phone reports whether or not anybody has ever
+        // pressed Start. Only the first two may have a lens in them.
+        if (ACTION_TRACK.equals(act)) {
+            reporting();
+        } else if (ACTION_LENS.equals(act)) {
+            releaseLens();
+        } else if (intent != null) {
+            hold(intent.getBooleanExtra(EXTRA_TRIP, false));
+        } else {
+            // Android's own restart carries no ask of any kind, so the lens is only opened
+            // again for a trip this app was holding when its process died. A phone that had
+            // been reporting positions comes back to reporting positions - collecting from the
+            // first second, and sending again once a page can lend it a sign-in.
+            if (tripWanted(this) && cfg.on) hold(true);
+            else if (Track.wanted(this) || tripWanted(this)) reporting();
+            else stopSelf();
+        }
         return START_STICKY;
     }
 
@@ -348,6 +375,11 @@ public class DmsService extends Service implements LifecycleOwner {
      */
     void hold(boolean tripping) {
         judged = tripping;
+        // This is the only place a lens is ever asked for: the page's own two buttons. An
+        // order that only wants this vehicle's positions, and an Android restart that carries
+        // no ask at all, both leave it down - which is what makes "the watch is switched off,
+        // so the camera must not work" hold against every way this service can come back.
+        lensAsked = true;
         tripSet(this, tripping);
         if (dead) return;
         if (wake != null && !wake.isHeld()) wake.acquire();
@@ -355,9 +387,7 @@ public class DmsService extends Service implements LifecycleOwner {
         // The notice is the one thing a driver can read with his screen off, so it says what
         // this service is doing for his trip rather than only what its camera is doing: a
         // fleet with the lens switched off still has its positions reported from here.
-        foreground(!cfg.on ? (track != null && track.isRunning()
-                ? "Reporting this trip to the office" : "Driver monitoring is switched off")
-                : tripping ? "Watching the driver" : "Driver camera open, no trip running");
+        foreground(notice());
     }
 
     /**
@@ -374,9 +404,106 @@ public class DmsService extends Service implements LifecycleOwner {
         else main.post(() -> hold(tripping));
     }
 
+    /**
+     * The line this service writes into its own notice. It has to say what the handset is
+     * really doing for this driver, which is not only what its camera is doing: a fleet that
+     * has switched the watch off, or a phone sitting between trips with no ask for a lens,
+     * still spends its day reporting where the vehicle is.
+     */
+    private String notice() {
+        if (lensAsked && cfg.on) {
+            return judged ? "Watching the driver" : "Driver camera open, no trip running";
+        }
+        Track t = track;
+        if (t != null && (t.isRunning() || t.isTripping())) {
+            return "Reporting this vehicle's position to the office";
+        }
+        return cfg.on ? "Driver camera closed: no trip is running"
+                : "Driver monitoring is switched off";
+    }
+
+    /**
+     * The service doing nothing but keeping the office told where this vehicle is, and warning
+     * its driver about the road: no lens, no frames, nothing judged.
+     *
+     * This is what a signed-in handset spends most of its day doing, so the wake lock follows
+     * the vehicle rather than the service - held while a trip is open or the wheels are
+     * turning, given back the moment it is standing with no trip asked for. A phone that keeps
+     * Android's CPU awake to say once an hour that a van is in a yard is a phone its driver
+     * unplugs at the end of his shift, and a dead handset reports nothing at all.
+     *
+     * Nothing here opens or closes a camera. The lens belongs to the page's own two asks, and
+     * the only thing that puts it away is the settings order that says the watch is off.
+     */
+    void reporting() {
+        if (isMain()) reportNow();
+        else main.post(this::reportNow);
+    }
+
+    private void reportNow() {
+        if (dead) return;
+        Track t = track;
+        boolean driving = t != null && (t.isTripping() || t.isMoving());
+        if (wake != null) {
+            if (driving && !wake.isHeld()) wake.acquire();
+            else if (!driving && wake.isHeld()) wake.release();
+        }
+        foreground(notice());
+    }
+
     void stopFromPage() {
         if (isMain()) stopSelf();
         else main.post(this::stopSelf);
+    }
+
+    /**
+     * The page has taken its ask for the lens back: the trip is over, or the driver closed the
+     * camera himself. The watch goes, and this service stays alive doing only what the office
+     * asked of a signed-in handset - saying where the vehicle is.
+     *
+     * This is the one thing that makes the driver's own stop survive a service that Android
+     * brings back a minute later. The trip marker goes down with the lens, so the restarted
+     * instance has no ask left to honour and opens nothing.
+     */
+    void releaseLens() {
+        if (isMain()) putLensDown();
+        else main.post(this::putLensDown);
+    }
+
+    /**
+     * Whether this handset still owes the office its positions once its lens goes: the runner
+     * alive in front of us, or an order on disk for one that is not. This is what decides
+     * whether the page's stop is a camera going away or the whole service going with it, and a
+     * signed-in phone is nearly always the first.
+     */
+    boolean keepsReporting() {
+        Track t = track;
+        return (t != null && t.isRunning()) || Track.wanted(this);
+    }
+
+    private void putLensDown() {
+        lensAsked = false;
+        judged = false;
+        tripSet(this, false);
+        closeCamera();
+        if (dead) return;
+        ExecutorService e = analysis;
+        if (e != null) {
+            try {
+                // an open breach and the ring of pictures are the camera thread's own
+                // business, so they are cleared there rather than beside a frame
+                e.execute(() -> {
+                    rules.reset();
+                    clip.finish();
+                });
+            } catch (Throwable ignore) {
+                // a thread that will not take the chore has already been told to stop
+            }
+        }
+        // The wake lock and the notice both follow the vehicle from here: a trip that has
+        // just ended with the wheels still turning keeps reporting, and one that is standing
+        // in a yard gives the CPU back to Android.
+        reportNow();
     }
 
     void applyNewConfig(Config next) {
@@ -386,7 +513,7 @@ public class DmsService extends Service implements LifecycleOwner {
         reader.wantObjects(Rules.needsObjects(next));
         clip.setRate(next.fps);
         clip.age(next.keepD);
-        if (next.on && !cameraOn) openCamera();
+        if (next.on && lensAsked && !cameraOn) openCamera();
         if (!next.on) {
             // switched off mid-trip: the lens goes back, because one camera can only be
             // held by one app and a driver who has turned this off should not be blocking
@@ -406,7 +533,7 @@ public class DmsService extends Service implements LifecycleOwner {
                 }
             }
         }
-        foreground(next.on ? "Watching the driver" : "Driver monitoring is switched off");
+        foreground(notice());
     }
 
     /** The fix the app already has, so an event can say where the vehicle was. */
@@ -432,6 +559,10 @@ public class DmsService extends Service implements LifecycleOwner {
     }
 
     void clearAll() {
+        // Sign-out: nothing on this phone belongs to that driver any more, and an account
+        // that has no page holding it has no ask for a lens either.
+        lensAsked = false;
+        judged = false;
         outbox.clear();
         clip.clearAll();
         if (track != null) track.clearDown();

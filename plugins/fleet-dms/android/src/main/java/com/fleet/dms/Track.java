@@ -210,7 +210,7 @@ class Track {
         want = sp.getBoolean(K_WANT, false);
         trip = sp.getBoolean(K_TRIP, false);
         readSettings(sp.getString(K_SET, null));
-        readZones(sp.getString(K_ZONE, null));
+        readZones(kept(sp.getString(K_ZONE, null)));
         take(sp.getString(K_PEND, null));
         sp.edit().remove(K_PEND).apply();
         load();
@@ -775,7 +775,205 @@ class Track {
         return p;
     }
 
-    // ---- the three vehicle alerts the page cannot hear with its screen off
+    // ---- the zones the office drew
+
+    /**
+     * One geofence: the ring of corners it was drawn with, and the three switches the
+     * dashboard's Geofences panel has for it. `known` is false until the first fix has said
+     * which side of the boundary this phone is on, because nothing can report a crossing that
+     * happened while the runner had no shape to test against.
+     */
+    private static final class Zone {
+        String id = "", name = "";
+        double limit;
+        boolean enter = true, exit = true, over = true;
+        double[] la = new double[0], ln = new double[0];
+        boolean inside, known;
+    }
+
+    /** The zone this runner last found the vehicle inside, whose own limit is lowest. */
+    private Zone tight;
+
+    /**
+     * The shapes as this phone kept them. A file this cannot read is no answer at all rather
+     * than an empty fleet: {@link #readZones} keeps what it already holds for a null, and the
+     * last thing a service Android restarted should do is cross every zone in silence because
+     * one byte of its own storage tore.
+     */
+    private static JSONArray kept(String raw) {
+        if (raw == null || raw.isEmpty()) return null;
+        try {
+            return new JSONArray(raw);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Replace the shapes the fixes are tested against.
+     *
+     * No array at all is not an empty fleet: the page's own settings read can fail to answer,
+     * and a runner that took that to mean "this fleet has no zones" would go on crossing
+     * every one of them in silence. A zone whose corners are unchanged keeps the state it had,
+     * so the five-minute re-read of the same setup cannot lose a crossing in progress; a
+     * redrawn one loses its baseline, which is the honest answer about a boundary that moved.
+     */
+    private void readZones(JSONArray a) {
+        if (a == null) return;
+        Map<String, Zone> had = new HashMap<>();
+        for (Zone z : zones) had.put(z.id, z);
+        List<Zone> next = new ArrayList<>();
+        for (int i = 0; i < a.length(); i++) {
+            JSONObject j = a.optJSONObject(i);
+            if (j == null) continue;
+            Zone z = new Zone();
+            z.id = j.optString("id", "");
+            if (z.id.isEmpty()) continue;
+            z.name = j.optString("name", "");
+            double lim = j.optDouble("limit", 0);
+            z.limit = usable(lim) && lim > 0 ? lim : 0;
+            z.enter = j.optBoolean("enter", true);
+            z.exit = j.optBoolean("exit", true);
+            z.over = j.optBoolean("overspeed", true);
+            JSONArray pts = j.optJSONArray("pts");
+            if (pts == null || pts.length() < 3) continue;
+            int n = 0;
+            for (int k = 0; k < pts.length(); k++) {
+                JSONArray p = pts.optJSONArray(k);
+                if (p == null || p.length() < 2) continue;
+                double x = p.optDouble(0, Double.NaN), y = p.optDouble(1, Double.NaN);
+                if (!usable(x) || !usable(y)) continue;
+                n++;
+            }
+            if (n < 3) continue;
+            z.la = new double[n];
+            z.ln = new double[n];
+            int at = 0;
+            for (int k = 0; k < pts.length(); k++) {
+                JSONArray p = pts.optJSONArray(k);
+                if (p == null || p.length() < 2) continue;
+                double x = p.optDouble(0, Double.NaN), y = p.optDouble(1, Double.NaN);
+                if (!usable(x) || !usable(y)) continue;
+                z.la[at] = x;
+                z.ln[at] = y;
+                at++;
+            }
+            Zone old = had.get(z.id);
+            if (old != null && !moved(old, pts)) {
+                z.inside = old.inside;
+                z.known = old.known;
+            }
+            next.add(z);
+        }
+        zones.clear();
+        zones.addAll(next);
+    }
+
+    private static boolean usable(double x) {
+        return !Double.isNaN(x) && !Double.isInfinite(x);
+    }
+
+    /** The corners are not the ones this runner was holding, so its state cannot carry over. */
+    private static boolean moved(Zone z, JSONArray pts) {
+        if (z.la.length != pts.length()) return true;
+        for (int i = 0; i < pts.length(); i++) {
+            JSONArray p = pts.optJSONArray(i);
+            if (p == null || p.length() < 2) return true;
+            if (p.optDouble(0, Double.NaN) != z.la[i] || p.optDouble(1, Double.NaN) != z.ln[i]) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Driving into a zone, out of one, or past its own limit, read from the fix the fleet's
+     * interval is being cut by.
+     *
+     * The rows are only ever written with the page asleep, exactly as the vehicle breaches
+     * are: while the driver is looking at his app that page runs the same test on the same
+     * shapes, and two writers of one crossing is how a trip ends up with an entered and a left
+     * record for a vehicle that never moved. The inside-set travels back in the status either
+     * way, so a page that wakes agrees with this one before it tests its next fix.
+     */
+    private void zoneCheck(Location loc, double kmh, long at) {
+        if (zones.isEmpty()) {
+            tight = null;
+            return;
+        }
+        boolean quiet = svc != null && svc.pageAsleep();
+        double lat = loc.getLatitude(), lng = loc.getLongitude();
+        for (Zone z : zones) {
+            boolean on = inside(z, lat, lng);
+            boolean was = z.inside;
+            boolean fresh = !z.known;
+            z.inside = on;
+            z.known = true;
+            if (fresh || on == was || !quiet) continue;
+            if (on && z.enter) zEvent("zone_enter", z, loc, at, kmh);
+            else if (!on && z.exit) zEvent("zone_exit", z, loc, at, kmh);
+        }
+        Zone best = null;
+        for (Zone z : zones) {
+            if (!z.inside || !z.over || z.limit <= 0) continue;
+            if (best == null || z.limit < best.limit) best = z;
+        }
+        tight = best;
+        Config.Rule r = rules.get("zone_overspeed");
+        double over = r == null ? 0 : Math.max(0, r.threshold);
+        watch("zone_overspeed", best != null && kmh > best.limit + over, kmh, loc, at,
+                best == null ? 0 : best.limit + over, best);
+    }
+
+    /** The page's own point-in-polygon test, on the same shape: a crossing must not read
+     *  differently in the two hands it can be tested by. */
+    private static boolean inside(Zone z, double lat, double lng) {
+        boolean c = false;
+        for (int i = 0, j = z.la.length - 1; i < z.la.length; j = i++) {
+            double ai = z.la[i], aj = z.la[j], bi = z.ln[i], bj = z.ln[j];
+            if ((bi > lng) != (bj > lng) && lat < (aj - ai) * (lng - bi) / (bj - bi) + ai) c = !c;
+        }
+        return c;
+    }
+
+    /**
+     * A crossing the page never saw. The row is the page's own shape - a moment, closed one
+     * second after itself, with the zone's limit beside it - and it goes into the same outbox
+     * the camera's events use, which is the one queue in this app that survives a sign-in, a
+     * dead spot and a process Android killed. The page files it under its own live session when
+     * it drains, so the row guards still decide what it becomes.
+     */
+    private void zEvent(String type, Zone z, Location loc, long at, double kmh) {
+        DmsService s = svc;
+        if (s == null) return;
+        Config.Rule r = rules.get(type);
+        if (r != null && !r.on) return;
+        String cid = java.util.UUID.randomUUID().toString();
+        String detail = (type.equals("zone_enter") ? "Entered " : "Left ")
+                + (z.name.isEmpty() ? "zone" : z.name)
+                + (z.limit > 0 ? " · limit " + Math.round(z.limit) + " km/h" : "");
+        JSONObject p = s.row(type, cid, at, (double) Math.round(kmh), detail);
+        JSONObject item = new JSONObject();
+        try {
+            // a zone change is a moment, not a breach that grows, so it closes after itself -
+            // the same second the page gives it, for the same reason: a blank duration column
+            // reads as lost data to the office
+            p.put("ended_at", Outbox.iso(at + 1000));
+            if (z.limit > 0) p.put("road_limit", (double) Math.round(z.limit));
+            item.put("op", "ev").put("cid", cid).put("clip", null).put("p", p);
+        } catch (Exception ignore) {
+            // JSONObject only throws on a null key, and none of these are null
+        }
+        s.outbox().add(item);
+        s.pageEvent();
+        // the office's Alert / Buzzer / Voice switches for the crossing itself, behind the same
+        // 60 second guard every other warning on this phone uses
+        if (r != null && r.alert) {
+            sound(type, r, Math.round(kmh) + " km/h"
+                    + (z.limit > 0 ? " against a " + Math.round(z.limit) + " km/h zone limit" : ""),
+                    kmh, at);
+        }
+    }
+
+    // ---- the alerts the page cannot hear with its screen off
 
     /**
      * One breach of one of the vehicle's own rules, as the runner saw it.
@@ -792,13 +990,22 @@ class Track {
         String cid = "";
         long start, last;
         double val, peak, kmh, lat, lng, alt, hdg;
+        /** The level this breach was judged against, and the zone it belongs to: the fleet's
+         *  own alert level for everything except a zone's limit, which is the one threshold in
+         *  this app that moves with the ground the vehicle is on. */
+        double lim;
+        Zone z;
         boolean row, adopted;
     }
 
     private void watch(String type, boolean isBad, double val, Location loc, long at) {
+        watch(type, isBad, val, loc, at, speedLimit + buf, null);
+    }
+
+    private void watch(String type, boolean isBad, double val, Location loc, long at, double lim, Zone z) {
         double acc = loc.hasAccuracy() ? loc.getAccuracy() : Double.NaN;
         if (Double.isNaN(acc) || acc > MAX_ACC) return;
-        if (!type.equals("overspeed")) lastA = val;
+        if (!isSpeed(type)) lastA = val;
         double kmh = loc.hasSpeed() ? Math.max(0, loc.getSpeed() * 3.6) : 0;
         Config.Rule r = rules.get(type);
         Boolean was = bad.get(type);
@@ -823,6 +1030,8 @@ class Track {
             b.start = b.last = at;
             b.val = b.peak = val;
             b.kmh = kmh;
+            b.lim = lim;
+            b.z = z;
             b.lat = loc.getLatitude();
             b.lng = loc.getLongitude();
             b.alt = loc.hasAltitude() ? loc.getAltitude() : Double.NaN;
@@ -835,7 +1044,7 @@ class Track {
         }
         if (Math.abs(val) > Math.abs(b.peak)) {
             b.peak = val;
-            if (type.equals("overspeed")) b.kmh = kmh;
+            if (isSpeed(type)) b.kmh = kmh;
         }
         b.last = at;
         // The row follows the page's two rules exactly: it is written once the breach has
@@ -843,19 +1052,37 @@ class Track {
         // stop is its own evidence, so it is written from the sample that peaked.
         if (!b.row && b.adopted) b.row = true;
         if (!b.row && s.pageAsleep()
-                && (type.equals("overspeed") ? at - b.start >= (long) (r.holdS * 1000) : true)) {
+                && (isSpeed(type) ? at - b.start >= (long) (r.holdS * 1000) : true)) {
             writeBreach(type, r, b);
         }
     }
 
+    /** The two rules that are a speed held over seconds, rather than a pedal that peaked. */
+    private static boolean isSpeed(String type) {
+        return type.equals("overspeed") || type.equals("zone_overspeed");
+    }
+
     private void sound(String type, Config.Rule r, Breach b, long at) {
-        if (at - sounded.getOrDefault(type, 0L) < 60000) return;
-        sounded.put(type, at);
-        String detail = type.equals("overspeed")
-                ? Math.round(b.kmh) + " km/h against a limit of " + Math.round(speedLimit + buf) + " km/h"
+        String detail = isSpeed(type)
+                ? Math.round(b.kmh) + " km/h against a limit of " + Math.round(b.lim) + " km/h"
+                + (b.z != null ? " in " + zName(b.z) : "")
                 : Math.abs(round1(b.val)) + " km/h/s "
                 + (type.equals("harsh_braking") ? "of braking" : "of acceleration");
-        svc.announced(type, detail, b.val, r);
+        sound(type, r, detail, b.val, at);
+    }
+
+    /** What the office called the zone, or the one word a nameless shape is answered by. */
+    private static String zName(Zone z) {
+        return z != null && !z.name.isEmpty() ? z.name : "zone";
+    }
+
+    /** The one warning clock: a type this has spoken about in the last minute stays silent. */
+    private void sound(String type, Config.Rule r, String detail, double val, long at) {
+        DmsService s = svc;
+        if (s == null) return;
+        if (at - sounded.getOrDefault(type, 0L) < 60000) return;
+        sounded.put(type, at);
+        s.announced(type, detail, val, r);
     }
 
     /**
@@ -872,6 +1099,10 @@ class Track {
         JSONObject p = s.row(type, b.cid, b.start, num(type, b, false), text(type, r, b, false));
         JSONObject item = new JSONObject();
         try {
+            // the zone's own limit sits in its own column, exactly as the page puts it there,
+            // so the Events table can tell a fleet limit from a school-road one without reading
+            // the words
+            if (b.z != null && b.z.limit > 0) p.put("road_limit", (double) Math.round(b.z.limit));
             item.put("op", "ev").put("cid", b.cid).put("clip", null).put("p", p);
         } catch (Exception ignore) {
             // JSONObject only throws on a null key, and none of these are null
@@ -901,7 +1132,7 @@ class Track {
 
     /** The number the Events table sorts on: km/h for a limit, km/h/s for a pedal. */
     private static Double num(String type, Breach b, boolean closed) {
-        double x = type.equals("overspeed")
+        double x = isSpeed(type)
                 ? (closed ? Math.max(b.kmh, b.peak) : b.kmh)
                 : (closed ? b.peak : b.val);
         return Math.round(x * 10) / 10.0;
@@ -914,9 +1145,11 @@ class Track {
      */
     private String text(String type, Config.Rule r, Breach b, boolean closed) {
         long dur = Math.max(0, (closed ? Math.max(b.last, b.start) : b.start) - b.start) / 1000;
-        if (type.equals("overspeed")) {
-            String sb = Math.round(b.kmh) + " km/h against a "
-                    + Math.round(speedLimit + buf) + " km/h alert level";
+        if (isSpeed(type)) {
+            // the zone says which of its own limits applied, because that is the only thing
+            // that tells the office why this one row was raised at 60 and the next at 90
+            String sb = Math.round(b.kmh) + " km/h against a " + Math.round(b.lim)
+                    + " km/h alert level" + (b.z != null ? " in " + zName(b.z) : "");
             // "held over N s" is what the tolerance is for, and the page only ever says it
             // when the fleet has actually set one
             if (r.holdS > 0) sb += " held over " + (long) r.holdS + " s";
@@ -1270,6 +1503,34 @@ class Track {
         return a.toString();
     }
 
+    /**
+     * The shapes this runner tests, written back the way the page sent them, so a service
+     * Android had to bring back crosses the fleet's zones from its first fix instead of
+     * waiting for a page that may not wake for hours. Which side of each boundary the vehicle
+     * was last found on is deliberately not in here: after a restart the first fix only sets
+     * the baseline, and a crossing nobody measured is not one to report.
+     */
+    private String zonesJson() {
+        JSONArray a = new JSONArray();
+        for (Zone z : zones) {
+            JSONObject j = new JSONObject();
+            try {
+                JSONArray pts = new JSONArray();
+                for (int i = 0; i < z.la.length; i++) {
+                    pts.put(new JSONArray().put(z.la[i]).put(z.ln[i]));
+                }
+                j.put("id", z.id).put("name", z.name).put("limit", z.limit)
+                        .put("enter", z.enter).put("exit", z.exit).put("overspeed", z.over)
+                        .put("pts", pts);
+            } catch (Exception ignore) {
+                // JSONObject and JSONArray only throw on a null key or a NaN, and neither of
+                // these can be either: the id is required and the corners are screened twice
+            }
+            a.put(j);
+        }
+        return a.toString();
+    }
+
     private void readSettings(String raw) {
         if (raw == null || raw.isEmpty()) return;
         JSONArray a;
@@ -1292,7 +1553,14 @@ class Track {
     }
 
     private void startFrom(JSONObject j) {
-        if (j.has("url")) url = j.optString("url", url);
+        // the same gate as an order that arrives from the page: this one was read off the
+        // phone's own storage, and neither route may leave this trip for an address that is
+        // not the fleet's project
+        if (j.has("url")) {
+            String u = j.optString("url", "");
+            if (hostOk(u)) url = u;
+            else why = "the server address kept on this phone is not a Supabase project, so nothing has been sent to it";
+        }
         if (j.has("anon")) anon = j.optString("anon", anon);
         movingS = clamp(j.optInt("movingS", movingS), 1, 3600);
         parkedS = clamp(j.optInt("parkedS", parkedS), 5, 43200);
@@ -1312,6 +1580,8 @@ class Track {
         if (rs != null) {
             for (int i = 0; i < rs.length(); i++) addRule(rs.optJSONObject(i));
         }
+        if (j.has("trip")) trip = j.optBoolean("trip", trip);
+        readZones(j.optJSONArray("zones"));
     }
 
     private void addRule(JSONObject r) {
@@ -1353,10 +1623,12 @@ class Track {
             }
             j.put("running", running).put("wanted", want).put("queued", q).put("sent", sent)
                     .put("movingS", movingS).put("parkedS", parkedS)
+                    .put("trip", trip).put("moving", isMoving)
                     .put("listening", providers.size())
                     .put("sending", allowed && !token.isEmpty())
                     .put("sinceFix", lastFixAt == 0 ? -1
                             : (SystemClock.elapsedRealtime() - lastFixAt) / 1000)
+                    .put("zones", insideZones())
                     .put("sounded", s).put("open", openRows()).put("error", error).put("why", why);
         } catch (Exception ignore) {
             // JSONObject only throws on a null key, and none of these are null

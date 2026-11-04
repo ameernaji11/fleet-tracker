@@ -141,20 +141,30 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
         });
     }
 
-    /** End the trip's watch: the lens goes back to whoever wants it. */
+    /**
+     * End the trip's watch: the lens goes back to whoever wants it.
+     *
+     * A stop used to be one thing - the service going down with the camera. It is now two, and
+     * the difference is what the office sees on the map afterwards. A handset that is signed in
+     * with a vehicle still owes that vehicle's positions every second of the day, so its stop
+     * puts the lens away and leaves the runner alive beside it; only a phone that has nothing
+     * left to report is switched off.
+     */
     @PluginMethod
     public void stop(PluginCall call) {
         safe(call, () -> {
             wantBox = false;
             wantTrip = false;
             DmsService s = DmsService.get();
+            boolean keeps = s != null && s.keepsReporting();
             if (s == null) {
                 // nothing holds the camera, but the flag that tells Android to bring the
                 // service back by itself still has to be cleared
                 DmsService.tripSet(getContext(), false);
             } else {
                 Intent i = new Intent(getContext(), DmsService.class);
-                i.setAction(DmsService.ACTION_STOP);
+                // The lens goes, and the service stays if it still has positions to send.
+                i.setAction(keeps ? DmsService.ACTION_LENS : DmsService.ACTION_STOP);
                 try {
                     getContext().startService(i);
                 } catch (Exception e) {
@@ -162,10 +172,16 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
                     // the cost of swallowing it is a lens left open over a driver nobody is
                     // watching, held by an app that has just been told it stopped.
                     Logger.error("fleet-dms: the camera stop was not accepted, " + name(e), e);
-                    s.stopFromPage();
+                    if (keeps) s.releaseLens();
+                    else s.stopFromPage();
                 }
             }
-            call.resolve();
+            JSObject r = new JSObject();
+            // What the page has to know as well as that the lens is down: a stop that leaves a
+            // runner behind is a phone still reporting, and one that did not is a phone the
+            // office will read as gone quiet.
+            r.put("reporting", keeps);
+            call.resolve(r);
         });
     }
 
@@ -298,25 +314,33 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
     // ---- the trip's own position runner
 
     /**
-     * Hand the trip to the part of this app that Android does not freeze.
+     * Hand the vehicle's positions to the part of this app that Android does not freeze.
      *
-     * The order carries the server, the vehicle and the two recording intervals, and never a
-     * sign-in: {@link #trackToken} is the only method that takes one, and it is only ever
-     * kept in memory. A service that has to be started by this call is given the order on
-     * disk instead, which is how a trip Android had to bring back by itself starts taking
+     * The order carries the server, the vehicle, the two recording intervals, the road limits
+     * the office drew and the flag that says whether a trip is open, and never a sign-in:
+     * {@link #trackToken} is the only method that takes one, and it is only ever kept in
+     * memory. A service that has to be started by this call is given the order on disk
+     * instead, which is how a stretch Android had to bring back by itself starts taking
      * positions again before the page has woken up - collecting, and sending nothing until a
      * page that can see itself hands over a token again.
+     *
+     * A driver who can see this page may be asking for two different things with the same
+     * call: the office's positions, which every signed-in handset wants all day, and the
+     * camera that only a trip or his own watch may have. Only the first of these is what
+     * reaches a service that is not already alive - an order to report positions must never
+     * be the thing that lights a lens over a man who did not ask for one.
      */
     @PluginMethod
     public void trackStart(PluginCall call) {
         safe(call, () -> {
             JSONObject order = call.getObject("cfg");
+            boolean tripping = order != null && order.optBoolean("trip", false);
             DmsService s = DmsService.get();
             Track t = s == null ? null : s.track();
             JSObject r = new JSObject();
             if (t == null) {
                 Track.holdOrder(getContext(), order);
-                String why = launch(true);
+                String why = tripping ? launch(true) : launchTrack();
                 DmsService again = DmsService.get();
                 r.put("started", why.isEmpty());
                 r.put("running", again != null);
@@ -377,15 +401,30 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
         });
     }
 
-    /** The trip ended: stop asking where the vehicle is, and keep whatever has not been sent. */
+    /**
+     * The trip ended, or this account signed out.
+     *
+     * {@code keep} is the difference between the two, and it is the whole of #211: a trip that
+     * stops is a vehicle that goes back to a yard and still has to be seen there, while a
+     * sign-out is a handset that belongs to nobody and must go quiet and forget the order. With
+     * {@code keep} the runner is told to stop calling itself a trip, writes its closing point,
+     * and carries on reporting at the parked interval it was configured with.
+     */
     @PluginMethod
     public void trackStop(PluginCall call) {
         safe(call, () -> {
+            boolean keep = call.getBoolean("keep", false);
             DmsService s = DmsService.get();
             Track t = s == null ? null : s.track();
-            if (t != null) t.stop();
-            else Track.dropOrder(getContext());
             JSObject r = new JSObject();
+            if (t != null) {
+                t.stop(keep);
+                // The trip's camera went with the trip, and the page asked for that here in
+                // the same breath; the runner stays, and only the watch is put away.
+                if (!keep) s.releaseLens();
+            } else if (!keep) {
+                Track.dropOrder(getContext());
+            }
             r.put("ran", t != null);
             r.put("status", t == null ? new JSONObject() : t.status());
             call.resolve(r);
@@ -627,6 +666,36 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
     }
 
     // ---- the service
+
+    /**
+     * Ask for the position runner on a phone that has no service alive yet. Answers with the
+     * reason it could not, or an empty string when it did.
+     *
+     * This is the one launch that carries no ask for a lens, and the only one a handset that
+     * is not in the middle of a trip ever makes. Android will not let a background app start
+     * a camera service at all, so a page that wants positions all day would otherwise be
+     * refused by the very rule that is supposed to let it report them.
+     */
+    private String launchTrack() {
+        Context ctx = getContext();
+        Intent i = new Intent(ctx, DmsService.class);
+        i.setAction(DmsService.ACTION_TRACK);
+        try {
+            ContextCompat.startForegroundService(ctx, i);
+            return "";
+        } catch (Throwable t) {
+            Logger.error("fleet-dms: the position runner could not be started", t);
+            // The order is already on disk, so nothing is lost by a service that is already
+            // alive taking it instead of a fresh one: this instance has the same runner, and
+            // it is told to look at that order rather than to open anything.
+            DmsService s = DmsService.get();
+            if (s != null) {
+                s.reporting();
+                return "";
+            }
+            return "this phone would not start the position runner (" + name(t) + ")";
+        }
+    }
 
     /**
      * Hand the order to the camera service. Answers with the reason it could not, or an
