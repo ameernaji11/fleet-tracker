@@ -1303,12 +1303,20 @@ function trkOrder(){const v=asg?.vehicles||{},d=asg?.drivers||{};
   trip:!!(watcher||SRT),
   ids:{user_id:me?me.id:'',vehicle_id:asg?.vehicle_id||'',driver_id:asg?.driver_id||'',
    vehicle_name:v.name||'',driver_name:d.name||''},
-  rules:['overspeed','harsh_acceleration','harsh_braking'].map(t=>RUL[t]).filter(Boolean),
+  // the zone rules travel with the others: the runner is the only thing that can see a
+  // boundary while this page is frozen, and it needs the office's own Alert / Buzzer / Voice
+  // switches for the crossing, not just for the speed inside it
+  rules:['overspeed','harsh_acceleration','harsh_braking','zone_overspeed','zone_enter','zone_exit']
+   .map(t=>RUL[t]).filter(Boolean),
   // the shapes the office drew, and their own limits: the page cannot check a zone with its
   // screen off, and a driver who crossed one behind a locked handset went on being silent
-  zones:(ZONES||[]).filter(z=>z.pts&&z.pts.length>2).map(z=>({id:String(z.id),name:z.name||'',
-   limit:+z.speed_limit||0,enter:z.enter!==false,exit:z.exit!==false,overspeed:z.overspeed!==false,
-   pts:z.pts.map(p=>[+p[0],+p[1]]}))})}
+  zones:(ZONES||[]).filter(z=>z.pts&&z.pts.length>2).map(z=>{
+   const q=z.pts.map(p=>[+p[0],+p[1]]);
+   return{id:String(z.id),name:z.name||'',limit:+z.speed_limit||0,
+    enter:z.enter!==false,exit:z.exit!==false,overspeed:z.overspeed!==false,pts:q};
+  })
+ }
+}
 // Hand the trip over, or hand it over again. The settings are re-read every five minutes and
 // whenever the office changes them, and a runner that kept the old intervals would go on
 // reporting at the wrong beat for the rest of the driver's shift.
@@ -1350,7 +1358,16 @@ function trkPoll(){if(!trkHas()||!me||!asg?.vehicle_id)return;let p=null;
   trkUi(st);
   if(!TRUN)return;
   if(st&&st.sending===false)trkTok();
+  trkZones(st&&st.zones);
   trkAdopt(st&&st.open)}).catch(()=>{})}
+// Which zones the runner says this vehicle is standing inside right now. It has the fixes and
+// the shapes while this page sleeps, so its answer is the baseline the page's own crossing test
+// works from: copy it over every poll and the page can neither write a second "Entered" for a
+// boundary the runner already reported nor miss an "Left" out of a zone it never saw entering.
+// Every zone is answered for, not only the ones listed - a stay the runner has driven out of
+// has to come down here as much as a new one comes up.
+function trkZones(a){if(!a||!a.length&&!ZONES.length)return;
+ ZONES.forEach(z=>{INZ[z.id]=a.some(x=>String(x)===String(z.id))})}
 // The breaches the runner opened while this page was asleep, taken over the moment it wakes:
 // the page has the peak maths, the words the Events table prints, and the closing update the
 // office reads as the end of the breach. `claim` is what stops the runner finishing a row the
@@ -1890,6 +1907,42 @@ async function outSend(r){const v=r.v;
  // of the breach is waiting on this phone under the same id
  if(v.dms)await clipFor(v.id,v.p,1);
  const {error}=await q(sb.from('events').update(v.p).eq('cid',v.id));return {ok:true,error:error&&error.message&&('Event end not saved: '+error.message)}}
+// Why the last batch of positions could not be delivered, in the words the driver sees.
+let POSWHY='',POSBAD={k:'',n:0};
+// A refusal that is this handset's own sign-in rather than the row's - the same answer the
+// background runner calls TOKEN. It is the one refusal that must never throw records away:
+// signing in again makes every one of them deliverable, so the queue keeps them and says why.
+const isAuth=e=>{try{if(!e)return false;return +e.statusCode===401||String(e.code||'').startsWith('PGRST30')||
+ /jwt expired|invalid json web token|invalid token/i.test(String(e.message||e))}catch(x){return false}}
+// One INSERT for the whole batch is what makes a drive cheap to upload - and it was also what
+// could lose a whole one. A batch the server ANSWERS "no" to is refused for a reason that
+// will not change by asking again, and the old code stopped the flush at that answer, so the
+// refused row sat at the head of the queue and everything behind it - the rest of the trip,
+// the zone crossings, the camera alerts - waited for a yes that was never coming. The driver
+// saw a number in brackets and nothing else. So a refused batch is split in two and tried
+// again, and again, until the row nobody will take is the only row in its request: that one
+// goes, out loud, and the rest of the drive lands beside it.
+// Two answers are not split this way, because neither of them says anything about the rows:
+// a request that never reached the server has told us nothing, and a sign-in that has run out
+// is this phone's fault and not the road's. Both keep the batch whole and wait.
+async function posSend(run){
+ const {ok,error}=await outSend({v:{t:'pos',p:run.map(x=>x.v.p)}});
+ if(ok){run.forEach(outDel);SENT+=run.length;localStorage.sent=SENT;POSBAD={k:'',n:0};outUi();return 'gone'}
+ if(!navigator.onLine||noNet(error)){POSWHY='No signal: these records stay on the phone until it returns';return 'wait'}
+ if(isAuth(error)){POSWHY='The phone sign-in has run out: sign in again to send what is waiting';return 'wait'}
+ if(run.length===1){const m=String((error&&error.message)||error);
+  // Splitting is for the row the server will not take, not for a phone it will not take
+  // at all. The same answer ten times running is the second thing, and going on would
+  // spend the whole queue on it: the records stop being dropped and the phone waits,
+  // saying what the server said, because that is the office's problem to fix, not his.
+  POSBAD=(m===POSBAD.k)?{k:m,n:POSBAD.n+1}:{k:m,n:1};
+  if(POSBAD.n>10){POSWHY='The server refuses every position from this phone ('+m+'): tell your office';return 'wait'}
+  outDel(run[0]);POSWHY='A position was refused by the server and dropped: '+m;
+  $('err').textContent=POSWHY;outUi();return 'lost'}
+ const h=Math.ceil(run.length/2);
+ const a=await posSend(run.slice(0,h));if(a==='wait')return a;
+ const b=await posSend(run.slice(h));
+ return b==='wait'?'wait':(a==='lost'||b==='lost'?'lost':'gone')}
 async function flush(){if(fl||!me)return;fl=true;
  try{let after=0,rounds=0,stop=false,why='';
   while(!stop&&rounds++<200){const b=await outTake(200,after);if(!b.length)break;
@@ -1898,11 +1951,10 @@ async function flush(){if(fl||!me)return;fl=true;
    let i=0;
    while(i<b.length){
     if(b[i].v.t==='pos'){const run=[];while(i<b.length&&b[i].v.t==='pos')run.push(b[i++]);
-     // nothing was deleted yet, so a failed batch simply stays where it is and the
-     // next flush reads it again from the top of the queue
-     const {ok,error}=await outSend({v:{t:'pos',p:run.map(x=>x.v.p)}});
-     if(!ok){stop=true;why=error&&error.message||'send failed';break}
-     run.forEach(outDel);SENT+=run.length;localStorage.sent=SENT;outUi()}
+     // nothing was deleted yet, so a batch the server never heard about simply stays where
+     // it is and the next flush reads it again from the top of the queue
+     const r=await posSend(run);if(r==='wait'){stop=true;why=POSWHY}
+     else if(r==='lost')why=POSWHY}
     else{const r=b[i++];const {ok,error}=await outSend(r);
      // Two very different failures, and the old code treated them the same way - which
      // is the bug that hid whole days of records. A request that never reached the
@@ -1920,7 +1972,13 @@ async function flush(){if(fl||!me)return;fl=true;
   OFFL=!navigator.onLine;netUi(why)}
  finally{fl=false;outUi()}}
 // the two tiles that tell the driver whether the phone is talking to the server
-function outUi(){return outCount().then(n=>{PEND=n;const w=n+TQ,t=$('v_sent');if(t)t.textContent=SENT+(w?' (+'+w+')':'')})}
+function outUi(){return outCount().then(n=>{PEND=n;const w=n+TQ,t=$('v_sent');if(!t)return;
+ t.textContent=SENT+(w?' (+'+w+')':'');
+ // the two queues a driver can be waiting on are in different hands - one is this page's
+ // records, the other the background runner's, and only the page can empty the second one -
+ // so the bracket says which, instead of leaving him to guess from a number
+ if(w)t.title=n&&TQ?w+' waiting: '+n+' in the app, '+TQ+' in the background service':
+   TQ?TQ+' waiting in the background service':n+' waiting in the app'})}
 function netUi(why){const t=$('v_sent');if(!t)return;
  if(!navigator.onLine){const w=(PEND||0)+TQ;t.textContent='⚠ '+w;t.title='No internet - '+w+' records waiting on the phone';return}
  if(why)t.title=why;outUi()}
@@ -2260,8 +2318,9 @@ async function stop(auto){SGEN++;FIRSTRUN=false;stopTone();clearInterval(batT);c
  gpsTripEnd();
  // the camera ends with the trip: a breach still open on the phone gets its end time
  // there and comes back here before anything is pushed
- // the runner ends first: stopping the camera tears down the service that hosts it, and a
- // runner killed mid-teardown never writes the closing point of the trip it was reporting
+ // the runner is told the trip is over first, and keeps reporting after it: the camera stop
+ // that follows only puts the lens away, and a runner that has already written the closing
+ // point of the trip cannot be caught mid-write by anything the camera does
  const tr=await trkStop(true);
  await dmsStop();
  // the driver's own stop dies with the trip it stopped: the unwatched stretch gets its end
@@ -2281,7 +2340,10 @@ async function stop(auto){SGEN++;FIRSTRUN=false;stopTone();clearInterval(batT);c
  // so it is handed over again here: this is what renews the poll that lends it a sign-in, and
  // a runner left without one collects in silence and stops sending an hour later. It carries
  // the trip flag down with it, so the points it writes from now on rest outside any trip.
- trkGo();
+ // A handset that is losing its seat is the one exception: the loss ends this on the very
+ // next line, and an order still in flight here would be a phone reporting a vehicle that it
+ // has just been told is no longer its driver's.
+ if(!CLDOWN)trkGo();
  // the seat goes back to its two-minute wait the moment the trip does, instead of holding a
  // spare handset outside for three minutes longer than it has to
  claimGo(false);
