@@ -1135,14 +1135,22 @@ const dmsOn=()=>dmsHas()&&V.dms_on===1;
 function dmsMinKmh(){const a=DMS.filter(t=>RUL[t]&&RUL[t].enabled!==false)
  .map(t=>Math.max(0,+RUL[t].speed_min||0));return a.length?Math.min.apply(null,a):0}
 // the whole setup, in the shape the plugin reads: the nine rules by their own column
-// names, the words to speak by language, and who to file a record against
+// names, the words to speak by language, and who to file a record against.
+// `dms_on` is the only order the service takes about whether to look at the driver at all,
+// and it is kept on the phone's own disk so a service Android restarts mid-shift wakes up
+// doing what the office last said. It used to be sent as `true` on every call, and not sent
+// at all once the watch was off, so the strongest order this phone ever held was "watch him":
+// an office that switched driver monitoring off, and a driver who pressed the camera button
+// himself, both went on being judged and warned all day by a lens nothing had ever told to
+// close. It is now the truth - off means off - and it goes over even when it is off.
+const dmsWants=()=>dmsOn()&&!CAMOFF;
 function dmsCfg(){const v=asg?.vehicles||{},d=asg?.drivers||{};
- return{dms_on:true,dms_fps:V.dms_fps,dms_pre_s:V.dms_pre_s,dms_post_s:V.dms_post_s,dms_keep_d:V.dms_keep_d,
+ return{dms_on:dmsWants(),dms_fps:V.dms_fps,dms_pre_s:V.dms_pre_s,dms_post_s:V.dms_post_s,dms_keep_d:V.dms_keep_d,
   dms_preview:V.dms_preview===1,mute:!!MUTE,voice_on:V.voice_on!==0,voice_lang:V.lang,lens:'front',
   ids:{user_id:me?me.id:'',vehicle_id:asg?.vehicle_id||'',driver_id:asg?.driver_id||'',
    vehicle_name:v.name||'',driver_name:d.name||''},
   msgs:VMSG,rules:DMS.map(t=>RUL[t]).filter(Boolean)}}
-async function dmsSync(){if(!(dmsOn()||CAMON))return;try{await CapPlugins.Dms.configure({cfg:dmsCfg()})}catch(e){}}
+async function dmsSync(){if(!dmsHas())return;try{await CapPlugins.Dms.configure({cfg:dmsCfg()})}catch(e){}}
 // why the lens is not watching, in the driver's own words
 // The rules that ask the second model to name a thing in the driver's hand. Phone use
 // is one of them although it can answer without it, because the named phone is the
@@ -1205,6 +1213,11 @@ async function dmsStart(){camPaint(false);
  // looks like a driver who never does anything wrong.
  if(!dmsOn()){if(dmsHas())banner('<i class="fa-solid fa-video-slash"></i> Your fleet office has the driver camera switched off, so this trip is not watched and no camera warning will sound',8000);return}
  CAMSEEN=false;let r=null;
+ // the lens is opened with the order that says it may be opened, in the same breath: a
+ // service Android restarts later reads the copy this leaves on disk, and it has to be this
+ // one. The driver's own stop, or an office that has switched the watch off since the last
+ // trip, is handed over here rather than left for the next settings poll to mention.
+ await dmsSync();
  try{r=await CapPlugins.Dms.start({trip:true})}catch(e){camErr('Driver camera could not start: '+(e.message||e));return}
  // Android will not let an app that is off screen raise a camera service. The page asked
  // from its own button, so this is the rare answer - and it has always been the one the
@@ -1283,12 +1296,27 @@ const trkHas=()=>dmsHas()&&typeof CapPlugins.Dms.trackStart==='function';
 function trkOrder(){const v=asg?.vehicles||{},d=asg?.drivers||{};
  return{url:SUPABASE_URL,anon:SUPABASE_KEY,movingS:MOV,parkedS:STP,
   speedLimit:+LIM.speed||0,buffer:+LIM.buf||0,accelLimit:+LIM.accel||0,brakeLimit:+LIM.brake||0,
+  // whether this phone is driving a trip or merely keeping the office told where the vehicle
+  // is. The runner writes it into the `ignition` column: a point taken with a trip open is a
+  // vehicle being driven even when it is standing at a light, and a point taken without one is
+  // a rest heartbeat the office's trip list must not join into a trip of its own.
+  trip:!!(watcher||SRT),
   ids:{user_id:me?me.id:'',vehicle_id:asg?.vehicle_id||'',driver_id:asg?.driver_id||'',
    vehicle_name:v.name||'',driver_name:d.name||''},
-  rules:['overspeed','harsh_acceleration','harsh_braking'].map(t=>RUL[t]).filter(Boolean)}}
+  rules:['overspeed','harsh_acceleration','harsh_braking'].map(t=>RUL[t]).filter(Boolean),
+  // the shapes the office drew, and their own limits: the page cannot check a zone with its
+  // screen off, and a driver who crossed one behind a locked handset went on being silent
+  zones:(ZONES||[]).filter(z=>z.pts&&z.pts.length>2).map(z=>({id:String(z.id),name:z.name||'',
+   limit:+z.speed_limit||0,enter:z.enter!==false,exit:z.exit!==false,overspeed:z.overspeed!==false,
+   pts:z.pts.map(p=>[+p[0],+p[1]]}))})}
 // Hand the trip over, or hand it over again. The settings are re-read every five minutes and
 // whenever the office changes them, and a runner that kept the old intervals would go on
 // reporting at the wrong beat for the rest of the driver's shift.
+// This order is not the trip's: a phone that is signed in with a vehicle always has one
+// standing, whether or not anybody has pressed Start. It is what keeps the office's map from
+// going blank - and the whole reason a driver's home-to-office run can arrive with no trip and
+// no points on it is that the only thing that ever asked for positions was a trip this page
+// had to be awake to start.
 async function trkGo(){if(!trkHas()||!me||!asg?.vehicle_id)return;let r=null;
  try{r=await CapPlugins.Dms.trackStart({cfg:trkOrder()})}catch(e){r=null}
  TRUN=!!(r&&r.started===true&&r.running!==false);
@@ -1296,7 +1324,7 @@ async function trkGo(){if(!trkHas()||!me||!asg?.vehicle_id)return;let r=null;
  clearInterval(trkT);trkT=setInterval(trkPoll,15000);
  // whether the phone really took the order is not answerable from this call: a service that
  // had to be started comes back a second or two later. This look is what finds out.
- setTimeout(()=>{if(SRT||watcher)trkPoll()},4000);
+ setTimeout(()=>{if(SRT||watcher||me)trkPoll()},4000);
  if(TRUN)trkTok()}
 // The page's own sign-in, lent to the runner as often as the page can see it. It is also the
 // only thing that lets a runner Android restarted by itself send again: that one has never
@@ -1310,7 +1338,7 @@ async function trkTok(){if(!trkHas()||!me||!sb)return;
 // off mid-shift is found while the trip is still running rather than two hours later in the
 // office's report - and the only way a breach the runner recorded behind the driver's back
 // gets handed back before the page opens a second row for the same corner.
-function trkPoll(){if(!trkHas()||(!SRT&&!watcher))return;let p=null;
+function trkPoll(){if(!trkHas()||!me||!asg?.vehicle_id)return;let p=null;
  try{p=CapPlugins.Dms.trackStatus({})}catch(e){return}
  if(!p||!p.then)return;
  p.then(r=>{const st=r&&r.status;
@@ -1352,9 +1380,14 @@ function trkNow(){if(!trkHas())return;
 // was the one reporting, which is what decides whose job the closing point was. This has to
 // come before the camera stop: that one takes the service down, and a runner with no service
 // can write nothing at all.
-async function trkStop(){clearInterval(trkT);trkT=0;const was=TRUN;TRUN=false;TQ=0;
+// `keep` is the difference between a trip ending and this phone going quiet. A driver who
+// parks has not asked the office to stop seeing his vehicle, and the two intervals the
+// Configuration page sets are the fleet's own answer for how often a standing vehicle speaks,
+// so the order stays with the runner and only the trip flag comes down. Sign-out and a second
+// handset taking the account give it up entirely.
+async function trkStop(keep){clearInterval(trkT);trkT=0;const was=TRUN;TRUN=false;TQ=0;
  if(!trkHas())return was;
- try{await CapPlugins.Dms.trackStop({})}catch(e){}
+ try{await CapPlugins.Dms.trackStop({keep:keep===true})}catch(e){}
  await trkBack();outUi();return was}
 // Everything the runner could not put on the server, taken back into this page's queue and
 // filed against the session this page holds. The names on each row are rewritten here for the
@@ -1511,7 +1544,12 @@ async function dwTog(){
  // recordings went on being written about a driver who had asked to stop. Now one press puts
  // the whole watch down and stays down until he presses again - and the office is told.
  if(CAMON&&!CAMOFF){await dmsStop();
-  CAMOFF=true;camOffEv(true);
+  CAMOFF=true;
+  // his press has to reach the service, not just this screen: what keeps a lens judging is
+  // the copy the phone holds on disk, and a stop only this page knew about was undone by the
+  // next time anything restarted the service to report a position.
+  await dmsSync();
+  camOffEv(true);
   camErr(CAMOFFTXT);dwUi();logAct('Driver camera stopped for this trip',camVeh());
   return banner('<i class="fa-solid fa-video-slash"></i> Driver camera stopped: this trip raises no alerts and records nothing until you press the button again',5000)}
  // Pressing again is the only thing in the app that lifts a stop. The stop is only dropped
@@ -1519,6 +1557,9 @@ async function dwTog(){
  // picture of this trip exactly as it was, not open a second unwatched stretch.
  const res=CAMOFF;
  CAMOFF=false;dwUi();
+ // the watch is handed back before it is asked for, so the service opens on this order and
+ // not on whatever the last stop left on disk
+ await dmsSync();
  await dmsStart();
  // A press this phone could not honour is not a second stop: his own one is still open, and
  // a row saying he closed the lens again would blame him for a refusal he did not choose.
@@ -1653,12 +1694,18 @@ function applyCfg(a,r,t,g){
  dmsSync();camPaint(CAMD);
  // the runner works from the copy of this setup it was handed, so a change the office makes
  // mid-trip goes over now: an interval moved from 30 to 60 seconds has to move on the phone
- // with it, not wait for the driver's next trip
- if((watcher||SRT)&&trkHas())trkGo();
+ // with it, not wait for the driver's next trip. And it is handed this setup whether or not a
+ // trip is open: the office's two intervals are what a fleet agreed to be told by, and a
+ // handset that only ever reported during a trip went quiet for the whole of a drive that
+ // began with nobody pressing Start - which is how a vehicle arrives at the office having
+ // apparently done nothing at all.
+ if(me&&asg?.vehicle_id)trkGo();
  // an administrator who switches the camera off mid-trip takes the lens away now,
  // not at the end of the trip - a stop the driver pressed himself is already CAMON false,
- // so nothing here can restart a lens he closed
- if(CAMON&&!dmsOn())dmsStop();
+ // so nothing here can restart a lens he closed. The order went over at dmsSync above: this
+ // is the page's own flag going down with it, so the map stops painting a picture nobody is
+ // judging and the trip's status stops asking a closed lens what it is doing.
+ if(CAMON&&!dmsWants())dmsStop();
  // an administrator who switches the automatic start off takes the watcher down now rather
  // than at the next trip, because a live watcher keeps opening trips the fleet has just said
  // it does not want. Switching it back on hands the job to senOn, which refuses to install a
@@ -2215,7 +2262,7 @@ async function stop(auto){SGEN++;FIRSTRUN=false;stopTone();clearInterval(batT);c
  // there and comes back here before anything is pushed
  // the runner ends first: stopping the camera tears down the service that hosts it, and a
  // runner killed mid-teardown never writes the closing point of the trip it was reporting
- const tr=await trkStop();
+ const tr=await trkStop(true);
  await dmsStop();
  // the driver's own stop dies with the trip it stopped: the unwatched stretch gets its end
  // time here, so the office sees it as far as it reaches and no longer
@@ -2230,6 +2277,11 @@ async function stop(auto){SGEN++;FIRSTRUN=false;stopTone();clearInterval(batT);c
  // the trip's watcher is gone, so the one that waits for the next start takes its place -
  // including after this very callback ended a trip nobody had pressed a button for
  STILLAT=0;senOn();
+ // the runner keeps the vehicle from the trip's end onwards, at the fleet's parked interval,
+ // so it is handed over again here: this is what renews the poll that lends it a sign-in, and
+ // a runner left without one collects in silence and stops sending an hour later. It carries
+ // the trip flag down with it, so the points it writes from now on rest outside any trip.
+ trkGo();
  // the seat goes back to its two-minute wait the moment the trip does, instead of holding a
  // spare handset outside for three minutes longer than it has to
  claimGo(false);
