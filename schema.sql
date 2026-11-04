@@ -446,7 +446,7 @@ returns table(vehicle_id uuid, vehicle_name text, day date, km numeric, max_spee
 language sql stable security invoker as $$
  with st as (select coalesce(max(case when key = 'stopped_interval'
    then nullif(regexp_replace(value, '[^0-9]', '', 'g'), '')::int end), 3600) si from app_settings),
- p as (select po.vehicle_id, po.vehicle_name, po.recorded_at, po.speed, po.lat, po.lng,
+ p as (select po.vehicle_id, po.vehicle_name, po.recorded_at, po.speed, po.ignition, po.lat, po.lng,
    coalesce(v.speed_limit, 100) lim,
    least(86400, greatest(180, coalesce(v.stopped_interval, st.si, 3600) * 2 + 120)) si_gap,
    lag(po.lat) over w plat, lag(po.lng) over w plng, lag(po.recorded_at) over w pt
@@ -455,11 +455,16 @@ language sql stable security invoker as $$
    window w as (partition by po.vehicle_id order by po.recorded_at)),
  g as (select *, extract(epoch from recorded_at - pt) dt,
    6371*2*asin(sqrt(power(sin(radians(lat-plat)/2),2)+cos(radians(plat))*cos(radians(lat))*power(sin(radians(lng-plng)/2),2))) d from p)
+ -- v35: a handset now reports all day, so a vehicle that was shut off and parked at the depot
+ -- overnight writes points of its own accord. Idling is engine-on standing time, and the phone
+ -- says which of the two it was writing; a rest point (ignition false) is not idling and not
+ -- the fuel burnt while it stood. A row from before the ignition answer says nothing either way
+ -- and keeps counting exactly as it did, so no closed shift's report changes under anybody.
  select g.vehicle_id, max(g.vehicle_name), (g.recorded_at at time zone p_tz)::date,
   round(coalesce(sum(case when dt<=180 then d end),0)::numeric,2),
   round(coalesce(max(speed),0)::numeric),
   round((coalesce(sum(case when dt<=180 and speed>0 then dt end),0)/60)::numeric,1),
-  round((coalesce(sum(case when dt<=si_gap and speed=0 then dt end),0)/60)::numeric,1),
+  round((coalesce(sum(case when dt<=si_gap and speed=0 and ignition is distinct from false then dt end),0)/60)::numeric,1),
   round(coalesce(sum(case when dt<=180 and speed>lim then dt end),0)::numeric,1)
  from g group by g.vehicle_id, 3 order by 3 $$;
 
@@ -2127,5 +2132,22 @@ end $$;
 --        -> If the optional history purge has ever deleted a vehicle's very newest position,
 --        that vehicle has no marker until its phone reports again. It had none under the old
 --        view either, and a driver whose handset is working fills the pointer on his next fix.
+--
+-- v35, on top of the above (a parked night is not a shift of idling):
+--   vehicle_report()                                                     -> its stop_min term ignores a point the
+--        handset wrote with the ignition down.
+--        -> The phone now reports at the fleet's two intervals all day, whether or not anybody pressed Start, so
+--        a vehicle shut off at the depot for the night keeps saying where it stands. Those rest points are nearer
+--        to each other than the parked bound this function joins on, and every one of them used to be counted as
+--        idling: a two hour shift printed as twenty-two hours of standing, and the Fuel idling column turned that
+--        into litres the engine never burned. The Fleet Summary chart, its table and its fuel figures all read
+--        this one column, so the correction belongs here rather than in the page.
+--        -> Idling keeps its meaning for everything the phone could not tell us: a point from a build that never
+--        answered about the ignition (the column is null) counts exactly as it did, and a driver stopped with the
+--        engine running still writes ignition true, so his real idle minutes and their fuel are untouched.
+--        -> km, max_speed, drive_min and over_s are unchanged; the dashboard's own per-trip idling already
+--        measures inside a trip, and a rest point is never joined into one.
+--   Run this file again - it is create-or-replace, so one paste is the whole step. No build is owed with it: an
+--   older dashboard simply shows the old inflated numbers, and a newer one shows the truth either way.
 
 -- ============================================================================
