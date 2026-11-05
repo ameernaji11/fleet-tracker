@@ -908,6 +908,14 @@ function zDraw(){if(!map)return;if(zLayer){zLayer.remove();zLayer=null}
   L.polygon(z.pts,{color:z.color||'#2f7fe6',weight:2,fillOpacity:.08,dashArray:'6 4'})
    .bindTooltip(esc(z.name)+(z.speed_limit?' · '+z.speed_limit+' km/h':''),{permanent:false}).addTo(zLayer)})}
 function zEv(type,z,loc,kmh){if(!ON[type])return;
+ // One crossing, one event. A boundary is tested by two hands on this phone - this page, and
+ // the runner that keeps reporting behind a locked screen - and at the moment one hands over to
+ // the other a single exit can be filed twice a second apart at the same coordinates. So a
+ // repeat of this zone's own kind inside thirty seconds is the second copy of it, and goes
+ // before anything else: no row, no banner, no voice.
+ const n=Date.now(),evk=type+'|'+z.id;
+ if(lastEv[evk]&&n-lastEv[evk]<30000)return;
+ lastEv[evk]=n;
  // a zone change is a moment, not a breach that grows: nothing ever comes back to
  // close it, so the row carries its own end time one second after the instant of the
  // crossing. A duration column that is blank reads as lost data, and a moment that
@@ -927,7 +935,7 @@ function zEv(type,z,loc,kmh){if(!ON[type])return;
  // stayed silent. The same 60 second guard the other alerts use is kept, so crossing back and
  // forth over a boundary does not speak twice, and the rule's own Alert / Buzzer / Voice
  // switches on the Configuration page are what decide what this says - notify() reads them.
- const n=Date.now();ANN[type]=n-(lastNotify[type]||0)>60000;
+ ANN[type]=n-(lastNotify[type]||0)>60000;
  if(ANN[type]){lastNotify[type]=n;notify(type,kmh)}
  outAdd({t:'ev',p:P});
  flush()}
@@ -942,6 +950,11 @@ function zonesCheck(loc,kmh,t){
   // the first fix after a start or a zone list change only sets the baseline: it can
   // say nothing about a crossing that happened while the phone was quiet
   if(was===undefined)return;
+  // while this page is put away and the runner is proved to be sampling, the crossings are
+  // its to file: it tests the same shapes on fixes of its own and writes the same row. This
+  // JS keeps running behind another app's screen, and two hands filing one boundary is how
+  // a trip came to hold two "Zone exited" rows a second apart at one corner
+  if(TRUN&&!onScreen()&&TSFX>=0&&TSFX<=30)return;
   if(on&&!was){if(z.enter!==false)zEv('zone_enter',z,loc,kmh)}else if(!on&&was){if(z.exit!==false)zEv('zone_exit',z,loc,kmh)}});
  // overspeed inside a zone rides the same breach machinery as the fleet limit, so it
  // keeps the driver's alert, the tolerance window and the open/close event row
@@ -1266,7 +1279,7 @@ function dmsUi(){if(!dmsHas())return;
 // session this page holds. The page also carries on writing positions whenever the service is
 // not doing it - an old build, a phone that refused the service, or a satellite provider the
 // driver switched off at a fuel stop must never leave a trip with nobody reporting it.
-let TRUN=false,TQ=0,trkT=0,TRKERR=false;
+let TRUN=false,TQ=0,trkT=0,TRKERR=false,TSFX=-1;
 const trkHas=()=>dmsHas()&&typeof CapPlugins.Dms.trackStart==='function';
 // Everything the runner needs about this trip, in the shape it reads. Never a token: the
 // settings belong on the phone so a service Android restarts mid-shift wakes up with the
@@ -1408,6 +1421,13 @@ function trkUi(st){if(!st)return;
  // phone coming back to the front never shouts about a breach he was told about minutes ago.
  (st.sounded||[]).forEach(x=>{if(!x||!x.type)return;const t=Math.max(0,+x.at||0);
   if(t>(lastNotify[x.type]||0))lastNotify[x.type]=t});
+ // the same hand-over for the zone crossings. This runner filed that row while the screen was
+ // off; the page's own crossing test catches up with the boundary a moment later and would
+ // write the same exit at the same corner a second after it.
+ (st.filed||[]).forEach(x=>{if(!x||!x.key)return;const t=Math.max(0,+x.at||0);
+  if(t>(lastEv[x.key]||0))lastEv[x.key]=t});
+ // how long ago this runner last got a fix of its own, or -1 when it never has
+ TSFX=st.sinceFix==null?TSFX:Math.max(-1,+st.sinceFix);
  outUi();
  // Why this trip is not being reported, on the strip the camera uses for its own refusals -
  // and only ever clearing the line this wrote, so it never erases what the camera said. The
