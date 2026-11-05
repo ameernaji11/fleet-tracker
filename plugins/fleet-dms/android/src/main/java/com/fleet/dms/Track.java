@@ -183,6 +183,12 @@ class Track {
     // Handed back in the status so a page that wakes does not buzz the driver again for a
     // breach he has already been warned about with his screen off.
     private final Map<String, Long> sounded = new HashMap<>();
+    // The last fix each zone crossing was filed at, keyed by the kind and the zone. Handed back
+    // in the status exactly as the warnings above are: the page and this runner test the same
+    // boundary, and the instant the driver wakes his phone the page's own crossing test is a
+    // heartbeat ahead of the state he is handed. Seeding it with what was already written is
+    // what keeps one exit at one corner instead of two rows a second apart.
+    private final Map<String, Long> filed = new HashMap<>();
     private final Map<String, Boolean> bad = new HashMap<>();
     // The vehicle-rule breaches opened on this runner's own fixes, kept until they end or
     // until the page that has just woken takes them over.
@@ -958,6 +964,12 @@ class Track {
         if (s == null) return;
         Config.Rule r = rules.get(type);
         if (r != null && !r.on) return;
+        // one crossing, one row: this kind at this zone already filed inside the window the
+        // page uses too, so this is the second copy of the same boundary
+        String key = type + "|" + z.id;
+        Long was = filed.get(key);
+        if (was != null && at - was < 30000) return;
+        filed.put(key, at);
         String cid = java.util.UUID.randomUUID().toString();
         String detail = (type.equals("zone_enter") ? "Entered " : "Left ")
                 + (z.name.isEmpty() ? "zone" : z.name)
@@ -1695,6 +1707,10 @@ class Track {
             for (Map.Entry<String, Long> e : sounded.entrySet()) {
                 s.put(new JSONObject().put("type", e.getKey()).put("at", e.getValue()));
             }
+            JSONArray f = new JSONArray();
+            for (Map.Entry<String, Long> e : filed.entrySet()) {
+                f.put(new JSONObject().put("key", e.getKey()).put("at", e.getValue()));
+            }
             j.put("running", running).put("wanted", want).put("queued", q).put("sent", sent)
                     .put("movingS", movingS).put("parkedS", parkedS)
                     .put("trip", trip).put("moving", isMoving)
@@ -1703,7 +1719,7 @@ class Track {
                     .put("sinceFix", lastFixAt == 0 ? -1
                             : (SystemClock.elapsedRealtime() - lastFixAt) / 1000)
                     .put("zones", insideZones())
-                    .put("sounded", s).put("open", openRows()).put("error", error).put("why", why);
+                    .put("sounded", s).put("filed", f).put("open", openRows()).put("error", error).put("why", why);
         } catch (Exception ignore) {
             // JSONObject only throws on a null key, and none of these are null
         }
