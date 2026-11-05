@@ -275,6 +275,7 @@ public class DmsService extends Service implements LifecycleOwner {
         tripSet(this, false);
         closeCamera();
         alerts.stopVoice();
+        alerts.release();
         // The runner goes down with the service it lives in, and the wish that started it
         // stays on disk: a trip Android interrupted is a trip that should carry on reporting
         // when the service comes back, not one whose positions were thrown away with the

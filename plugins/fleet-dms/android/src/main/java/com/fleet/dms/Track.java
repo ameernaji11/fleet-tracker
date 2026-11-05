@@ -736,7 +736,19 @@ class Track {
         trySend();
     }
 
-    /** The positions row, in the columns the table has, in the shape the page writes them. */
+    /**
+     * The positions row, in the columns the table has, in the shape the page writes them.
+     * <p>
+     * Every row carries every key, and that is a wire rule rather than tidiness: these rows go
+     * out as one JSON array in one request, and the server refuses an array whose objects do not
+     * all name the same columns - "All object keys must match" - refusing the whole of it, not
+     * the odd row. A fix that happened to come without an altitude, a bearing the receiver had
+     * not settled on, or a minute in which the battery was not asked, therefore used to take two
+     * hundred positions with it, and a trip's worth of points went out of this phone in batches
+     * of two hundred. A JSON null is what puts the column empty instead, which is what the page
+     * already sends; every column here is nullable except the user, the place and the time, and
+     * this has all three of those before it builds anything.
+     */
     private JSONObject row(Location loc, long at, double kmh, double acc, boolean moving) {
         if (uid.isEmpty() || vid.isEmpty()) {
             why = "this phone has not been told which vehicle it is driving";
@@ -746,9 +758,11 @@ class Track {
         try {
             p.put("user_id", uid);
             p.put("vehicle_id", vid);
-            if (!did.isEmpty()) p.put("driver_id", did);
-            if (!vname.isEmpty()) p.put("vehicle_name", vname);
-            if (!dname.isEmpty()) p.put("driver_name", dname);
+            p.put("driver_id", did.isEmpty() ? JSONObject.NULL : did);
+            // The two names are rewritten by the database as the row lands, so an empty one here
+            // costs nothing - but leaving its key out costs the batch it sits in.
+            p.put("vehicle_name", vname.isEmpty() ? JSONObject.NULL : vname);
+            p.put("driver_name", dname.isEmpty() ? JSONObject.NULL : dname);
             p.put("lat", loc.getLatitude());
             p.put("lng", loc.getLongitude());
             // a standing vehicle reports zero, as the page does: an idling handset that
@@ -760,15 +774,13 @@ class Track {
             // heartbeat outside a trip says neither, so it reaches the map and the live list
             // without becoming a trip of its own.
             p.put("ignition", trip || moving);
-            if (!Double.isNaN(acc)) p.put("accuracy", round1(acc));
-            if (loc.hasAltitude()) p.put("altitude", round1(loc.getAltitude()));
-            if (loc.hasBearing()) p.put("heading", (double) Math.round(loc.getBearing()));
+            p.put("accuracy", Double.isNaN(acc) ? JSONObject.NULL : round1(acc));
+            p.put("altitude", loc.hasAltitude() ? round1(loc.getAltitude()) : JSONObject.NULL);
+            p.put("heading", loc.hasBearing() ? (double) Math.round(loc.getBearing()) : JSONObject.NULL);
             p.put("accel", round1(lastA));
             double[] b = svc == null ? null : svc.battery();
-            if (b != null) {
-                p.put("battery_pct", Math.round(b[0] * 10) / 10.0);
-                p.put("charging", b[1] > 0);
-            }
+            p.put("battery_pct", b == null ? JSONObject.NULL : Math.round(b[0] * 10) / 10.0);
+            p.put("charging", b == null ? JSONObject.NULL : b[1] > 0);
         } catch (Exception e) {
             return null;
         }
@@ -1392,45 +1404,107 @@ class Track {
                     return;
                 }
             }
-            JSONArray body = new JSONArray();
-            for (JSONObject o : batch) body.put(o);
-            String refused = post(body.toString(), tk);
-            if (refused == null) {
-                // never reached the server: put the batch back in front of the queue and
-                // leave it for the next turn, in the order the road was driven
-                synchronized (rows) {
-                    requeue(batch);
-                    save();
-                }
-                return;
-            }
-            if (refused.isEmpty()) {
-                synchronized (rows) {
-                    sent += batch.size();
-                    sp.edit().putLong(K_SENT, sent).apply();
-                    save();
-                }
-                if (!error.isEmpty()) error = "";
-                continue;
-            }
-            // A record the server refused is refused for a reason that will not change by
-            // asking again - except a sign-in this app cannot refresh on its own, which is
-            // kept, said, and handed to the page.
-            if (refused.startsWith("TOKEN")) {
-                synchronized (rows) {
-                    requeue(batch);
-                    save();
-                }
-                error = "the phone's sign-in has run out: open the app to send what is waiting";
-                allowed = false;
-                return;
-            }
+            int r = tryBatch(batch, tk);
+            // KEPT means the rows are back on the disk and there is no sense asking again this
+            // turn: either the server never heard the request or the sign-in ran out. DROPPED
+            // means one row of this batch went away and the rest of the queue is untouched, so
+            // the trip carries on reporting from the second it stopped being thrown away for.
+            if (r == KEPT) return;
+            if (r == LANDED && !error.isEmpty()) error = "";
+        }
+    }
+
+    /** What one try at a batch of positions came back as. */
+    private static final int LANDED = 0, KEPT = 1, DROPPED = 2;
+
+    /**
+     * How many single rows in a row this server has refused before the runner gives up on it.
+     * Ten identical answers is not a bad point in a trip, it is a database that will not take
+     * anything from this phone - a policy, a column the schema has not added, a server address
+     * belonging to another project - and the queue is worth more kept than asked about again.
+     */
+    private static final int MAX_DROP = 10;
+
+    private int dropRun = 0;
+    private String dropKey = "";
+
+    /**
+     * One batch, and when the server answers no, its two halves, and their halves, down to the
+     * single row that was the problem.
+     * <p>
+     * The descent is the only way to find the row: the answer comes back for the array as a
+     * whole and never names what it refused, and before this the whole batch was thrown away on
+     * the strength of it - one position the database would not take cost the driver the two
+     * hundred that came with it, which is a trip's worth of points, and every trip, tacho second
+     * and kilometre the office counts from them, gone in pieces of two hundred.
+     * <p>
+     * Two answers stop it and give the rows back rather than drop them: a request this phone
+     * never heard, which goes back on the disk in the order the road was driven, and a sign-in
+     * this app cannot refresh by itself, which every row survives because signing in again
+     * delivers all of them.
+     *
+     * @return LANDED when the server took every row, KEPT when they are back on the queue and
+     * nothing more should be tried this turn, DROPPED when a row was refused and thrown away.
+     */
+    private int tryBatch(List<JSONObject> batch, String tk) {
+        JSONArray body = new JSONArray();
+        for (JSONObject o : batch) body.put(o);
+        String refused = post(body.toString(), tk);
+        if (refused == null) {
+            // never reached the server: put the batch back in front of the queue and
+            // leave it for the next turn, in the order the road was driven
             synchronized (rows) {
+                requeue(batch);
                 save();
             }
-            error = "the server refused a position and it was dropped: " + refused;
-            Logger.error("fleet-dms: positions refused: " + refused);
+            return KEPT;
         }
+        if (refused.isEmpty()) {
+            synchronized (rows) {
+                sent += batch.size();
+                sp.edit().putLong(K_SENT, sent).apply();
+                save();
+            }
+            dropRun = 0;
+            return LANDED;
+        }
+        if (refused.startsWith("TOKEN")) {
+            synchronized (rows) {
+                requeue(batch);
+                save();
+            }
+            error = "the phone's sign-in has run out: open the app to send what is waiting";
+            allowed = false;
+            return KEPT;
+        }
+        if (batch.size() > 1) {
+            int h = (batch.size() + 1) / 2;
+            int a = tryBatch(batch.subList(0, h), tk);
+            if (a == KEPT) return KEPT;
+            int b = tryBatch(batch.subList(h, batch.size()), tk);
+            return b == KEPT ? KEPT : (a == DROPPED || b == DROPPED ? DROPPED : LANDED);
+        }
+        // A single row the server answered no to is refused for a reason that will not change
+        // by asking again, so it is the one thing here worth throwing away - out loud, and with
+        // the server's own words, because the office is who has to put it right.
+        dropRun = refused.equals(dropKey) ? dropRun + 1 : 1;
+        dropKey = refused;
+        if (dropRun > MAX_DROP) {
+            synchronized (rows) {
+                requeue(batch);
+                save();
+            }
+            error = "the server refuses every position from this phone: " + refused +
+                    " - tell your office, nothing more is thrown away";
+            Logger.error("fleet-dms: every position refused: " + refused);
+            return KEPT;
+        }
+        synchronized (rows) {
+            save();
+        }
+        error = "the server refused a position and it was dropped: " + refused;
+        Logger.error("fleet-dms: position refused: " + refused);
+        return DROPPED;
     }
 
     /** "" when the server took it, a message when it refused, null when it never heard. */
