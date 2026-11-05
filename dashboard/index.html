@@ -1378,6 +1378,17 @@ const ECL=[],EIX=[];
 // five decimals is about a metre: close enough for two fixes of one stop, far apart
 // enough that a car moving between two breaches is not mistaken for the same spot.
 const eSpot=x=>(+x.lat).toFixed(5)+','+(+x.lng).toFixed(5);
+// One crossing, one point. A zone boundary is tested by two writers on the driver's handset -
+// his page, and the runner that reports behind a locked screen - and at the moment one hands
+// over to the other a single exit arrives twice, a second apart, at the same coordinates. A
+// moment event cannot truly repeat that fast, so the later copies of one kind at one spot
+// inside ten seconds are the second hand filing the same crossing and only the first is kept.
+function evOnce(list){const first={};
+ const k=x=>x.vehicle_id+'|'+x.type+'|'+eSpot(x);
+ (list||[]).forEach(x=>{if(!INSTANT[x.type]||!okXY(x))return;const p=first[k(x)];
+  if(!p||tms(x)<tms(p))first[k(x)]=x});
+ return (list||[]).filter(x=>{if(!INSTANT[x.type]||!okXY(x))return true;
+  const p=first[k(x)];return !p||x===p||tms(x)-tms(p)>=10000})}
 function evGroups(list){const m=new Map(),out=[];
  (list||[]).forEach(x=>{if(!okXY(x))return;const k=eSpot(x);if(!m.has(k))m.set(k,[]);m.get(k).push(x)});
  m.forEach(g=>out.push(g.sort((a,b)=>tms(a)-tms(b))));
@@ -1490,6 +1501,9 @@ async function loadHist(keep){if(!keep)fSave('hist');pbStop();
  if(!data.length){$('hstat').innerHTML='';HREST=[];hSide();return toast('No data in this period.',1)}
  HEVS=(await fetchAll(()=>sb.from('events').select('*').eq('vehicle_id',vid).gte('recorded_at',hf).lte('recorded_at',ht).order('recorded_at'))).filter(x=>EV[x.type]&&okFix(x)&&skipZero(x));
  await evBorrow(HEVS);
+ // after the borrowed positions, so a pair of copies that rode on the same last known fix is
+ // still read as one crossing
+ HEVS=evOnce(HEVS);
  const Vh=vehicles.find(x=>x.id===vid)||{};
  TRIPS=splitTrips(data,Vh).map((pts,i)=>({n:i+1,pts,col:TCOL[i%TCOL.length],on:true,evsOn:true,st:tStats(pts,Vh),ly:L.layerGroup(),ely:L.layerGroup(),evs:[]}));
  hLayer=L.layerGroup().addTo(mapH);
@@ -1565,7 +1579,7 @@ function evRow(x){const k=HEVS.indexOf(x),E=EVX(x.type),pl=okFix(x)&&okXY(x);
  const g=x.__mk&&ECL[x.__mk.__gi]?ECL[x.__mk.__gi].length:1;
  return `<div class="evr${pl?'':' no'}"${pl?` onclick="evJump(${k})" title="Move the map to this event and open its readings"`:' title="This row never got a position the map can place"'}>`+
   `<i class="fa-solid ${E[1]}" style="color:${E[2]}"></i><b>${esc(E[0])}</b>`+
-  `<small>${new Date(x.recorded_at).toLocaleTimeString()}${x.ended_at?' · '+hms(evDur(x)):''}</small>`+
+  `<small>${new Date(x.recorded_at).toLocaleTimeString()}${x.ended_at&&!INSTANT[x.type]?' · '+hms(evDur(x)):''}</small>`+
   (g>1?`<small>${g} on one pin</small>`:'')+`</div>`}
 function evTog(i,on){const T=TRIPS[i];T.evsOn=!!on;(on&&T.on)?T.ely.addTo(mapH):T.ely.remove();hSide()}
 // The pin already carries the card; a spot shared by three events opens on the one that
@@ -1688,7 +1702,7 @@ function evPop(x){const E=EVX(x.type),d=evDur(x),e=evEnd(x),n=(a,u)=>a!=null&&a!
  val=x.type==='harsh_braking'||x.type==='harsh_acceleration'?`<br><i class="fa-solid fa-gauge"></i> ${(+x.value||0).toFixed(1)} km/h/s`:'';
  return `<div style="min-width:240px"><b style="font-size:15px;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</b>${evClipBtn(x)}${HR}
  <i class="fa-solid fa-car"></i> <b>${esc(x.vehicle_name||'-')}</b><br><i class="fa-solid fa-id-card"></i> ${esc(x.driver_name||'-')}<br>
- <i class="fa-regular fa-clock"></i> ${new Date(x.recorded_at).toLocaleString()}${e?'<br><i class="fa-regular fa-clock"></i> Ended '+e.toLocaleTimeString()+' · <b>'+hms(d)+'</b>':''}<br>
+ <i class="fa-regular fa-clock"></i> ${new Date(x.recorded_at).toLocaleString()}${e&&!INSTANT[x.type]?'<br><i class="fa-regular fa-clock"></i> Ended '+e.toLocaleTimeString()+' · <b>'+hms(d)+'</b>':''}<br>
  <i class="fa-solid fa-gauge-high"></i> ${Math.round(x.speed||0)} km/h${x.road_limit?' · limit '+x.road_limit+' km/h':''}${val}${x.details?'<br>'+esc(x.details):''}${HR}
  <i class="fa-solid fa-location-dot"></i> ${okXY(x)?(+x.lat).toFixed(5)+', '+(+x.lng).toFixed(5)+(borAge(x)>=0?'<br><small style="opacity:.7"><i class="fa-solid fa-clock-rotate-left"></i> This row carries no position of its own: shown is the ${borTxt(x)}, when the handset last locked a satellite.</small>':''):'No fix'}<br>Accuracy ${n(x.accuracy,' m')} · Elev. ${x.altitude!=null?Math.round(x.altitude)+' m':'-'} · Dir ${x.heading!=null?Math.round(x.heading)+'°':'-'}<br>Accel ${n(x.accel,' km/h/s')} · Ignition ${x.ignition===false?'off':x.ignition?'on':'-'}<br><i class="fa-solid fa-battery-half"></i> ${x.battery_pct!=null?Math.round(x.battery_pct)+'%':'-'}${x.charging?' ⚡':''}</div>`}
 async function fetchAll(q){const one=async i=>{const {data,error}=await q().range(i*1000,i*1000+999);if(error)throw error;return data||[]};
@@ -1718,7 +1732,7 @@ function chart(id,type,labels,sets,o={}){const cs=getComputedStyle(document.docu
 const cnt=(rows,f)=>rows.reduce((o,r)=>{const k=f(r)||'-';o[k]=(o[k]||0)+1;return o},{});
 async function loadEvt(){fSave('evt');
  const v=mselVal('ev_v'),d=mselVal('ev_d'),t=mselVal('ev_t'),f=new Date($('ev_f').value).toISOString(),to=new Date($('ev_to').value).toISOString();
- EVR=(await fetchAll(()=>{let q=sb.from('events').select('*').gte('recorded_at',f).lte('recorded_at',to).order('recorded_at',{ascending:false});if(v.length)q=q.in('vehicle_id',v);if(d.length)q=q.in('driver_id',d);if(t.length)q=q.in('type',t);return q})).filter(skipZero);EVF={};await evBorrow(EVR);renderEvt()}
+ EVR=(await fetchAll(()=>{let q=sb.from('events').select('*').gte('recorded_at',f).lte('recorded_at',to).order('recorded_at',{ascending:false});if(v.length)q=q.in('vehicle_id',v);if(d.length)q=q.in('driver_id',d);if(t.length)q=q.in('type',t);return q})).filter(skipZero);EVF={};await evBorrow(EVR);EVR=evOnce(EVR);renderEvt()}
 // The three toolbar dropdowns keep their tick marks between visits, so a type ticked
 // weeks ago can hide every event with nothing on the page to say why. Name an active
 // one here, in the same row as the tile filters, and let one click clear both.
@@ -1856,7 +1870,7 @@ function renderEvt(){
  chart('c2','bar',days,K.map(k=>({label:EV[k][0],backgroundColor:EV[k][2],data:days.map(d=>rows.filter(r=>r.type===k&&dayOf(r)===d).length)})),{t:'Events per Day',s:1,click:(e,el)=>el.length&&evSet('day',days[el[0].index])});
  const dr=Object.entries(cnt(rows,r=>r.driver_name)).sort((a,b)=>b[1]-a[1]).slice(0,8).map(x=>x[0]);
  chart('c3','bar',dr,K.map(k=>({label:EV[k][0],backgroundColor:EV[k][2],data:dr.map(n=>rows.filter(r=>(r.driver_name||'-')===n&&r.type===k).length)})),{t:'Violator Drivers',s:1,h:1,click:(e,el)=>{if(!el.length)return;EVF.driver=dr[el[0].index];EVF.type=K[el[0].datasetIndex];renderEvt()}});
- $('evT').innerHTML=`<table><tr><th>Event Start</th><th>Event End</th><th>Duration</th><th>Vehicle</th><th>Driver</th><th>Event</th><th>Clip <span class="hp" data-tip="The few seconds the driver camera recorded around this event, in its own column so the answers line up one under the next however long the event is named. A video button opens the recording. Uploading means the handset has the picture and has not finished sending it - it travels with that driver's own events, so a phone out of signal holds it until the next bar appears. No video means the file never arrived: an app closed mid-encode, a phone that went away before it finished, a clip the retention window took over. Off is a setting rather than a shortage - that rule's Recording switch is off on the Configuration page. A dash is an event this camera does not raise. None of these is a reason to doubt the event: everything it measured is already in this row, and the clip is only the picture of it.">?</span></th><th>Speed (km/h)</th><th>Details</th><th>Location</th></tr>${rows.slice(0,1000).map(r=>{const E=EVX(r.type),d=evDur(r),en=evEnd(r);return `<tr><td>${new Date(r.recorded_at).toLocaleString()}</td><td>${en?en.toLocaleString():'-'}</td><td class="nw">${d==null?'-':hms(d)}</td><td>${esc(r.vehicle_name)}</td><td>${esc(r.driver_name)}</td><td><span class="chip" style="background:${E[2]}22;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</span></td><td class="taC">${evClipCell(r).trim()||'<small style="opacity:.5">—</small>'}</td><td>${Math.round(r.speed||0)}</td><td>${esc(r.details||'-')}</td><td><a href="#" onclick="goHist('${r.vehicle_id}','${r.recorded_at}',${r.lat},${r.lng});return false"><i class="fa-solid fa-map-location-dot"></i> ${okXY(r)?(+r.lat).toFixed(5)+', '+(+r.lng).toFixed(5)+(borAge(r)>=0?' <span class="hp" data-tip="This event has no position of its own: the handset had not locked a satellite when the lens fired. Shown is the vehicle\'s '+borTxt(r)+'. Click the row to see the route it was taken from.">·</span>':''):'No fix'}</a></td></tr>`}).join('')||'<tr><td colspan="10" class="empty">No events in this period.</td></tr>'}</table>`;tools($('evT'))}
+ $('evT').innerHTML=`<table><tr><th>Event Start</th><th>Event End</th><th>Duration</th><th>Vehicle</th><th>Driver</th><th>Event</th><th>Clip <span class="hp" data-tip="The few seconds the driver camera recorded around this event, in its own column so the answers line up one under the next however long the event is named. A video button opens the recording. Uploading means the handset has the picture and has not finished sending it - it travels with that driver's own events, so a phone out of signal holds it until the next bar appears. No video means the file never arrived: an app closed mid-encode, a phone that went away before it finished, a clip the retention window took over. Off is a setting rather than a shortage - that rule's Recording switch is off on the Configuration page. A dash is an event this camera does not raise. None of these is a reason to doubt the event: everything it measured is already in this row, and the clip is only the picture of it.">?</span></th><th>Speed (km/h)</th><th>Details</th><th>Location</th></tr>${rows.slice(0,1000).map(r=>{const E=EVX(r.type),ins=INSTANT[r.type],d=ins?null:evDur(r),en=ins?null:evEnd(r);return `<tr><td>${new Date(r.recorded_at).toLocaleString()}</td><td>${en?en.toLocaleString():'-'}</td><td class="nw">${d==null?'-':hms(d)}</td><td>${esc(r.vehicle_name)}</td><td>${esc(r.driver_name)}</td><td><span class="chip" style="background:${E[2]}22;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</span></td><td class="taC">${evClipCell(r).trim()||'<small style="opacity:.5">—</small>'}</td><td>${Math.round(r.speed||0)}</td><td>${esc(r.details||'-')}</td><td><a href="#" onclick="goHist('${r.vehicle_id}','${r.recorded_at}',${r.lat},${r.lng});return false"><i class="fa-solid fa-map-location-dot"></i> ${okXY(r)?(+r.lat).toFixed(5)+', '+(+r.lng).toFixed(5)+(borAge(r)>=0?' <span class="hp" data-tip="This event has no position of its own: the handset had not locked a satellite when the lens fired. Shown is the vehicle\'s '+borTxt(r)+'. Click the row to see the route it was taken from.">·</span>':''):'No fix'}</a></td></tr>`}).join('')||'<tr><td colspan="10" class="empty">No events in this period.</td></tr>'}</table>`;tools($('evT'))}
 async function goHist(vid,iso,lat,lng){document.querySelector('.nb[data-t=hist]').click();$('hv').value=vid;const t=new Date(iso).getTime();$('hf')._flatpickr.setDate(new Date(t-9e5),true);$('ht')._flatpickr.setDate(new Date(t+9e5),true);await loadHist(1);
  // an event with no fix of its own cannot be jumped to; frame the period instead of
  // handing Leaflet a null coordinate, which used to throw the same crash the row came from
