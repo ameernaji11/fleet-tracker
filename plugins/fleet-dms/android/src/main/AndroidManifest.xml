@@ -18,6 +18,7 @@
     <!-- The screen may be off while the vehicle is moving, and the analysis still has
          to run, so the service holds a partial wake lock for as long as it is watching. -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
     <!-- A wake lock keeps the CPU awake while the service runs, but it is Android's own
          battery saving that puts an app to sleep between trips and defers its uploads.
          This permission is what lets the app ask the driver, once, to keep this one out
