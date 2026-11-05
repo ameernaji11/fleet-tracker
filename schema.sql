@@ -1597,7 +1597,19 @@ create policy "latest read" on latest_pos for select to authenticated using (tru
 -- blackbox push - and all three must land the pointer. A newer recorded_at always wins,
 -- which matters for the phone that drove a dead spot for an hour and then flushed its
 -- queue oldest-first: the burst ends on the newest fix, like every other writer.
-create or replace function stamp_latest() returns trigger language plpgsql as $$
+--
+-- SECURITY DEFINER, and that is not decoration: this writes a second table on behalf of
+-- whoever inserted the position, so it runs as the function's owner rather than as the
+-- caller. RLS is enabled on latest_pos with one SELECT policy and no INSERT or UPDATE one,
+-- which is exactly what is wanted for a pointer nobody outside the database may move - but
+-- as an ordinary trigger function it ran as the driver, and the driver is not allowed to
+-- write that table. Every position insert then failed inside this trigger with
+-- "new row violates row-level security policy for table latest_pos", the handset dropped
+-- the record, and with it went every trip and every tacho second, because both read the
+-- positions rows this refused to accept. Reads stay as they were: the view is security
+-- invoker, so each position is still gated by positions' own policies.
+create or replace function stamp_latest() returns trigger language plpgsql
+  security definer set search_path = public as $$
 begin
   if new.user_id is not null and new.id is not null then
     insert into latest_pos (user_id, pos_id, latest_at)
@@ -1643,6 +1655,39 @@ do $$ begin
     create index events_time on events (recorded_at desc);
   end if;
 end $$;
+
+-- ------------------ v36 every position this file's own trigger refused -------
+-- The fix above is the whole of it, restated here instead of only in the v34 block so
+-- that a project which already ran v34 repairs itself with one more paste - and every
+-- project has, because the one that reported it had run it. A handset that hits this says
+-- so on the driver's screen: "A position was refused by the server and dropped: new row
+-- violates row-level security policy for table "latest_pos"", and every trip, tacho
+-- second and distance figure the office reads went with it, since all three are counted
+-- from the positions rows this refused to accept.
+--
+-- It is restated with the same signature and the same body, so the trigger that already
+-- points at it keeps pointing: no table, column, policy or view changes in this version,
+-- and nothing in either app has to be rebuilt to go with it.
+--
+-- The pointers themselves need no repair. While the trigger was failing no position was
+-- accepted at all, so nothing landed that the pointer missed; each account's row still
+-- names the newest position it genuinely has, and every handset fills it in again on the
+-- first fix it sends after this file is run.
+create or replace function stamp_latest() returns trigger language plpgsql
+  security definer set search_path = public as $$
+begin
+  if new.user_id is not null and new.id is not null then
+    insert into latest_pos (user_id, pos_id, latest_at)
+         values (new.user_id, new.id, new.recorded_at)
+      on conflict (user_id) do update
+        set pos_id = excluded.pos_id, latest_at = excluded.latest_at
+      where excluded.latest_at > latest_pos.latest_at;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists latest_stamp on positions;
+create trigger latest_stamp after insert on positions for each row execute function stamp_latest();
 
 -- ------------------------------------------------------------- admin seed ----
 -- Promote the owner account. Runs after the tables/policies exist, and is safe
@@ -2149,5 +2194,28 @@ end $$;
 --        measures inside a trip, and a rest point is never joined into one.
 --   Run this file again - it is create-or-replace, so one paste is the whole step. No build is owed with it: an
 --   older dashboard simply shows the old inflated numbers, and a newer one shows the truth either way.
+--
+-- v36, on top of the above (the pointer that refused every position):
+--   stamp_latest()                                                       -> SECURITY DEFINER now, like every other
+--        function in this file that writes a second table on somebody's behalf. Same signature, same body, same
+--        trigger; nothing else moves.
+--   Run this file again - one paste is the whole step, and it repairs a live database from the inside: no app
+--        version fixes it and no app version is made wrong by running it.
+--        -> Until it is run, EVERY position the fleet writes is refused. The page, the handset's background runner
+--        and a blackbox push all insert into positions, and v34's after-insert trigger then tries to move
+--        latest_pos as the caller - a table a caller has no right to write. The row is rolled back with "new row
+--        violates row-level security policy for table "latest_pos"", the driver's screen fills with dropped-record
+--        messages, and Historical Tracking shows no trips, the Tacho report says there is no data in the period
+--        and the Fleet Summary says no positions were recorded - because all three are counted from those rows.
+--        Events keep arriving, since events carry no such trigger: that split is what those symptoms are made of.
+--        -> v34's own note above claimed no build was owed with it and nothing was locked out by running it. That
+--        was wrong: the version it added lands a pointer through a trigger, and a trigger that cannot write its
+--        table refuses the insert it was there to decorate. The claim is corrected here rather than there, so the
+--        v34 block stays the description of what that version created.
+--        -> The other two messages on that screen are app ones, and no schema change answers them: "All object
+--        keys must match" (the runner sent a batch whose rows did not all name the same columns) and a refused
+--        alert row. Both are fixed in the build alongside this file.
+--   The pointers need no repair: while this was failing no position was accepted at all, so nothing landed that a
+--   pointer missed, and each handset fills its own row in again on the first fix it sends after the paste.
 
 -- ============================================================================
