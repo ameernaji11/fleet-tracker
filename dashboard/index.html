@@ -1488,7 +1488,7 @@ async function loadHist(keep){if(!keep)fSave('hist');pbStop();
  // the pins this page stood are gone, so the spot groups they pointed at must go with them
  ECL.length=0;EIX.length=0;
  if(!data.length){$('hstat').innerHTML='';HREST=[];hSide();return toast('No data in this period.',1)}
- HEVS=(await fetchAll(()=>sb.from('events').select('*').eq('vehicle_id',vid).gte('recorded_at',hf).lte('recorded_at',ht).order('recorded_at'))).filter(x=>EV[x.type]&&okFix(x));
+ HEVS=(await fetchAll(()=>sb.from('events').select('*').eq('vehicle_id',vid).gte('recorded_at',hf).lte('recorded_at',ht).order('recorded_at'))).filter(x=>EV[x.type]&&okFix(x)&&skipZero(x));
  await evBorrow(HEVS);
  const Vh=vehicles.find(x=>x.id===vid)||{};
  TRIPS=splitTrips(data,Vh).map((pts,i)=>({n:i+1,pts,col:TCOL[i%TCOL.length],on:true,evsOn:true,st:tStats(pts,Vh),ly:L.layerGroup(),ely:L.layerGroup(),evs:[]}));
@@ -1683,6 +1683,7 @@ const evIcon=t=>L.divIcon({className:'',html:`<div class="mk sm" style="backgrou
 const INSTANT={zone_enter:1,zone_exit:1,gps_recovered:1};
 const evEnd=x=>x.ended_at?new Date(x.ended_at):INSTANT[x.type]?new Date(new Date(x.recorded_at).getTime()+1000):null;
 const evDur=x=>{const e=evEnd(x);return e?(e-new Date(x.recorded_at))/1000:null};
+const skipZero=x=>{const d=evDur(x);return d===null||d>0};
 function evPop(x){const E=EVX(x.type),d=evDur(x),e=evEnd(x),n=(a,u)=>a!=null&&a!==''?a+u:'-',
  val=x.type==='harsh_braking'||x.type==='harsh_acceleration'?`<br><i class="fa-solid fa-gauge"></i> ${(+x.value||0).toFixed(1)} km/h/s`:'';
  return `<div style="min-width:240px"><b style="font-size:15px;color:${E[2]}"><i class="fa-solid ${E[1]}"></i> ${esc(E[0])}</b>${evClipBtn(x)}${HR}
@@ -1717,7 +1718,7 @@ function chart(id,type,labels,sets,o={}){const cs=getComputedStyle(document.docu
 const cnt=(rows,f)=>rows.reduce((o,r)=>{const k=f(r)||'-';o[k]=(o[k]||0)+1;return o},{});
 async function loadEvt(){fSave('evt');
  const v=mselVal('ev_v'),d=mselVal('ev_d'),t=mselVal('ev_t'),f=new Date($('ev_f').value).toISOString(),to=new Date($('ev_to').value).toISOString();
- EVR=await fetchAll(()=>{let q=sb.from('events').select('*').gte('recorded_at',f).lte('recorded_at',to).order('recorded_at',{ascending:false});if(v.length)q=q.in('vehicle_id',v);if(d.length)q=q.in('driver_id',d);if(t.length)q=q.in('type',t);return q});EVF={};await evBorrow(EVR);renderEvt()}
+ EVR=(await fetchAll(()=>{let q=sb.from('events').select('*').gte('recorded_at',f).lte('recorded_at',to).order('recorded_at',{ascending:false});if(v.length)q=q.in('vehicle_id',v);if(d.length)q=q.in('driver_id',d);if(t.length)q=q.in('type',t);return q})).filter(skipZero);EVF={};await evBorrow(EVR);renderEvt()}
 // The three toolbar dropdowns keep their tick marks between visits, so a type ticked
 // weeks ago can hide every event with nothing on the page to say why. Name an active
 // one here, in the same row as the tile filters, and let one click clear both.
@@ -1868,7 +1869,7 @@ async function loadRep(){fSave('rep');
  const {data,error}=await sb.rpc('vehicle_report',{p_from:f,p_to:t,p_tz:Intl.DateTimeFormat().resolvedOptions().timeZone});
  if(error)return toast(error.message);
  if(!data||!data.length){rep=[];$('rpK').innerHTML='';['r1','r2','r3','r4'].forEach(id=>charts[id]?.destroy());$('rpT').innerHTML='<p style="padding:12px;color:var(--mut)">No positions recorded in this period.</p>';return toast('No data in this period. Pick a wider period or another day.',1)}
- const evs=await fetchAll(()=>sb.from('events').select('vehicle_id,type').gte('recorded_at',f).lte('recorded_at',t));
+ const evs=(await fetchAll(()=>sb.from('events').select('vehicle_id,type,recorded_at,ended_at').gte('recorded_at',f).lte('recorded_at',t))).filter(skipZero);
  const V={},D={},K={harsh_braking:'b',harsh_acceleration:'a',overspeed:'o'};
  data.forEach(r=>{const o=V[r.vehicle_id]??={id:r.vehicle_id,name:r.vehicle_name,km:0,max:0,dr:0,sp:0,b:0,a:0,o:0,os:0};o.km+=+r.km;o.max=Math.max(o.max,+r.max_speed);o.dr+=+r.drive_min;o.sp+=+r.stop_min;o.os+=(+r.over_s||0);D[r.day]=(D[r.day]||0)+ +r.km});
  evs.forEach(e=>{if(V[e.vehicle_id]&&K[e.type])V[e.vehicle_id][K[e.type]]++});
@@ -2119,7 +2120,7 @@ async function alertEv(x){const R=RULES[x.type]||{},n=EVX(x.type)[0];
   if(okXY(x)){const m=L.marker([x.lat,x.lng],{icon:L.divIcon({className:'',html:'<div class="pulse"></div>',iconSize:[44,44],iconAnchor:[22,22]}),zIndexOffset:1000}).addTo(mapL).bindPopup(()=>evPop(x),{minWidth:240});
    if($('live').classList.contains('on'))m.openPopup();setTimeout(()=>m.remove(),60000)}}
  if(R.beep!==false)beep(R)}
-function onEv(x){if(!x||x.id==null||EVSEEN.has(x.id))return;EVSEEN.add(x.id);if(EVMAX==null||+x.id>+EVMAX)EVMAX=x.id;alertEv(x);
+function onEv(x){if(!x||x.id==null||EVSEEN.has(x.id))return;EVSEEN.add(x.id);if(EVMAX==null||+x.id>+EVMAX)EVMAX=x.id;if(!skipZero(x))return;alertEv(x);
  if(!$('evt').classList.contains('on')){evN++;$('evb').textContent=evN;$('evb').style.display='inline-block'}}
 async function evInit(){const {data}=await sb.from('events').select('id').order('id',{ascending:false}).limit(1);EVMAX=data&&data[0]?data[0].id:0}
 async function evPoll(){if(EVMAX==null)return evInit();const {data}=await sb.from('events').select('*').gt('id',EVMAX).order('id').limit(50);(data||[]).forEach(onEv)}
