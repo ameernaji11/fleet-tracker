@@ -788,14 +788,7 @@ async function askNotif(){await logAct('Allowed permissions');
  try{const p=await CapPlugins.LN.requestPermissions(),s=[p.display,p.alert,p.sound,p.badge].filter(Boolean);
  if(s.includes('denied')&&!s.includes('granted'))note('Notifications are blocked, so alerts only vibrate. Enable them in Android settings.','warn')}catch(e){}
  if(CHAN)return;
- // Android writes a channel's sound and loudness when it is created and never lets the
- // app change them again, so these ids are new: the silent "fleet" channel that earlier
- // builds registered cannot be repaired, it can only be left behind.
- for(const k of TONEK){try{await CapPlugins.LN.registerChannel({id:'fleet.'+k,name:'Fleet alerts: '+TONES[k],
-   description:'Overspeed and harsh driving warnings',sound:k+'.wav',importance:4,visibility:1,vibration:true})}catch(e){}}
- // a quiet channel for the banners posted while the app is on screen, so the same
- // breach never sounds twice at once
- try{await CapPlugins.LN.registerChannel({id:'fleet.quiet',name:'Fleet alerts: in app',description:'Shown while the app is open',importance:2,visibility:1,vibration:false});CHAN=true}catch(e){}}
+ try{await CapPlugins.LN.registerChannel({id:'fleet.quiet',name:'Fleet Tracker',description:'Account security notices',importance:2,visibility:1,vibration:false});CHAN=true}catch(e){}}
 // ---- spoken safety warnings. English, Arabic, Kurdish in both scripts, Hindi and Urdu;
 // the language and the on/off switches come from the dashboard Configuration page.
 const VLANG={en:['English','en-US'],ar:['Arabic','ar-SA'],hi:['Hindi','hi-IN'],ur:['Urdu','ur-PK'],ku:['Kurdish (Kurmanji)','ku'],ckb:['Kurdish (Sorani)','ckb-IQ']};
@@ -841,9 +834,6 @@ function muteTog(){MUTE=!MUTE;localStorage.mute=MUTE?'1':'0';if(MUTE)stopTone();
  banner(MUTE?'<i class="fa-solid fa-volume-xmark"></i> Alerts muted: warnings still show on screen':'<i class="fa-solid fa-volume-high"></i> Alerts are audible again',4000);
  logAct('Alert sounds',MUTE?'muted':'audible')}
 function beep(type){const R=RUL[type]||{};if(MUTE||R.beep===false||R.beep_type==='off')return;const dur=Math.max(1,+R.beep_duration||5);
- // with another app or the lock screen in front, the loud notification channel is the
- // sound, so this page starts no tone of its own: one breach, one buzzer
- if(!onScreen())return;
  playTone(R.beep_type,dur);
  if(navigator.vibrate){const p=[];if(R.beep_type==='continuous'||R.beep_type==='siren')p.push(dur*1000);
   else for(let i=0;i<Math.max(1,Math.round(dur*2));i++)p.push(300,200);try{navigator.vibrate(p)}catch(e){}}}
@@ -855,21 +845,11 @@ let aT;
 function banner(html,ms){const a=$('alert');a.innerHTML=html;a.classList.remove('hide');clearTimeout(aT);aT=setTimeout(()=>a.classList.add('hide'),ms)}
 function warnMsg(txt){banner('<i class="fa-solid fa-gauge-simple-high"></i> '+txt,4000)}
 function notify(type,kmh,lvl){const R=RUL[type]||{},txt=Math.round(kmh)+' km/h'+(lvl?' against '+lvl:'');
- const back=!onScreen(),bt=R.beep_type&&TONEK.indexOf(R.beep_type)>=0?R.beep_type:'discontinuous';
+ const back=!onScreen();
  if(R.alert!==false){banner('<i class="fa-solid fa-triangle-exclamation"></i> '+EVN[type]+' · '+txt,6000);alertRing()}
- // Android stops this page's own sound the moment another app or the lock screen takes
- // over, and only a notification still rings there, so one is posted even when the
- // in-app banner has been switched off - otherwise a backgrounded breach would be silent
- if(back||R.alert!==false){
-   const n={id:Date.now()%2147483647,title:'Fleet Tracker: '+EVN[type],
-     body:txt+(R.voice===false||!V.voice_on?'':' - '+vrMsg(type,VLANG[R.voice_lang]?R.voice_lang:V.lang))};
-   n.channelId=(CHAN&&back&&!MUTE&&R.beep!==false&&bt!=='off')?'fleet.'+bt:'fleet.quiet';
-   try{const p=CapPlugins.LN.schedule({notifications:[n]});if(p&&p.catch)p.catch(()=>{})}catch(e){}
-   // the voice waits for the tone only while the app is on screen, where a timer is
-   // safe to rely on; in the background it is spoken at once instead of never
-   const vl=R.voice_lang&&VLANG[R.voice_lang]?R.voice_lang:(R.voice_lang==='off'||R.voice===false||!V.voice_on?'off':V.lang);
-   if(ANN[type]!==false&&vl!=='off'){
-     if(back)speak(type,vl);else setTimeout(()=>speak(type,vl),Math.min(2,Math.max(1,+R.beep_duration||5)))}}
+ const vl=R.voice_lang&&VLANG[R.voice_lang]?R.voice_lang:(R.voice_lang==='off'||R.voice===false||!V.voice_on?'off':V.lang);
+ if(ANN[type]!==false&&vl!=='off'){
+   if(back)speak(type,vl);else setTimeout(()=>speak(type,vl),Math.min(2,Math.max(1,+R.beep_duration||5)))}
  beep(type)}
 // A driver, or whoever hands the phone over, must be able to prove the alarm works
 // before setting off: this runs the overspeed alert exactly the way a breach does,
@@ -1758,7 +1738,12 @@ async function loadRules(){
  if(!off)$('err').textContent='Could not read your settings: '+(a.error&&a.error.message||r.error&&r.error.message||'unknown');
  return 0}
 async function pollBat(){try{const b=await CapPlugins.Device.getBatteryInfo();bat={p:Math.round(b.batteryLevel*100),c:b.isCharging};$('v_bat').textContent=bat.p+'%'+(bat.c?' ⚡':'')}catch(e){}}
-const row=(loc,speed,ign)=>({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name,driver_name:asg.drivers?.name,lat:loc.latitude,lng:loc.longitude,speed,accuracy:loc.accuracy,altitude:loc.altitude,heading:loc.bearing,ignition:ign,accel:+(lastA*3.6).toFixed(1),battery_pct:bat.p,charging:bat.c,recorded_at:new Date(loc.time||Date.now()).toISOString()});
+// Every point names every column, with null where this fix has no answer. That is a wire rule,
+// not tidiness: a batch goes out as ONE array of these objects and the server refuses an array
+// whose rows do not all carry the same keys ("All object keys must match") - it refuses all of
+// them, so a point written before the battery was first read and one written after used to cost
+// the trip every position between the two. An undefined value would not survive the JSON either.
+const row=(loc,speed,ign)=>({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name??null,driver_name:asg.drivers?.name??null,lat:loc.latitude,lng:loc.longitude,speed,accuracy:loc.accuracy??null,altitude:loc.altitude??null,heading:loc.bearing??null,ignition:ign,accel:+(lastA*3.6).toFixed(1),battery_pct:bat.p??null,charging:bat.c??null,recorded_at:new Date(loc.time||Date.now()).toISOString()});
 // a client-side id lets an event and its closing update both wait in the outbox in
 // order, so a breach that started offline still ends up as one complete row
 const uid=()=>{try{if(crypto.randomUUID)return crypto.randomUUID()}catch(e){}
@@ -1899,6 +1884,23 @@ async function outSend(r){const v=r.v;
   // a name the server already has counts as delivered: the record is there, and the driver
   // must not be told a thing he has already reported was lost
   if(dupCid(error))return {ok:true};
+  // An answer of "this account may not write that row" is the one refusal this phone can
+  // repair by itself. The three ids on an alert are whatever the assignment said at the
+  // second it was raised - and a record drained from the background runner can carry the
+  // pair from the trip that started hours ago, across an office that has reassigned the
+  // vehicle, a driver moved to another one, or a second login that shares it. So put the
+  // ids this page is holding right now on a copy and ask once more. Nothing landed the
+  // first time - the database refused the row - and the same cid is unique on the table,
+  // so a retry cannot write the breach twice.
+  if(isOwn(error)&&me&&asg){const p=Object.assign({},v.p,{user_id:me.id,vehicle_id:asg.vehicle_id,
+    driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name??null,driver_name:asg.drivers?.name??null});
+   const r=await q(sb.from('events').insert(p));
+   if(!r.error||dupCid(r.error))return {ok:true};
+   // a second refusal is the pairing itself, which only the office can put right, and the
+   // driver cannot be told to fix it without being told what does not match
+   return {ok:false,error:{message:'this handset filed it as vehicle '+(short(p.vehicle_id)||'nothing')+
+     ' with driver '+(short(p.driver_id)||'nothing')+' - this login is not assigned to that pair ('+
+     (r.error&&r.error.message||r.error)+')'}}}
   return {ok:!error,error}}
  // a close the server refuses must not hold the whole queue behind it
  // the row is found by the name the phone gave it, because that is the only id it
@@ -1914,6 +1916,14 @@ let POSWHY='',POSBAD={k:'',n:0};
 // signing in again makes every one of them deliverable, so the queue keeps them and says why.
 const isAuth=e=>{try{if(!e)return false;return +e.statusCode===401||String(e.code||'').startsWith('PGRST30')||
  /jwt expired|invalid json web token|invalid token/i.test(String(e.message||e))}catch(x){return false}}
+// The database's own word for "this login has no right to that row" (SQL state 42501, the one
+// every row-level-security refusal arrives as). It is different from a column it does not know
+// or a value it will not take: those say the schema is behind the phone, this one says the
+// pairing on the record is, and only the second is something the page can put right itself.
+const isOwn=e=>{try{return String((e&&e.code)||'')==='42501'||/row-level security/.test(String((e&&e.message)||e))}catch(x){return false}}
+// eight characters of a uuid is enough to tell one vehicle from another in a message a driver
+// reads once in a taxi; the whole thing is what the office would need, and it never fits
+const short=u=>String(u||'').split('-')[0]||''
 // One INSERT for the whole batch is what makes a drive cheap to upload - and it was also what
 // could lose a whole one. A batch the server ANSWERS "no" to is refused for a reason that
 // will not change by asking again, and the old code stopped the flush at that answer, so the
