@@ -1,0 +1,258 @@
+name: Build APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Load signing key from secret
+        id: key
+        env:
+          FLEET_KEYSTORE_B64: ${{ secrets.FLEET_KEYSTORE_B64 }}
+        run: |
+          # This step used to have no guard at all, so a secret that was not clean
+          # base64 - a carriage return from a Windows editor, or the BEGIN/END lines
+          # of certutil's PEM output - killed the run with nothing but "exit code 1"
+          # two minutes in, which reads exactly like a code problem. It now says so.
+          trap 'echo "::error::The signing key could not be read from the FLEET_KEYSTORE_B64 secret (failing line $LINENO). Save the secret as one base64 string with no headers, no spaces and no carriage returns." | head -c 600; exit 1' ERR
+          if [ -n "$FLEET_KEYSTORE_B64" ]; then
+            # Secrets get pasted in whatever shape the tool that made them produced:
+            # one long line, wrapped at 76, with Windows line endings, or with certutil's
+            # BEGIN/END lines around it. All four decode to the same key here. A strict
+            # `base64 -d` on any of the others is what ended this run with nothing but
+            # "exit code 1" - and `-i` alone is not enough, because the letters of
+            # "BEGIN CERTIFICATE" are themselves valid base64 and shift the whole file.
+            printf '%s' "$FLEET_KEYSTORE_B64" \
+              | tr -d '\r\n \t' \
+              | sed -E 's/-----[A-Za-z ]+-----//g' \
+              | base64 -di > fleet.keystore
+            SZ=$(stat -c %s fleet.keystore)
+            [ "$SZ" -gt 500 ] || { echo "::error::FLEET_KEYSTORE_B64 decoded to only $SZ bytes - the secret is truncated or is not this keystore."; exit 1; }
+            echo "source=secret" >> "$GITHUB_OUTPUT"
+          else
+            echo "source=none" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Fall back to the cached key
+        if: steps.key.outputs.source != 'secret'
+        uses: actions/cache@v4
+        with:
+          path: fleet.keystore
+          key: fleet-keystore-v1
+      # Checked before the two-minute Gradle build so a key/password mismatch
+      # names itself instead of surfacing as "exit code 2" from apksigner.
+      - name: Check the signing key
+        env:
+          KS_PASS: ${{ secrets.FLEET_KEYSTORE_PASSWORD }}
+          SRC: ${{ steps.key.outputs.source }}
+        run: |
+          if [ ! -s fleet.keystore ]; then
+            echo "::error::No signing key available: the FLEET_KEYSTORE_B64 secret is empty and the fleet-keystore-v1 cache entry is gone."
+            echo "Generating a fresh key here would change the APK signature, so every driver has to uninstall and reinstall."
+            exit 1
+          fi
+          if [ -z "$KS_PASS" ]; then
+            echo "::error::Missing the FLEET_KEYSTORE_PASSWORD secret."
+            exit 1
+          fi
+          if ! keytool -list -keystore fleet.keystore -storepass "$KS_PASS" -alias fleet >/dev/null 2>&1; then
+            echo "::error::fleet.keystore (from the $SRC) cannot be opened with FLEET_KEYSTORE_PASSWORD, or has no 'fleet' alias."
+            echo "::error::The key and the password come from different keystores. Correct the secret - do not generate a new key, that changes the APK signature and forces every driver to reinstall."
+            exit 1
+          fi
+          echo "Signing key verified (source: $SRC)."
+      # This one long step used to be a single "Create Android project" box, so any
+      # command inside it that failed printed nothing but "Process completed with
+      # exit code 1" and the run could not be read. It is now four named steps, each
+      # of which says what it was doing when it broke.
+      - name: Install the build packages
+        run: |
+          trap 'echo "::error::npm could not install the Capacitor packages (failing line $LINENO)"; exit 1' ERR
+          npm init -y
+          # fleet-dms is our own module, in this repository rather than on npm: the
+          # file: path is how Capacitor's CLI finds it, its package.json is what tells
+          # the CLI it is a plugin, and plugins/fleet-dms/android is what gets added to
+          # the Gradle build as :fleet-dms.
+          npm i @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7 @capacitor/device@7 @capacitor/local-notifications@7 @capacitor/browser@7 @capacitor-community/background-geolocation@1.2.26 @capacitor-community/text-to-speech@6.1.0 file:./plugins/fleet-dms esbuild
+      - name: Bundle the plugin bridge
+        run: |
+          trap 'echo "::error::www/bridge.js could not be built (failing line $LINENO)"; exit 1' ERR
+          echo "import { registerPlugin } from '@capacitor/core';" > bridge.js
+          echo "window.CapPlugins = { BG: registerPlugin('BackgroundGeolocation'), Device: registerPlugin('Device'), LN: registerPlugin('LocalNotifications'), Browser: registerPlugin('Browser'), TTS: registerPlugin('TextToSpeech'), Dms: registerPlugin('FleetDms') };" >> bridge.js
+          npx esbuild bridge.js --bundle --minify --outfile=www/bridge.js
+      - name: Copy the map libraries into the app
+        run: |
+          # The app has to open in a basement, a tunnel or a dead spot, so the map
+          # library, the database client and the icon font travel inside the APK
+          # instead of being fetched from a CDN at start-up. index.html falls back to
+          # the CDN only if these files are missing.
+          trap 'echo "::error::the offline copies of the map libraries were not built (failing line $LINENO)"; exit 1' ERR
+          npm i --no-save leaflet@1.9.4 @supabase/supabase-js@2.45.4 @fortawesome/fontawesome-free@6.5.1
+          mkdir -p www/vendor/fa/css www/vendor/fa/webfonts
+          cp node_modules/leaflet/dist/leaflet.js www/vendor/leaflet.js
+          cp node_modules/leaflet/dist/leaflet.css www/vendor/leaflet.css
+          # There is no supabase.min.js inside the npm package - that name only
+          # exists on the CDN, which minifies on request - and the library keeps its
+          # realtime client in a separate webpack chunk that it loads from its own
+          # folder. Copying only supabase.js builds fine and then loses live tracking
+          # and the blackbox answers inside the APK, so both files are required.
+          cp node_modules/@supabase/supabase-js/dist/umd/supabase.js www/vendor/supabase.js
+          cp node_modules/@supabase/supabase-js/dist/umd/591.supabase.js www/vendor/591.supabase.js
+          cp node_modules/@fortawesome/fontawesome-free/css/all.min.css www/vendor/fa/css/all.min.css
+          cp node_modules/@fortawesome/fontawesome-free/webfonts/fa-*-*.woff2 www/vendor/fa/webfonts/
+          for f in www/vendor/leaflet.js www/vendor/leaflet.css www/vendor/supabase.js www/vendor/591.supabase.js www/vendor/fa/css/all.min.css; do
+            [ -s "$f" ] || { echo "::error::$f is missing or empty after the copy."; exit 1; }
+          done
+          [ "$(ls www/vendor/fa/webfonts/*.woff2 2>/dev/null | wc -l)" -ge 3 ] || { echo "::error::no icon fonts in www/vendor/fa/webfonts - the buttons would render as empty boxes."; exit 1; }
+          ls -l www/vendor www/vendor/fa/css www/vendor/fa/webfonts
+      # The driver's face is read on the handset, so the models that read it travel
+      # inside the APK: a driver in a dead spot cannot download one, and nothing about
+      # his eyes or what he is holding ever leaves the phone. They are fetched at build
+      # time rather than kept in git because they are megabytes of binary nobody can
+      # review, and the URLs below are version-pinned copies (float16/1 and int8/1).
+      # The second one is the object model that names a phone, a cup or a piece of food
+      # in front of the driver, which no face model can tell the difference between.
+      - name: Fetch the driver-camera models
+        run: |
+          trap 'echo "::error::a driver-camera model was not fetched (failing line $LINENO)"; exit 1' ERR
+          A=plugins/fleet-dms/android/src/main/assets
+          mkdir -p "$A"
+          curl -fsSL --retry 3 -o "$A/face_landmarker.task" \
+            https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
+          curl -fsSL --retry 3 -o "$A/efficientdet_lite0.tflite" \
+            https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/int8/1/efficientdet_lite0.tflite
+          # A half-downloaded file builds into an APK that quietly has no eyes for the
+          # whole trip, which is a long way to find out about a bad mirror.
+          SZ=$(stat -c %s "$A/face_landmarker.task")
+          [ "$SZ" -gt 3000000 ] || { echo "::error::face_landmarker.task is only $SZ bytes - the download did not finish."; exit 1; }
+          SZ2=$(stat -c %s "$A/efficientdet_lite0.tflite")
+          [ "$SZ2" -gt 4000000 ] || { echo "::error::efficientdet_lite0.tflite is only $SZ2 bytes - the download did not finish."; exit 1; }
+          echo "Driver-camera models ready: face $SZ bytes, objects $SZ2 bytes."
+      - name: Create the Android project
+        run: |
+          trap 'echo "::error::the Android project could not be created (failing line $LINENO)"; exit 1' ERR
+          npx cap add android
+          # The driver-camera library is built for Android 7 and up, and a library may
+          # not ask less of the app it is merged into, so the app's own floor moves with
+          # it. The grep afterwards is the check that the template still says what it
+          # said when this line was written - if it ever changes, the build should stop
+          # here rather than fail three minutes later in the Gradle merge.
+          sed -i 's/minSdkVersion = 2[0-9]/minSdkVersion = 24/' android/variables.gradle
+          grep -q 'minSdkVersion = 24' android/variables.gradle || { echo "::error::android/variables.gradle no longer holds a minSdkVersion this step can raise to 24."; exit 1; }
+          sed -i 's#</manifest>#<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/><uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/><uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE"/><uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/><uses-permission android:name="android.permission.POST_NOTIFICATIONS"/><uses-permission android:name="android.permission.VIBRATE"/></manifest>#' android/app/src/main/AndroidManifest.xml
+          sed -i 's/android:allowBackup="true"/android:allowBackup="false"/; s/<application/<application android:usesCleartextTraffic="false"/' android/app/src/main/AndroidManifest.xml
+          # The buzzer tones double as notification-channel sounds, which is how an
+          # alert is still heard when Android has frozen this app's JavaScript. A
+          # channel points at res/raw by file name, and Android silently plays
+          # nothing if that file is missing, so this step has to succeed.
+          mkdir -p android/app/src/main/res/raw
+          cp www/tones/*.wav android/app/src/main/res/raw/
+          ls -l android/app/src/main/res/raw/ | grep -c '\.wav'
+          npx cap sync android
+          # cap sync is what writes the list of plugin classes the app loads when it
+          # starts. If our own module is missing from it the phone still builds, still
+          # installs and still drives - only the camera never opens, which is a hard
+          # thing to notice from a dashboard. So the build checks it instead.
+          PL=android/app/src/main/assets/capacitor.plugins.json
+          [ -s "$PL" ] || { echo "::error::$PL was not written by cap sync."; exit 1; }
+          grep -q 'com.fleet.dms.FleetDmsPlugin' "$PL" || { echo "::error::cap sync did not register the driver camera. It reads plugins/fleet-dms/package.json for the module path and the Java under plugins/fleet-dms/android/src/main for the class name, so check the capacitor manifest and the @CapacitorPlugin annotation."; exit 1; }
+          cat "$PL"
+      # One artwork for the browser tab and the phone: both come from www/icon.svg.
+      # @capacitor/assets is not used here - its v3 CLI has no icon-only flag and it
+      # insists on a splash.png we don't ship, so the mipmaps are written straight
+      # into res/ by tools/make-icons.js. The step stays non-fatal: a broken icon
+      # must never block an APK the drivers are waiting for.
+      - name: Generate app icons
+        continue-on-error: true
+        run: |
+          npm i --no-save sharp@0.33.5
+          node tools/make-icons.js --direct
+          ls -l android/app/src/main/res/mipmap-xxxhdpi/
+      # Gradle was in the same step as zipalign and apksigner, and the whole thing had
+      # no guard: a Java or Gradle failure printed "Process completed with exit code 1"
+      # and nothing else, which is the one thing this file has been fixed for twice
+      # already. Each of the three now says what it was doing, and the Gradle one
+      # repeats the lines that actually failed into the annotation.
+      - name: Build the release APK with Gradle
+        run: |
+          chmod +x android/gradlew
+          # pipefail is on for the whole job, so a failing gradlew would end the step
+          # before the report below could run; it is lifted just for this pipeline.
+          set +o pipefail
+          (cd android && ./gradlew assembleRelease --console=plain --warning-mode=none 2>&1) | tee gradle.log
+          RC=${PIPESTATUS[0]}
+          set -o pipefail
+          if [ "$RC" -ne 0 ]; then
+            echo "::group::why the build failed"
+            grep -nE "FAILURE:|^\* What went wrong|^\* Where|^> Task .* FAILED|error:|Execution failed for task|Could not (find|resolve|determine|create)" gradle.log | tail -40
+            echo "--- last 60 lines ---"
+            tail -60 gradle.log
+            echo "::endgroup::"
+            # The log itself can only be read signed in, so the lines that name the
+            # cause are repeated inside the annotation: %0A is how a workflow command
+            # carries a newline, and %25 has to go first or the escapes break.
+            KEY=$(grep -A6 "^\* What went wrong:" gradle.log | head -30)
+            [ -n "$KEY" ] || KEY=$(grep -E "FAILURE:|error:|^> Task .* FAILED|Could not (find|resolve|determine|create)" gradle.log | head -12)
+            [ -n "$KEY" ] || KEY=$(tail -6 gradle.log)
+            MSG=$(printf '%s\n' "$KEY" | tr -d '\r' | sed -e 's/%/%25/g' -e 's/[[:space:]]\{1,\}/ /g' -e ':a' -e 'N' -e '$!ba' -e 's/\n/%0A/g')
+            echo "::error::Gradle could not build the release APK (exit $RC): ${MSG:0:1500}"
+            exit 1
+          fi
+          grep -q "BUILD SUCCESSFUL" gradle.log || { echo "::error::Gradle said it succeeded but left no BUILD SUCCESSFUL line."; exit 1; }
+          ls -l android/app/build/outputs/apk/release/
+      - name: Align and sign the APK
+        env:
+          KS_PASS: ${{ secrets.FLEET_KEYSTORE_PASSWORD }}
+        run: |
+          trap 'echo "::error::the APK could not be aligned or signed (failing line $LINENO)"; exit 1' ERR
+          BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+          [ -x "$BT/zipalign" ] || { echo "::error::No build-tools with zipalign under $ANDROID_HOME"; exit 1; }
+          UNSIGNED=android/app/build/outputs/apk/release/app-release-unsigned.apk
+          [ -s "$UNSIGNED" ] || { echo "::error::Gradle produced no $UNSIGNED."; exit 1; }
+          $BT/zipalign -p 4 "$UNSIGNED" aligned.apk
+          $BT/apksigner sign --ks fleet.keystore --ks-pass pass:$KS_PASS --key-pass pass:$KS_PASS --ks-key-alias fleet --out fleet-tracker.apk aligned.apk
+      - name: Check the signed APK
+        run: |
+          BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+          $BT/apksigner verify --print-certs fleet-tracker.apk || { echo "::error::fleet-tracker.apk is not a valid signed APK."; exit 1; }
+          # A handset rebooted at a depot takes the background runner down with it, and the
+          # driver does not open the app again until he notices the map has stopped moving.
+          # Three things have to survive the manifest merger for the receiver to be called,
+          # and all three are read off the built APK rather than the source: the permission,
+          # the receiver class, and its BOOT_COMPLETED filter. exported must be true - a
+          # system broadcast cannot reach a receiver that says false on API 31 and later.
+          # Missing any of them still builds, installs and drives; it just never comes back.
+          PERMS=$($BT/aapt dump permissions fleet-tracker.apk)
+          echo "$PERMS" | grep -q 'android.permission.RECEIVE_BOOT_COMPLETED' || { echo "::error::the APK cannot hear a reboot: RECEIVE_BOOT_COMPLETED is not in the merged manifest. It is declared in plugins/fleet-dms/android/src/main/AndroidManifest.xml, so check that the plugin module is still part of the build."; exit 1; }
+          $BT/aapt dump xmltree fleet-tracker.apk AndroidManifest.xml > manifest.txt
+          grep -q '"com.fleet.dms.BootReceiver"' manifest.txt || { echo "::error::com.fleet.dms.BootReceiver is not in the shipped manifest - the plugin manifest was not merged, so nothing brings the runner back after a reboot."; exit 1; }
+          BLOCK=$(grep -A6 '"com.fleet.dms.BootReceiver"' manifest.txt)
+          echo "$BLOCK" | grep -q 'android.intent.action.BOOT_COMPLETED' || { echo "::error::the boot receiver is declared without a BOOT_COMPLETED filter, so Android will never call it."; exit 1; }
+          echo "$BLOCK" | grep -q 'android:exported(0x01010010)=(type 0x12)0xffffffff' || { echo "::error::the boot receiver is not exported=true, so the system broadcast cannot reach it on API 31 and later."; exit 1; }
+          ls -l fleet-tracker.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fleet-tracker-apk
+          path: fleet-tracker.apk
+      # The APK is already an artifact at this point, so a hiccup here (a stale
+      # "latest" tag, a dropped asset upload) must not turn a good build red and
+      # make it look as if the phones got nothing.
+      - name: Publish APK as a release
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag --repo ${{ github.repository }} || true
+          gh release create latest fleet-tracker.apk --title "Fleet Tracker APK" --notes "Latest build" --repo ${{ github.repository }} \
+            || echo "::warning::The APK built fine and is in the Artifacts list, but the 'latest' release was not updated."
