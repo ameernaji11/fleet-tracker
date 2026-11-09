@@ -318,11 +318,11 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
      *
      * The order carries the server, the vehicle, the two recording intervals, the road limits
      * the office drew and the flag that says whether a trip is open, and never a sign-in:
-     * {@link #trackToken} is the only method that takes one, and it is only ever kept in
-     * memory. A service that has to be started by this call is given the order on disk
-     * instead, which is how a stretch Android had to bring back by itself starts taking
-     * positions again before the page has woken up - collecting, and sending nothing until a
-     * page that can see itself hands over a token again.
+     * {@link #trackToken} lends one for an hour at a time and {@link #trackSession} hands over
+     * the one this runner keeps. A service that has to be started by this call is given the
+     * order on disk instead, which is how a stretch Android had to bring back by itself starts
+     * taking positions again before the page has woken up - and, on a phone that was ever given
+     * a sign-in of its own, sends them too.
      *
      * A driver who can see this page may be asking for two different things with the same
      * call: the office's positions, which every signed-in handset wants all day, and the
@@ -356,7 +356,11 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
         });
     }
 
-    /** The page's own sign-in, refreshed as often as the page can see it. Never written to disk. */
+    /**
+     * The page's own sign-in, lent for as long as the page is awake to see it. Kept in memory
+     * and never on the disk - which is exactly why it is not enough on its own, and why the
+     * runner is given a sign-in of its own at {@link #trackSession}.
+     */
     @PluginMethod
     public void trackToken(PluginCall call) {
         safe(call, () -> {
@@ -364,6 +368,34 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
             Track t = s == null ? null : s.track();
             if (t != null) t.token(call.getString("token", ""));
             JSObject r = new JSObject();
+            r.put("ran", t != null);
+            r.put("status", t == null ? new JSONObject() : t.status());
+            call.resolve(r);
+        });
+    }
+
+    /**
+     * The sign-in this runner keeps for itself, so that it can upload with the app shut.
+     *
+     * The page mints it once, in the background, from the driver's own sign-in: it is a second
+     * session for the same account rather than the page's session handed over, because the
+     * sign-in server burns a refresh token as soon as it is used and the page would find its own
+     * no longer works. Only the two tokens, the moment the first stops working and the account
+     * they belong to are kept; the password is not here and cannot be got from what is.
+     *
+     * It is sealed with a key inside the phone's own Keystore that cannot be exported, and a
+     * handset that will not give up such a key simply keeps doing what it did before. Sign-out
+     * and giving up the seat both forget it.
+     */
+    @PluginMethod
+    public void trackSession(PluginCall call) {
+        safe(call, () -> {
+            String raw = call.getString("session", "");
+            DmsService s = DmsService.get();
+            Track t = s == null ? null : s.track();
+            boolean kept = t != null ? t.session(raw) : Track.seal(getContext(), raw);
+            JSObject r = new JSObject();
+            r.put("kept", kept);
             r.put("ran", t != null);
             r.put("status", t == null ? new JSONObject() : t.status());
             call.resolve(r);
@@ -444,6 +476,36 @@ public class FleetDmsPlugin extends Plugin implements DmsService.Host {
             JSONArray items = t != null ? t.drain() : Track.peek(getContext());
             JSObject r = new JSObject();
             r.put("items", items);
+            call.resolve(r);
+        });
+    }
+
+    /**
+     * Records the page holds but cannot send, given to the runner, which can. The other
+     * direction of {@link #trackDrain}, and the answer to a vehicle whose phone works but whose
+     * office has gone quiet: a page Android froze hours ago leaves its collected points in its
+     * own outbox, where only a page can flush them, and the queue that keeps running behind the
+     * driver's back never sees them.
+     * <p>
+     * Nothing is thrown away on the way. The page keeps its copies until this call says the
+     * runner holds the whole batch, and the runner refuses a batch it cannot post - no order,
+     * no sign-in, no room - so the records are in one queue or the other at every moment, never
+     * in neither.
+     */
+    @PluginMethod
+    public void trackPush(PluginCall call) {
+        safe(call, () -> {
+            JSONArray rows = call.getArray("rows");
+            DmsService s = DmsService.get();
+            Track t = s == null ? null : s.track();
+            JSObject r = new JSObject();
+            // A dead service is not a spare queue: with nothing alive to post, the file on disk
+            // would be written by two hands at once. The page keeps the records and asks again
+            // after it has brought the runner back.
+            int kept = t == null ? 0 : t.handover(rows);
+            r.put("kept", kept);
+            r.put("ran", t != null);
+            r.put("status", t == null ? new JSONObject() : t.status());
             call.resolve(r);
         });
     }

@@ -53,14 +53,19 @@ import java.util.Map;
  * applies them, keeps the corner points and the last point of a trip, and puts the rows
  * where the dashboard reads them.
  *
- * It uploads with the driver's own access token, handed over by the page when the trip
- * begins and refreshed whenever the page can see itself. That is not a second way into the
- * database: it is the same sign-in in a different hand, and every guard on the positions
- * table still applies to it, so this cannot file a position for a vehicle its driver does
- * not own any more than the page can. A token is never written to disk, and a runner that
- * Android had to start on its own therefore collects without sending: the rows go to the
- * same file, the page drains what a refused or expired sign-in left there, and nothing is
- * dropped for a reason the phone could have waited out.
+ * It uploads with the driver's own sign-in. That is not a second way into the database: it is
+ * the same driver in a different hand, and every guard on the positions table still applies to
+ * it, so this cannot file a position for a vehicle its driver does not own any more than the
+ * page can. Two sign-ins reach it: the one the page lends from memory every fifteen seconds,
+ * and one the page mints for this runner alone at the driver's own sign-in, which is kept
+ * sealed on the phone by {@link Session} and started again here whenever it runs out. The
+ * second is what changed the shape of a shift: the lent token dies an hour after sign-in, a
+ * page Android has frozen cannot lend a new one, and a runner that had nothing else to send
+ * with spent the rest of the day collecting - which is the driver's "+243 records waiting"
+ * and the office's blank map. A runner started without the app now reads the sealed sign-in
+ * back and goes on uploading. What it cannot do is sign in by itself: a phone that has never
+ * been handed one, or that lost the blob, collects and the page drains what is left, so
+ * nothing is ever dropped for a reason the phone could have waited out.
  *
  * The page stays the writer of events while the driver is looking at it, and this takes over
  * the ones it cannot see: a zone the vehicle crossed behind a locked screen, and the three
@@ -125,9 +130,11 @@ class Track {
     /**
      * The only server this runner will ever talk to. The page names the Supabase project it
      * reads from its own config, and the same test is applied to it at www/index.html, but
-     * this service is the one that carries the driver's live sign-in in memory and posts a
-     * whole trip with it - so the host is checked here as well, at the moment it arrives, at
-     * the moment it is read back off the disk after a restart, and again at the connection.
+     * this service is the one that carries the driver's live sign-in and posts a whole trip
+     * with it - so the host is checked here as well, at the moment it arrives, at the moment it
+     * is read back off the disk after a restart, and again at the connection. A host it is not
+     * allowed to speak to is also a host it will not ask to start a sign-in again: the sealed
+     * refresh token only ever goes to the same address, checked the same way.
      * A page that had been tricked into naming somebody else's host would otherwise hand
      * over both the route and the key that writes it, and a bad host typed into the config
      * would keep being used by a service that outlives the page that made the mistake.
@@ -138,6 +145,18 @@ class Track {
     private static boolean hostOk(String u) { return u != null && HOST.matcher(u).matches(); }
 
     private volatile String url = "", anon = "", token = "";
+    /**
+     * The sign-in this runner owns outright, read back from the sealed copy on this phone: the
+     * access token it last started, the refresh token that can start the next one, the moment
+     * the first stops working, and the account both belong to. All empty until a page hands a
+     * minted sign-in over, and cleared again by sign-out, by giving up the seat, and by the
+     * sign-in server refusing the refresh token. See {@link Session}.
+     */
+    private volatile String own = "", refresh = "", ownUid = "";
+    private volatile long ownUntil;
+    /** The last moment the sign-in server was asked to start a new hour, so a phone sitting in
+     *  a dead spot with a queue on it cannot build a loop of auth requests behind itself. */
+    private volatile long lastRenew;
     private volatile String uid = "", vid = "", did = "", vname = "", dname = "";
     private volatile int movingS = 10, parkedS = 3600;
     private volatile double speedLimit, buf, accelLimit, brakeLimit;
@@ -158,14 +177,20 @@ class Track {
     /** Consecutive fixes on each side of the moving line, so one drifting satellite cannot
      *  decide that the vehicle has started being driven. */
     private int hotStreak, coldStreak;
+    /** When this runner's own judgement last said the vehicle had stopped being driven, in
+     *  {@link SystemClock#elapsedRealtime} units, or 0 while no fix has been judged. The page
+     *  keeps a still clock of its own, but Android freezes that one when the driver locks his
+     *  handset, so a trip that must not be cut in two asks this clock instead. */
+    private volatile long stoodAt;
     /** The last moment the beat was changed, so a vehicle crawling in a queue cannot re-tune
      *  the handset's receiver every second. */
     private long lastBeat;
     /** Whether {@link #tick} is posted right now. Never more than one clock per trip. */
     private volatile boolean scheduled;
-    // True only while a page in this process has handed over a token. Android can restart
-    // this runner mid-shift, and the sign-in it would have to send with is not on disk - so
-    // a restarted runner collects, and the page sends or re-hands the token over.
+    // Whether this runner has a sign-in to send with at all - one a page lent it from memory,
+    // or one it keeps sealed on this phone. Android can restart this runner mid-shift, and a
+    // restarted one used to be unable to send because the lending was never on the disk; now it
+    // reads its own sign-in back and carries on. See {@link Session}.
     private volatile boolean allowed;
     private volatile boolean want;
     private long lastSent, lastTry, lastFixAt, sent;
@@ -220,6 +245,11 @@ class Track {
         take(sp.getString(K_PEND, null));
         sp.edit().remove(K_PEND).apply();
         load();
+        // Before this line a runner Android had to start on its own could only collect, because
+        // the only sign-in it ever knew was one a page held in memory and had no way to pass on
+        // while it was frozen. The sealed copy is what a restarted service reads instead.
+        restore();
+        checkOwner();
         // A trip that Android had to bring back by itself is still a trip: it keeps taking
         // positions from this second, and the page hands over a token when it wakes.
         if (want) resume();
@@ -277,6 +307,7 @@ class Track {
             vname = ids.optString("vehicle_name", vname);
             dname = ids.optString("driver_name", dname);
         }
+        checkOwner();
         JSONArray rs = j.optJSONArray("rules");
         if (rs != null) {
             for (int i = 0; i < rs.length(); i++) {
@@ -307,9 +338,10 @@ class Track {
 
     /**
      * The sign-in moves: the page's own client refreshes it an hour in, and only the page
-     * can see that happen. Handing it over here is also the only thing that lets this send,
-     * so a runner Android started by itself starts uploading again the moment the page can
-     * talk.
+     * can see that happen. Handing it over here is the cheapest way for this runner to send,
+     * and it stays in memory like it always did. What has changed is that it is no longer the
+     * only way: a page that is frozen, or an app that was swiped away, leaves the sign-in
+     * minted at {@link #session} to carry the rest of the shift.
      */
     void token(String t) {
         if (t == null || t.isEmpty()) return;
@@ -317,6 +349,235 @@ class Track {
         allowed = true;
         if (!error.isEmpty()) error = "";
         trySend();
+    }
+
+    /**
+     * The sign-in the page minted for this runner alone, at the moment the driver signed in
+     * with his own hands, in the shape the sign-in server answers in. Sealed onto this phone so
+     * that a service Android restarts, or one that simply outlived the hour of the token the
+     * page lent it, can go on uploading with the app closed.
+     *
+     * A second sign-in for one driver, rather than the page's own kept twice, because the
+     * server burns a refresh token the moment it is used: see {@link #renew}. The password is
+     * not in here and cannot be got out of what is stored.
+     *
+     * @return whether this phone can now keep a sign-in. Nothing else changes if it cannot -
+     *         the page still lends a token every fifteen seconds it is awake to.
+     */
+    boolean session(String raw) {
+        if (raw == null || raw.isEmpty()) return false;
+        if (!apply(raw, true)) {
+            Logger.error("fleet-dms: the sign-in handed to the position runner would not read");
+            return false;
+        }
+        checkOwner();
+        trySend(true);
+        return !refresh.isEmpty();
+    }
+
+    /**
+     * Put one sign-in into memory, and - when asked - onto the disk.
+     *
+     * @param ans  the sign-in server's own answer, which the page passes on as it received it
+     *             and a refresh passes on itself.
+     * @param seal whether to overwrite the sealed copy. A refresh must answer yes: the server
+     *             has just burned the token this phone was holding and handed a new one, and a
+     *             runner that dies before writing it down has no sign-in left to go back to.
+     */
+    private boolean apply(String ans, boolean seal) {
+        String kept = trim(ans);
+        if (kept == null) return false;
+        try {
+            JSONObject j = new JSONObject(kept);
+            own = j.optString("a", "");
+            refresh = j.optString("r", "");
+            ownUntil = j.optLong("x", 0);
+            ownUid = j.optString("u", "");
+        } catch (Exception e) {
+            return false;
+        }
+        token = own;
+        allowed = true;
+        if (!error.isEmpty()) error = "";
+        if (seal) Session.save(ctx, kept);
+        return true;
+    }
+
+    /**
+     * One sign-in, cut down to the four things this runner can use and put in the shape it
+     * keeps them. Anything else the sign-in server sends - the driver's email, his metadata,
+     * the whole of his profile - has no business on a phone that only needs to prove who it is.
+     *
+     * @return the compact sign-in, or null when the answer is not one a runner can send with.
+     */
+    private static String trim(String ans) {
+        try {
+            JSONObject j = new JSONObject(ans);
+            String a = j.optString("access_token", ""), r = j.optString("refresh_token", "");
+            if (a.isEmpty() || r.isEmpty()) return null;
+            // The server says both the absolute moment this token stops working and how long it
+            // was worth from now. The first is what survives a reboot, so it wins when present.
+            long at = j.optLong("expires_at", 0), in = j.optLong("expires_in", 0);
+            JSONObject usr = j.optJSONObject("user");
+            JSONObject o = new JSONObject();
+            o.put("a", a).put("r", r)
+                    .put("x", at > 0 ? at * 1000L : in > 0 ? System.currentTimeMillis() + in * 1000L : 0)
+                    .put("u", usr == null ? "" : usr.optString("id", ""));
+            return o.toString();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Seal a sign-in for a runner that is not alive yet. The page mints one when the driver
+     * signs in, and on a handset with no service at that moment there is nothing to hand it to -
+     * so it goes on the disk here, in the same blob the next service reads back, rather than
+     * being dropped until the page happens to talk to a live one.
+     */
+    static boolean seal(Context c, String raw) {
+        String kept = trim(raw);
+        if (kept == null) return false;
+        Session.save(c, kept);
+        return true;
+    }
+
+    /** The sign-in kept on this phone, put back into memory. See {@link Session}. */
+    private void restore() {
+        String raw = Session.load(ctx);
+        if (raw == null || raw.isEmpty()) return;
+        try {
+            JSONObject j = new JSONObject(raw);
+            own = j.optString("a", "");
+            refresh = j.optString("r", "");
+            ownUntil = j.optLong("x", 0);
+            ownUid = j.optString("u", "");
+        } catch (Exception e) {
+            own = refresh = ownUid = "";
+            ownUntil = 0;
+            return;
+        }
+        if (own.isEmpty() || refresh.isEmpty()) {
+            own = refresh = ownUid = "";
+            ownUntil = 0;
+            return;
+        }
+        allowed = true;
+    }
+
+    /**
+     * This phone stops owning a sign-in, and forgets the copy on the disk. Sign-out, a seat
+     * given up, a blob that would not read, a refresh token the server says nothing about, or
+     * one that belongs to a driver who is not the one this runner was told about.
+     */
+    private void forget() {
+        String a = own;
+        own = refresh = ownUid = "";
+        ownUntil = 0;
+        // The borrowed token is the page's to keep using; the runner's own is only ever in hand
+        // while the refresh token that made it can be.
+        if (!a.isEmpty() && a.equals(token)) token = "";
+        allowed = !token.isEmpty();
+        Session.wipe(ctx);
+    }
+
+    /** Give up a sign-in kept on this phone that was minted by a different driver's sign-in. */
+    private void checkOwner() {
+        if (ownUid.isEmpty() || uid.isEmpty() || ownUid.equals(uid)) return;
+        Logger.error("fleet-dms: the sign-in kept on this phone belongs to another driver");
+        forget();
+    }
+
+    /**
+     * A sign-in to post with, answered on the network thread because answering it can need a
+     * request of its own. This is the whole of the fix for a shift that arrives as "+243
+     * records waiting": the gate used to be "has a page lent me a token lately", an hour-old
+     * answer on a phone whose page has been frozen since the driver locked his screen, and a
+     * runner that only ever collected costs the office every trip, tacho second and kilometre
+     * counted from those rows.
+     *
+     * @return the token to send with, or "" when this phone genuinely has nothing to send as.
+     */
+    private String ready() {
+        if (token.isEmpty()) token = own;
+        // A minute early, so a two-hundred-row batch never starts a flight whose sign-in runs
+        // out underneath it. Only this runner's own sign-in has a known moment of death: a
+        // token the page lent says nothing about its own, and is simply asked again if refused.
+        if (token.equals(own) && ownUntil > 0 && System.currentTimeMillis() >= ownUntil - 60000)
+            renew(false);
+        allowed = !token.isEmpty();
+        return token;
+    }
+
+    /**
+     * Start a fresh hour with the sign-in kept on this phone. Network thread only.
+     * <p>
+     * The refresh token used here is not the one the page's own client holds, and that is the
+     * reason the page mints a second sign-in at all: Supabase burns a refresh token the moment
+     * it is exchanged and hands back a new one, so a runner that refreshed the page's sign-in
+     * would leave the page unable to refresh its own - and the driver would find himself signed
+     * out by his own background service at the moment he unlocked his handset, which is the one
+     * case this was added for. Two families, one driver, and each hand keeps its own.
+     *
+     * @param now ask the server whatever else has been asked recently. {@link #send} uses this
+     *            for the one retry a refused batch is worth; the clock-driven ask does not, so
+     *            a phone sitting in a dead spot with a queue on it cannot build a loop of auth
+     *            requests behind itself.
+     * @return whether there is a usable token in hand afterwards.
+     */
+    private boolean renew(boolean now) {
+        String r = refresh;
+        if (r.isEmpty() || !hostOk(url) || anon.isEmpty()) return false;
+        long n = System.currentTimeMillis();
+        if (now || n - lastRenew >= 60000) lastRenew = n;
+        else return !token.isEmpty();
+        String body;
+        try {
+            body = new JSONObject().put("refresh_token", r).toString();
+        } catch (Exception e) {
+            return false;
+        }
+        String ans = auth(body);
+        if (ans == null) return !token.isEmpty();
+        if (ans.isEmpty()) return false;
+        // Written down before it is used: see the seal argument of {@link #apply}.
+        return apply(ans, true);
+    }
+
+    /**
+     * One request to the sign-in server of the same project the page logs in to.
+     *
+     * @return the answer as text, "" when the server refused this refresh token outright and it
+     *         has been forgotten, or null when this phone never heard anything at all - which
+     *         is the only answer that leaves the sealed sign-in worth asking about again.
+     */
+    private String auth(String body) {
+        HttpURLConnection c = null;
+        try {
+            c = (HttpURLConnection) new URL(url + "/auth/v1/token?grant_type=refresh_token").openConnection();
+            c.setRequestMethod("POST");
+            c.setConnectTimeout(15000);
+            c.setReadTimeout(30000);
+            c.setDoOutput(true);
+            c.setRequestProperty("apikey", anon);
+            c.setRequestProperty("Content-Type", "application/json");
+            try (OutputStream out = c.getOutputStream()) {
+                out.write(body.getBytes("UTF-8"));
+            }
+            int code = c.getResponseCode();
+            if (code == 200) return readAll(c.getInputStream());
+            if (code >= 400 && code < 500 && code != 408 && code != 429) {
+                Logger.error("fleet-dms: the sign-in kept on this phone was refused (code " + code + ")");
+                forget();
+                return "";
+            }
+            return null;
+        } catch (Throwable t) {
+            // never reached the server: nothing here has learned that this refresh token is bad
+            return null;
+        } finally {
+            if (c != null) c.disconnect();
+        }
     }
 
     /**
@@ -387,6 +648,58 @@ class Track {
     }
 
     /**
+     * The positions the page has collected but cannot send, taken onto this queue. The other
+     * half of {@link #drain}.
+     * <p>
+     * A frozen page is the last place a record can still hide in this app. Everything the driver
+     * saw while his screen was on - the points between two flushes, the alerts, the updates that
+     * close them - waits in the page's own outbox for a flush, and a flush only ever happens
+     * while the page is awake to run it. So the office's map goes blank for a phone that is
+     * working perfectly, and the driver reads a number in brackets when he opens the app again
+     * hours later. This queue is the one that keeps working behind his back, and now it can
+     * carry the page's share too.
+     * <p>
+     * The whole lot or none of it, because the page is only allowed to throw its copies away
+     * once this queue says it holds them, and a half-taken batch would leave it guessing which
+     * half. The rows travel exactly as the page wrote them: each already names the driver, the
+     * vehicle and the second it was taken at, and both queues send as the same account, so the
+     * guards on the table see the same person whichever way a row came.
+     *
+     * @return how many rows this queue took, or 0 when it refused them all - no sign-in to send
+     *         with, no room for the lot, or a row that is not a position. The page keeps
+     *         everything it handed over until one of those says yes.
+     */
+    int handover(JSONArray in) {
+        if (in == null || in.length() == 0) return 0;
+        // Rows landed here because the page could not post them, not because anywhere could
+        // not: a queue with nothing to ask with would keep them out of sight instead.
+        if (!canSend()) return 0;
+        List<JSONObject> keep = new ArrayList<>();
+        for (int i = 0; i < in.length(); i++) {
+            JSONObject o = in.optJSONObject(i);
+            if (!isRow(o)) return 0;
+            keep.add(o);
+        }
+        synchronized (rows) {
+            // A full queue is a day of driving out of signal. Emptying it of the points this
+            // phone measured itself, to make room for records the page would have sent anyway,
+            // is the wrong trade - and the page has room for these, so nothing is lost by
+            // asking again at the next beat.
+            if (rows.length() + keep.size() > MAX_ROWS) return 0;
+            for (JSONObject o : keep) push(o);
+        }
+        trySend(true);
+        return keep.size();
+    }
+
+    /** Whether a handed row is a position at all - a place, a second, and no room for doubt. */
+    private static boolean isRow(JSONObject o) {
+        if (o == null || o.optString("recorded_at").isEmpty()) return false;
+        return !Double.isNaN(o.optDouble("lat", Double.NaN))
+                && !Double.isNaN(o.optDouble("lng", Double.NaN));
+    }
+
+    /**
      * An alert the page raised: the position it happened at goes now, not at the end of the
      * fleet's interval, because the live map is the one thing an office reads while a
      * vehicle is still moving. The point is only ever queued once, so this cannot leave two
@@ -400,7 +713,7 @@ class Track {
         synchronized (rows) {
             push(last);
         }
-        allowed = !token.isEmpty();
+        allowed = !token.isEmpty() || !own.isEmpty();
         trySend(true);
     }
 
@@ -423,6 +736,10 @@ class Track {
         trip = false;
         allowed = false;
         token = "";
+        // The sealed sign-in goes with everything else this phone was holding for this driver.
+        // Left behind it would let a service started after he handed the seat over - by the
+        // order on the disk, or by the handset booting - carry on filing positions in his name.
+        forget();
         open.clear();
         bad.clear();
         sp.edit().putBoolean(K_WANT, false).putBoolean(K_TRIP, false).remove(K_PEND).remove(K_ZONE).apply();
@@ -688,6 +1005,13 @@ class Track {
         if (!isMoving && hotStreak >= 3) isMoving = true;
         else if (isMoving && coldStreak >= 3) isMoving = false;
         if (isMoving != was) beat();
+        // The standing clock the page is handed: started by the first fix this runner judges
+        // as still, and wiped by any fix that says the wheels are turning again. It is the
+        // service's own, so it keeps counting through a locked screen and a frozen WebView -
+        // which is the only reason a 40 minute drive with the screen off cannot be read as
+        // 40 minutes parked and ended on the fix after the driver unlocks his phone.
+        if (isMoving) stoodAt = 0;
+        else if (stoodAt == 0) stoodAt = SystemClock.elapsedRealtime();
 
         // The camera judges frames with the screen off and the page asleep, and it can only
         // say where a breach happened, or how fast the vehicle was going, from the reading it
@@ -1257,6 +1581,21 @@ class Track {
         }
     }
 
+    /**
+     * A server's whole answer, however long. The short capped reader the positions call uses is
+     * right for a refusal message and wrong here: a sign-in cut in half reads as nonsense, and
+     * nonsense thrown away is a refresh token this phone had and will never get back.
+     */
+    private static String readAll(InputStream in) throws Exception {
+        try (InputStream i = in) {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] b = new byte[8192];
+            int n;
+            while ((n = i.read(b)) > 0) out.write(b, 0, n);
+            return new String(out.toByteArray(), "UTF-8");
+        }
+    }
+
     private void load() {
         if (!file.isFile()) return;
         try {
@@ -1374,9 +1713,25 @@ class Track {
         trySend(false);
     }
 
+    /**
+     * Whether this queue has a way to reach the office at all: its address, its key, and a
+     * sign-in - the one this phone keeps or one a page has lent. {@link #trySend} asks before it
+     * wakes the network thread, and {@link #handover} asks before it takes records off another
+     * queue, because rows that land where nothing can post them are only lost more slowly.
+     */
+    private boolean canSend() {
+        return !url.isEmpty() && !anon.isEmpty() && (!token.isEmpty() || !own.isEmpty());
+    }
+
     /** `urgent` is a point the office should see now, so the two-second wait is skipped. */
     private void trySend(boolean urgent) {
-        if (!allowed || token.isEmpty() || url.isEmpty() || anon.isEmpty()) return;
+        // Whether this phone has any sign-in at all is answered here. Whether the one in hand
+        // still works is answered on the network thread, where it can be started again, because
+        // that is the only place a request can be made. The gate used to be "a page has lent a
+        // token lately", which is an hour of an answer at best: the lending ran out while the
+        // driver was still driving, the frozen page could not lend a new one, and the rows piled
+        // up on the handset until he opened the app again.
+        if (!canSend()) return;
         long n = System.currentTimeMillis();
         if (!urgent && n - lastTry < 2000) return;
         lastTry = n;
@@ -1391,18 +1746,20 @@ class Track {
             e = net;
         }
         try {
-            final String tk = token;
-            e.execute(() -> send(tk));
+            e.execute(this::send);
         } catch (Throwable ignore) {
             // a pool that will not take the chore means the trip is ending; the rows are
             // on disk and the page drains them
         }
     }
 
-    private void send(String tk) {
+    private void send() {
+        String tk = ready();
+        if (tk.isEmpty()) return;
         // A trip that ran offline for a day is sixty thousand rows, and this must not hold
         // the queue while an unbounded loop tries them all: one run empties what it can and
         // the next turn of the clock takes the rest.
+        int ran = 0;
         for (int turn = 0; turn < 200; turn++) {
             List<JSONObject> batch = new ArrayList<>();
             synchronized (rows) {
@@ -1418,9 +1775,25 @@ class Track {
             }
             int r = tryBatch(batch, tk);
             // KEPT means the rows are back on the disk and there is no sense asking again this
-            // turn: either the server never heard the request or the sign-in ran out. DROPPED
-            // means one row of this batch went away and the rest of the queue is untouched, so
-            // the trip carries on reporting from the second it stopped being thrown away for.
+            // turn: the server never heard the request. RANOUT means the same, and that the
+            // reason is the sign-in this phone sends with - which is worth one restart and one
+            // second try, because the rows at the front of the queue are exactly the ones that
+            // were just put back. Anything past that is a server that will not have this
+            // driver's rows today, and the page is the only thing that can ask it again.
+            if (r == RANOUT) {
+                if (++ran > 1 || !renew(true)) {
+                    allowed = false;
+                    error = refresh.isEmpty()
+                            ? "the phone's sign-in has run out: open the app to send what is waiting"
+                            : "this phone could not start its own sign-in again: open the app once and everything waiting goes";
+                    return;
+                }
+                tk = token;
+                continue;
+            }
+            // DROPPED means one row of this batch went away and the rest of the queue is
+            // untouched, so the trip carries on reporting from the second it stopped being
+            // thrown away for.
             if (r == KEPT) return;
             if (r == LANDED && !error.isEmpty()) error = "";
         }
@@ -1428,6 +1801,11 @@ class Track {
 
     /** What one try at a batch of positions came back as. */
     private static final int LANDED = 0, KEPT = 1, DROPPED = 2;
+    /** The rows are back on the queue and the refusal was about who was asking: {@link #send}
+     *  gets one chance to start this phone's own sign-in again and take the same piece a second
+     *  time, and that is the difference between a locked screen costing one trip and costing
+     *  the whole shift. */
+    private static final int RANOUT = 3;
 
     /**
      * How many single rows in a row this server has refused before the runner gives up on it.
@@ -1452,11 +1830,12 @@ class Track {
      * <p>
      * Two answers stop it and give the rows back rather than drop them: a request this phone
      * never heard, which goes back on the disk in the order the road was driven, and a sign-in
-     * this app cannot refresh by itself, which every row survives because signing in again
-     * delivers all of them.
+     * that has run out, which goes back the same way and is then asked about again by
+     * {@link #send} with a fresh hour of this phone's own sign-in.
      *
      * @return LANDED when the server took every row, KEPT when they are back on the queue and
-     * nothing more should be tried this turn, DROPPED when a row was refused and thrown away.
+     * nothing more should be tried this turn, DROPPED when a row was refused and thrown away,
+     * RANOUT when they are back on the queue because the sign-in sent for an hour that is over.
      */
     private int tryBatch(List<JSONObject> batch, String tk) {
         JSONArray body = new JSONArray();
@@ -1481,20 +1860,34 @@ class Track {
             return LANDED;
         }
         if (refused.startsWith("TOKEN")) {
+            // Every row of this batch goes back on the disk, because a sign-in is the one
+            // refusal that says nothing whatever about the rows themselves: they are the
+            // driver's route, and an hour that ran out cannot make them wrong.
             synchronized (rows) {
                 requeue(batch);
                 save();
             }
-            error = "the phone's sign-in has run out: open the app to send what is waiting";
-            allowed = false;
-            return KEPT;
+            return RANOUT;
         }
         if (batch.size() > 1) {
             int h = (batch.size() + 1) / 2;
-            int a = tryBatch(batch.subList(0, h), tk);
-            if (a == KEPT) return KEPT;
-            int b = tryBatch(batch.subList(h, batch.size()), tk);
-            return b == KEPT ? KEPT : (a == DROPPED || b == DROPPED ? DROPPED : LANDED);
+            List<JSONObject> left = batch.subList(0, h), right = batch.subList(h, batch.size());
+            int a = tryBatch(left, tk);
+            // The half this turn never asked about is not thrown away with the answer to the
+            // other one. It has reached no server at all, and answering early used to drop it
+            // with the batch it came out of. Putting it back behind its twin reverses the order
+            // of two neighbouring halves, which costs nothing: every row carries the second it
+            // was taken at, and losing one of them costs a stretch of road nobody can redraw.
+            if (a == KEPT || a == RANOUT) {
+                synchronized (rows) {
+                    requeue(right);
+                    save();
+                }
+                return a;
+            }
+            int b = tryBatch(right, tk);
+            if (b == KEPT || b == RANOUT) return b;
+            return a == DROPPED || b == DROPPED ? DROPPED : LANDED;
         }
         // A single row the server answered no to is refused for a reason that will not change
         // by asking again, so it is the one thing here worth throwing away - out loud, and with
@@ -1714,8 +2107,20 @@ class Track {
             j.put("running", running).put("wanted", want).put("queued", q).put("sent", sent)
                     .put("movingS", movingS).put("parkedS", parkedS)
                     .put("trip", trip).put("moving", isMoving)
+                    // How long this service has judged the vehicle stationary, in
+                    // milliseconds, or -1 while no fix has been judged at all. The page's own
+                    // trip end is measured against this rather than against its frozen
+                    // WebView clock, so a drive taken with the screen off cannot be read as
+                    // a park. See {@link #stoodAt}.
+                    .put("stood", stoodAt == 0 ? -1 : SystemClock.elapsedRealtime() - stoodAt)
                     .put("listening", providers.size())
-                    .put("sending", allowed && !token.isEmpty())
+                    .put("sending", allowed && (!token.isEmpty() || !own.isEmpty()))
+                    // Whether this phone can send with the app shut: the sign-in minted at the
+                    // driver's own sign-in is still sealed here and still worth asking. The page
+                    // shows nothing for it - it is what tells a support call apart between "this
+                    // handset uploads on its own" and "this one waits for you to open it".
+                    .put("keeps", !refresh.isEmpty())
+                    .put("renews", ownUntil > 0 ? (ownUntil - System.currentTimeMillis()) / 1000 : -1)
                     .put("sinceFix", lastFixAt == 0 ? -1
                             : (SystemClock.elapsedRealtime() - lastFixAt) / 1000)
                     .put("zones", insideZones())
