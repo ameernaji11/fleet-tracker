@@ -25,6 +25,10 @@
          of that saving; it is a normal permission, so it is granted at install and never
          at runtime, and declining it on the settings screen changes nothing here. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- The runner is what reports a trip, and a handset rebooted at a depot takes it down with
+         it. This is what lets the app hear about the reboot and bring it back, rather than
+         waiting for the driver to open the app and notice. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.front" android:required="false" />
 
@@ -33,5 +37,15 @@
             android:name="com.fleet.dms.DmsService"
             android:exported="false"
             android:foregroundServiceType="camera|location" />
+        <!-- exported is required true for a system broadcast on API 31 and later; the receiver
+             answers nothing else, does nothing unless the office's order still stands, and
+             starts the location runner only - never a lens. See BootReceiver. -->
+        <receiver
+            android:name="com.fleet.dms.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>
