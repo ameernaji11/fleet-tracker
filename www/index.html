@@ -433,7 +433,7 @@ async function signIn(){
   // at his app while the phone makes the copy.
   const pwv=$('pw').value;
   await init(1);
-  credSave(pwv)}
+  credSave(pwv);runSess(em,pwv)}
  catch(e){$('err').textContent=(e.soft?'':'Error: ')+(e.message||e)}
  b.disabled=false;b.innerHTML='<i class="fa-solid fa-right-to-bracket"></i>Sign in'}
 // ---- signing out. This button did nothing at all on a weak signal, and the reason
@@ -461,8 +461,18 @@ function outLocal(){try{const q=sb&&sb.auth&&sb.auth.stopAutoRefresh();if(q&&q.c
 async function signOut(){
  // standing up from the seat with a trip running cuts that trip short: the office gets
  // the route up to this moment and nothing after it. The icon is small and easy to tap
- // by mistake, so ending a drive has to be the driver's own answer, not a side effect
- if(SRT&&!confirm('A trip is still running. Signing out ends it now and sends the office the route so far. Sign out anyway?'))return;
+ // by mistake, so ending a drive has to be the driver's own answer, not a side effect.
+ // The question is asked of the trip, not of the Start button's flag: SRT only stands while
+ // start() itself is still running, so a driver whose trip is open - auto-started, or long
+ // past his last press - used to be signed out without any warning at all, and with the
+ // record left open: stop() writes the boundary the office needs to close a trip, and
+ // signing out skipped it, leaving one journey that the dashboard only finished two hours
+ // later on its own gap rule.
+ if((watcher||SRT||tripLive())&&!confirm('A trip is still running. Signing out ends it now and sends the office the route so far. Sign out anyway?'))return;
+ // the flag that says "this handset is leaving the seat", set here too so the End-trip work
+ // below does not hand the runner back to a service that outlives the session it reports with
+ CLDOWN=true;
+ if(watcher||SRT||tripLive()){try{await outWait(stop(1),TRIP_MS)}catch(e){}}
  try{sessStop()}catch(e){}
  // The three things that still want his session go out together, under one deadline:
  // the audit row, the watcher that listens for a vehicle moving, and standing up from
@@ -519,7 +529,12 @@ function logAct(action,details,duration_s){if(!me)return;(async()=>{
 let SST=0;
 function sessStop(){if(!SST||!me)return;const s=Math.round((Date.now()-SST)/1000);SST=0;if(s>=10)logAct('Session time','App',s)}
 function sessStart(){if(me)SST=Date.now()}
-document.addEventListener('visibilitychange',()=>{if(document.hidden){sessStop();dmsUi();return}
+document.addEventListener('visibilitychange',()=>{if(document.hidden){sessStop();dmsUi();
+ // going behind another app is how this page starts sleeping, and it may sleep for the rest of
+ // the drive: what it is holding goes to the runner now, not at a flush that has no page to
+ // run it. Best effort by nature - a page Android kills outright never finishes this call, and
+ // the records simply stay where they were, unsent rather than lost.
+ trkHand();return}
  sessStart();dmsUi();if(Date.now()<ALRM)$('fr').classList.add('on');
  // coming back to the front: stop a tone whose deadline passed while we were away,
  // and push whatever the phone saved in the meantime - including the warnings the
@@ -536,7 +551,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){sessStop()
  // the fleet's retention window has just passed over - both only ever about this driver's
  // own folder, which is the only one these rights reach
  clipSweep();clipPrune()});
-addEventListener('pagehide',sessStop);
+addEventListener('pagehide',()=>{sessStop();trkHand()});
 // A driver with no signal still has to be able to open the app, start a trip and be
 // warned. The session may be unreadable offline, so the last identity the phone proved
 // is kept as a fallback and the app re-checks it the moment the network is back.
@@ -1279,7 +1294,7 @@ function dmsUi(){if(!dmsHas())return;
 // session this page holds. The page also carries on writing positions whenever the service is
 // not doing it - an old build, a phone that refused the service, or a satellite provider the
 // driver switched off at a fuel stop must never leave a trip with nobody reporting it.
-let TRUN=false,TQ=0,trkT=0,TRKERR=false,TSFX=-1;
+let TRUN=false,TQ=0,trkT=0,TRKERR=false,TSFX=-1,HK=false,HKAT=0;
 const trkHas=()=>dmsHas()&&typeof CapPlugins.Dms.trackStart==='function';
 // Everything the runner needs about this trip, in the shape it reads. Never a token: the
 // settings belong on the phone so a service Android restarts mid-shift wakes up with the
@@ -1293,7 +1308,13 @@ function trkOrder(){const v=asg?.vehicles||{},d=asg?.drivers||{};
   // is. The runner writes it into the `ignition` column: a point taken with a trip open is a
   // vehicle being driven even when it is standing at a light, and a point taken without one is
   // a rest heartbeat the office's trip list must not join into a trip of its own.
-  trip:!!(watcher||SRT),
+  // The third test is what stops the office cutting a live trip in two. Every app open and
+  // every five-minute settings refresh lands here, and on a phone Android had killed mid-
+  // journey `watcher` is gone with the process while the trip is still very much running -
+  // so this order used to say trip:false, the runner stamped the next point ignition:false,
+  // and the dashboard closed the trip at that second before maybeResume opened it again.
+  // The marker on the handset knows the truth, so it is asked.
+  trip:!!(watcher||SRT||tripLive()),
   ids:{user_id:me?me.id:'',vehicle_id:asg?.vehicle_id||'',driver_id:asg?.driver_id||'',
    vehicle_name:v.name||'',driver_name:d.name||''},
   // the zone rules travel with the others: the runner is the only thing that can see a
@@ -1327,13 +1348,32 @@ async function trkGo(){if(!trkHas()||!me||!asg?.vehicle_id)return;let r=null;
  // had to be started comes back a second or two later. This look is what finds out.
  setTimeout(()=>{if(SRT||watcher||me)trkPoll()},4000);
  if(TRUN)trkTok()}
-// The page's own sign-in, lent to the runner as often as the page can see it. It is also the
-// only thing that lets a runner Android restarted by itself send again: that one has never
-// heard of a token, and it spends the whole of a dead-spot stretch collecting.
+// The page's own sign-in, lent to the runner as often as the page is awake to see it. A runner
+// that has never been handed a sign-in of its own sends with this and nothing else - and the
+// reason that is not enough is that an hour after the driver signs in this page is frozen, the
+// lent token is dead, and there is nobody left awake to lend the next one. See runSess below.
 async function trkTok(){if(!trkHas()||!me||!sb)return;
  try{const s=await sb.auth.getSession();const tk=s&&s.data&&s.data.session;
   if(!tk||!tk.access_token)return;
   const r=await CapPlugins.Dms.trackToken({token:tk.access_token});if(r&&r.ran)trkUi(r.status)}catch(e){}}
+// The runner behind the screen has to be able to send on its own, and a token this page lends
+// cannot do that: Android freezes this WebView for the whole of a drive, the lent token dies an
+// hour after sign-in, and there is nobody left awake to lend the next one. So the runner is
+// given a sign-in of its own, minted here once, in the background, while the driver is already
+// looking at his trip.
+// It is a second sign-in for the same driver rather than the one supabase-js is holding, and
+// that is the whole of the reason it is minted instead of copied: the server burns a refresh
+// token the moment it is exchanged, so a runner that refreshed the page's own would leave the
+// page unable to refresh it - and the driver would be signed out by his own background service
+// the next time he unlocked his phone, which is exactly the case this is for. Nothing is waited
+// for here, and nothing is said if it fails: a phone that will not keep one goes on doing what
+// it has always done, which is to collect until this page wakes up again.
+async function runSess(email,pw){if(!trkHas()||!pw)return;
+ try{const r=await fetch(SUPABASE_URL+'/auth/v1/token?grant_type=password',{method:'POST',
+   headers:{apikey:SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password:pw})});
+  if(!r.ok)return;
+  const p=await CapPlugins.Dms.trackSession({session:await r.text()});
+  if(p&&p.ran)trkUi(p.status)}catch(e){}}
 // The service answers on its own clock, so the page asks after it on one of its own. This is
 // the only way a runner that died, a sign-in that ran out, or a phone whose satellites went
 // off mid-shift is found while the trip is still running rather than two hours later in the
@@ -1352,7 +1392,9 @@ function trkPoll(){if(!trkHas()||!me||!asg?.vehicle_id)return;let p=null;
   if(!TRUN)return;
   if(st&&st.sending===false)trkTok();
   trkZones(st&&st.zones);
-  trkAdopt(st&&st.open)}).catch(()=>{})}
+  trkAdopt(st&&st.open);
+  // and on the same beat the queue this page cannot empty goes to the one that can
+  trkHand()}).catch(()=>{})}
 // Which zones the runner says this vehicle is standing inside right now. It has the fixes and
 // the shapes while this page sleeps, so its answer is the baseline the page's own crossing test
 // works from: copy it over every poll and the page can neither write a second "Entered" for a
@@ -1413,6 +1455,31 @@ async function trkBack(){if(!trkHas())return;let items=null;
    p.vehicle_name=v.name||null;p.driver_name=d.name||null}
   outAdd({t:'pos',p})}
  flush()}
+// The positions this page cannot send go to the runner, which can. Points are the only thing
+// worth moving: an alert's row and the update that closes it belong in this queue, where they
+// keep the order they happened in, and the runner has no way to write either one.
+// This is the other half of the blank map. A page Android froze hours ago leaves every point it
+// took in its own outbox, and nothing but a page can empty that outbox - so a driver's handset
+// reports perfectly, the office sees nothing, and the number he reads when he reopens the app is
+// the drive he just had. On the runner's queue the same rows go out with the phone's own
+// sign-in, on its own fifteen-second beat, whether this page ever wakes again or not.
+// This page's copies are thrown away only when the runner says it holds the whole batch, so a
+// record is in one queue or the other at every moment. That is once-and-a-half rather than once:
+// a phone killed in the moment between the answer and the delete sends the same seconds twice,
+// which the office reads as one more point on a bend, instead of losing a stretch of road.
+// A refusal is worth waiting on rather than asking about every beat: it means the runner is out
+// of signal for a day and its queue is full, or it has no sign-in yet, and both answer again
+// better in a minute than in fifteen seconds.
+async function trkHand(){if(!trkHas()||!TRUN||fl||!me||HK||!PEND||Date.now()-HKAT<120000)return;
+ HK=true;const run=[];let after=0;
+ try{for(let p=0;p<3&&run.length<400;p++){const b=await outTake(200,after);if(!b.length)break;
+   after=b[b.length-1].k;b.forEach(x=>{if(x.v&&x.v.t==='pos'&&x.v.p)run.push(x)})}
+  if(!run.length)return;
+  const r=await CapPlugins.Dms.trackPush({rows:run.map(x=>x.v.p)});
+  if(!r||r.kept!==run.length){HKAT=Date.now();return}
+  run.forEach(outDel);outUi();if(r.status)trkUi(r.status)}
+ catch(e){HKAT=Date.now()}
+ finally{HK=false}}
 // the two things the runner tells this page about itself, and the one line it has to say
 function trkUi(st){if(!st)return;
  TQ=Math.max(0,+st.queued||0);
@@ -1677,7 +1744,11 @@ function applyCfg(a,r,t,g){
   // the dashboard turns one off, so a database that has not run v29 - which has no auto_ keys
   // at all - keeps the behaviour every handset has had since it learned to drive itself.
   auto_start:VC.auto_start_on==='0'?0:1,auto_end:VC.auto_end_on==='0'?0:1,
-  auto_start_s:num(VC.auto_start_s,5),auto_end_min:num(VC.auto_end_min,10),auto_kmh:num(VC.auto_kmh,5)};
+  auto_start_s:num(VC.auto_start_s,5),auto_end_min:num(VC.auto_end_min,10),auto_kmh:num(VC.auto_kmh,5),
+  // v37: how much longer a trip is still held open once the standing wait alone would have
+  // ended it. Absent from any database that has not run it, so 3 is the behaviour every
+  // handset gets - a stop sign, a queue at a loading bay or a short delivery stays one trip.
+  auto_end_grace_min:num(VC.auto_end_grace_min,3)};
  // the offline wrong-try count ages out on the fleet's own window, and the sign-in
  // screen has to read it out of storage because nothing is downloaded at that moment
  try{localStorage.lwin=String(Math.max(1,Math.round(S.login_window_m||15)))}catch(e){}
@@ -2024,6 +2095,13 @@ async function tripSave(){try{const t=tripRead();
  // closed, and the row he opened would outlive the only thing that knows how to close it.
  localStorage.trip=JSON.stringify({v:asg?.vehicle_id,t:t&&t.v===asg?.vehicle_id?+t.t||Date.now():Date.now(),u:Date.now(),o:ODOM,c:CAMOFF?1:0,e:CAMOFF?CAMOFFID:''})}catch(e){}}
 const tripRead=()=>{try{const t=JSON.parse(localStorage.trip||'null');return t&&t.v?t:null}catch(e){return null}};
+// Whether a trip is open on this handset, judged from the marker rather than from the page's
+// own memory. The marker is the only copy that survives a process Android killed, and it is
+// the answer the runner has to be given before this page has got as far as picking the trip
+// back up - see trkOrder. Same 12-hour bound and the same vehicle test as maybeResume, so the
+// two can never disagree about what "still open" means.
+const tripLive=()=>{const t=tripRead();
+ return !!(t&&t.v===asg?.vehicle_id&&Date.now()-(+t.u||+t.t||0)<12*3600e3)};
 function tripClear(){localStorage.removeItem('trip')}
 // A restart has to bring back the driver's own camera stop and the row that carries it
 // together: the flag without its id leaves an unwatched stretch that nothing will ever close,
@@ -2041,7 +2119,11 @@ function camRestore(quiet){const t=quiet?tripRead():null,c=!!t&&+t.c===1;
 async function maybeResume(){
  if(!map||!me||watcher||SRT||document.hidden||!window.CapPlugins||!asg?.vehicle_id)return;
  const tr=tripRead();if(!tr)return;
- if(asg.vehicle_id!==tr.v||Date.now()-(+tr.u||+tr.t||0)>12*3600e3){tripClear();return}
+ // A marker thrown away here has to be thrown away by the runner too, in the same breath:
+ // trkGo has already ordered this trip as open on the way through applyCfg, and a runner left
+ // believing it would go on stamping ignition:true for another five minutes of standing in a
+ // yard - a trip that never ended, which is the opposite of the bug this page is fixing.
+ if(asg.vehicle_id!==tr.v||Date.now()-(+tr.u||+tr.t||0)>12*3600e3){tripClear();await trkGo();return}
  await start(1);
  if(watcher)banner('<i class="fa-solid fa-road"></i> Trip picked back up - the phone closed the app while you were driving',7000)}
 // ---- the trip the driver forgets. A handset in a cab knows when the cab is moving, and a
@@ -2059,6 +2141,13 @@ async function maybeResume(){
 const A_KMH=()=>Math.min(60,Math.max(0.5,num(V.auto_kmh,5))),
  A_START=()=>Math.max(1,Math.min(600,num(V.auto_start_s,5)))*1000,
  A_END=()=>Math.max(1,Math.min(720,num(V.auto_end_min,10)))*60000,
+// The tolerance the office sets between "the vehicle has stood long enough to be finished"
+// and "this trip really ended". A driver who spends a quarter of an hour at a delivery point
+// is on one journey, and closing the record the second the standing wait expires cut it in
+// two: the sentry re-arms in the same breath as the end, and five seconds of movement opens
+// the next trip. While the end is pending the trip stays open exactly as it was, so nothing
+// is written twice and no boundary is stamped unless he is still standing when this expires.
+ A_GRACE=()=>Math.max(0,Math.min(720,num(V.auto_end_grace_min,3)))*60000,
 // each half of the automatic trip. Only an explicit 0 turns one off, so a cache written
 // before the dashboard learned about these switches keeps the behaviour it always had.
  A_STARTON=()=>V.auto_start!==0,A_ENDON=()=>V.auto_end!==0;
@@ -2068,9 +2157,22 @@ const A_KMH=()=>Math.min(60,Math.max(0.5,num(V.auto_kmh,5))),
 function autoTips(){const g=$('go'),s=$('stp');if(!g||!s)return;
  g.title=A_STARTON()?'You can press this, but you no longer have to: a trip starts by itself once the vehicle has been above '+A_KMH()+' km/h for '+Math.round(A_START()/1000)+' seconds'
   :'Only this button starts a trip: your fleet has switched the automatic start off, so press it when you set off';
- s.title=A_ENDON()?'A trip also ends by itself after '+Math.round(A_END()/60000)+' minutes below '+A_KMH()+' km/h'
+ s.title=A_ENDON()?'A trip also ends by itself after '+Math.round(A_END()/60000)+' minutes below '+A_KMH()+
+  ' km/h'+(A_GRACE()?' - and stays open '+Math.round(A_GRACE()/60000)+' minutes longer in case you set off again'
+  :' - and closes the moment that wait is up')
   :'Only this button ends a trip: your fleet has switched the automatic end off, so press it when you park'}
-let SEN=null,SENUP=0,STILLAT=0;
+let SEN=null,SENUP=0,STILLAT=0,ENDPD=0;
+// How long the vehicle has really been standing, in milliseconds, answered by the runner
+// rather than by this page when the runner is alive. This page's own clock is the one Android
+// freezes when the driver locks his handset: a 40 minute drive with the screen off would look
+// like 40 minutes parked and end a live trip on the first fix after he unlocks. The runner is
+// a foreground service that sampled every one of those minutes and holds its own still clock.
+async function trkStood(n){if(!TRUN||!trkHas())return n-STILLAT;
+ try{const r=await CapPlugins.Dms.trackStatus({}),s=r&&r.status;
+  // -1 says the service has never seen a fix it could judge, which is not the same answer
+  // as zero and must not be mistaken for "the vehicle only just stopped"
+  if(s&&typeof s.stood==='number'&&s.stood>=0)return s.stood}catch(e){}
+ return n-STILLAT}
 async function senOff(){if(!SEN)return;const id=SEN;SEN=null;
  try{await CapPlugins.BG.removeWatcher({id})}catch(e){}}
 async function senOn(){if(SEN||watcher||SRT||!me||!asg?.vehicle_id||!A_STARTON())return;
@@ -2097,7 +2199,7 @@ async function senOn(){if(SEN||watcher||SRT||!me||!asg?.vehicle_id||!A_STARTON()
 // stood below the moving speed for the fleet's own wait is parked, and a record left open
 // until somebody presses a button is a trip that every report counts again the next day.
 async function endAuto(){banner('<i class="fa-solid fa-road"></i> Trip ended by itself after '+
-  Math.round(A_END()/60000)+' minutes without moving. Start a new one when you set off',9000);
+  Math.round(A_END()/60000)+' minutes without moving'+(A_GRACE()?' and a further '+Math.round(A_GRACE()/60000)+' more of the same':'')+': Start a new one when you set off',9000);
  await stop(1)}
 // ---- blackbox. Every fix the location watcher delivers above the fleet's own speed
 // (about one per second on the move, none at all while the vehicle stands still) is
@@ -2250,6 +2352,12 @@ async function start(quiet,auto){
  // place over before the trip's own callback can take it
  await senOff();
  SRT=true;STILLAT=Date.now();FIRSTRUN=true;const myGen=++SGEN;
+ // Both clocks belong to the trip that is opening, not to whatever the phone was doing
+ // before. SENUP is the sentry's own "it has been moving for N seconds" start, and it was
+ // only ever cleared inside the sentry's callback: a value left standing from before this
+ // press survived the whole trip and made the NEXT automatic start fire on the first fix
+ // above the speed with no wait at all, so the fleet's own debounce was silently bypassed.
+ SENUP=0;ENDPD=0;
  // the outage clock starts with the trip, so a vehicle that never locks a position at all
  // is reported just as loudly as one that loses it halfway through a tunnel
  LASTFIX=Date.now();GLOST=null;clearInterval(gpsT);gpsT=setInterval(gpsTick,10000);
@@ -2281,13 +2389,24 @@ async function start(quiet,auto){
   // the tone stops on its own deadline even if Android froze the timer that was
   // supposed to stop it, because these callbacks are what keep this page alive
   toneEnd();
-  // standing below the moving speed for the fleet's own wait ends the trip. The clock is
-  // kept whatever the switch says, so a fleet that turns the automatic end back on
-  // mid-shift measures from when the vehicle really stopped moving, not from the moment
-  // the settings arrived - and the same speed the auto start measures against says what
-  // moving means for both halves of a shift.
-  if(kmh>A_KMH())STILLAT=n;else if(!STILLAT)STILLAT=n;
-  else if(A_ENDON()&&n-STILLAT>=A_END()){STILLAT=0;await endAuto();return}
+  // standing below the moving speed for the fleet's own wait makes the end pending, and only
+  // a further tolerance without a single moving fix makes it real. The clock the fleet's own
+  // wait is measured against comes from the runner whenever it is reporting, because this
+  // page's clock is the one that stops while the screen is off - and the same speed the auto
+  // start measures against says what moving means for both halves of a shift.
+  if(kmh>A_KMH()){STILLAT=n;ENDPD=0}
+  else{
+   if(!STILLAT)STILLAT=n;
+   if(A_ENDON()&&n-STILLAT>=A_END()){
+    const sd=await trkStood(n);
+    // the runner was right and this page was asleep: the vehicle only just stopped, so the
+    // standing clock is moved back to when it actually did and nothing is closed
+    if(sd<A_END()){STILLAT=n-sd;ENDPD=0}
+    else if(!ENDPD)ENDPD=n;
+    else if(n-ENDPD>=A_GRACE()){STILLAT=0;ENDPD=0;await endAuto();return}
+   }
+   else ENDPD=0;
+  }
   // keep the trip marker fresh: it is the only thing that survives a process
   // Android kills, and its timestamp is what says "this trip was still running"
   if(n-TS_TRIP>60000){TS_TRIP=n;tripSave()}
@@ -2364,8 +2483,10 @@ async function stop(auto){SGEN++;FIRSTRUN=false;stopTone();clearInterval(batT);c
  logAct(auto?'Ended trip automatically':'Ended trip',(asg?.vehicles?.name||'')+(lastLoc?' at '+lastLoc.latitude.toFixed(5)+', '+lastLoc.longitude.toFixed(5):''));
  if(watcher){await CapPlugins.BG.removeWatcher({id:watcher});watcher=null}
  // the trip's watcher is gone, so the one that waits for the next start takes its place -
- // including after this very callback ended a trip nobody had pressed a button for
- STILLAT=0;senOn();
+ // including after this very callback ended a trip nobody had pressed a button for. Both
+ // clocks of the trip that just closed are wiped with it: a pending end must not be carried
+ // into the next journey, and the sentry must earn its own wait again.
+ STILLAT=0;SENUP=0;ENDPD=0;senOn();
  // the runner keeps the vehicle from the trip's end onwards, at the fleet's parked interval,
  // so it is handed over again here: this is what renews the poll that lends it a sign-in, and
  // a runner left without one collects in silence and stops sending an hour later. It carries
