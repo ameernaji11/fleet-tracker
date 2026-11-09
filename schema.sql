@@ -1689,6 +1689,26 @@ end $$;
 drop trigger if exists latest_stamp on positions;
 create trigger latest_stamp after insert on positions for each row execute function stamp_latest();
 
+-- ------------------ v37 the one journey the office counted eight times --------
+-- auto_end_min says how long standing makes a trip finish. It was the only wait there was,
+-- and a handset obeyed it the second it expired: the driver's End-trip record closed, the
+-- watcher that waits for the next start re-armed in the same breath, and five seconds of
+-- movement opened another trip. A delivery point, a queue at a loading bay, or a long ramp
+-- therefore read as several journeys - each with its own start, its own distance and its own
+-- events - and one shift with eight stops came home as eight trips.
+--
+-- This key is the tolerance between "the vehicle has stood long enough" and "the trip
+-- really ended": the phone holds the record open this many further minutes below the moving
+-- speed, and a single moving fix cancels the pending end outright. 0 asks for the behaviour
+-- above, unchanged.
+--
+-- Nothing to repair here, and no paste is owed: a database that has not run this has no such
+-- key, and a handset reads an absent key as 3 - the same number seeded below - so the fleet
+-- gets the new behaviour from the build alone, and this row only makes it visible and
+-- editable on the Configuration page.
+insert into app_settings (key, value) values ('auto_end_grace_min','3')
+  on conflict (key) do nothing;
+
 -- ------------------------------------------------------------- admin seed ----
 -- Promote the owner account. Runs after the tables/policies exist, and is safe
 
@@ -2217,5 +2237,23 @@ end $$;
 --        alert row. Both are fixed in the build alongside this file.
 --   The pointers need no repair: while this was failing no position was accepted at all, so nothing landed that a
 --   pointer missed, and each handset fills its own row in again on the first fix it sends after the paste.
+--
+-- v37, on top of the above (the one journey the office counted eight times):
+--   app_settings 'auto_end_grace_min' ('3')                                    -> one new key, no table, column,
+--        policy, function or view. It is the tolerance a phone holds a trip open for after auto_end_min has
+--        already expired; 0 means close the trip the moment that first wait runs out, which is what every handset
+--        did until this build.
+--   -> Nothing is owed by running it, and no app version is made wrong by it: a phone that cannot see the key
+--        obeys the same 3 minutes as its own default, so an older dashboard simply has no box for it. The card
+--        "Trips the phone starts and ends by itself" on the Configuration page is where a fleet changes it, and
+--        the handsets pick the new number within five minutes or at the next trip start.
+--   -> v29's note above is left as it wrote itself: it described the two waits that version seeded, and at that
+--        moment the standing wait really was the only thing that ended a trip. The eight-trips-from-one-shift
+--        symptom belonged to that design, not to the paste, and is answered here.
+--   -> The reports needed no change. Trip boundaries are still cut purely from the ignition column: what this
+--        version changes is how often a handset puts a false value in it, so Historical Tracking, the Trip list,
+--        the Tacho report and vehicle_report stop receiving the splits rather than learning to merge them.
+--        A trip that was already recorded as several stays several - rows on the server cannot be repaired from
+--        the phone, and the office that needs an old shift re-cut has to delete the wrongly-opened records by hand.
 
 -- ============================================================================
