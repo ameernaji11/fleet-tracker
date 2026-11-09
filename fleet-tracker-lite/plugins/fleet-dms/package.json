@@ -1,0 +1,20 @@
+{
+  "name": "@fleet/dms",
+  "version": "1.0.0",
+  "description": "Background position reporting for the Fleet Tracker Lite driver app: the runner that keeps sampling and sending a vehicle's positions while the phone is locked, and the blackbox store behind it. No camera, no driver monitoring, no alerts. Native half only - the app talks to it through window.CapPlugins.Dms.",
+  "license": "UNLICENSED",
+  "capacitor": {
+    "android": {
+      "src": "android"
+    }
+  },
+  "keywords": [
+    "capacitor",
+    "plugin",
+    "android",
+    "position-tracking"
+  ],
+  "peerDependencies": {
+    "@capacitor/core": "^7.0.0"
+  }
+}

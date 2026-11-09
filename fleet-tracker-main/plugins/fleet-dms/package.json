@@ -1,0 +1,20 @@
+{
+  "name": "@fleet/dms",
+  "version": "1.0.0",
+  "description": "Driver monitoring for the Fleet Tracker driver app: the forward camera, on-device face analysis, the alerts and the short video an alert leaves behind. Native half only - the app talks to it through window.CapPlugins.Dms.",
+  "license": "UNLICENSED",
+  "capacitor": {
+    "android": {
+      "src": "android"
+    }
+  },
+  "keywords": [
+    "capacitor",
+    "plugin",
+    "android",
+    "driver-monitoring"
+  ],
+  "peerDependencies": {
+    "@capacitor/core": "^7.0.0"
+  }
+}

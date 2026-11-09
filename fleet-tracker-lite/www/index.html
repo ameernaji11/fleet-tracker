@@ -1,0 +1,1494 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src 'self' https://cdnjs.cloudflare.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; media-src 'self' data: blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+
+<link rel="stylesheet" href="vendor/leaflet.css" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'">
+<link rel="stylesheet" href="vendor/fa/css/all.min.css" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css'">
+<link rel="icon" href="icon.svg" type="image/svg+xml"><link rel="apple-touch-icon" href="icon.svg">
+<style>
+:root{--bg:#fff7ee;--ink:#26323a;--mut:#6b7a85;--line:#efe3d4;--or:#f28c28;--orl:#ffe9d2;--gr:#27a46a;--grl:#ddf4e8;--bl:#2f7fe6;--bll:#dcebfd;--rd:#d9534f;--rdl:#fde4e2}
+*{box-sizing:border-box}body{margin:0;font:15px/1.4 system-ui,sans-serif;color:var(--ink);background:var(--bg);padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.hide{display:none!important}.screen{padding:16px;max-width:520px;margin:auto}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px;margin:10px 0}
+input{font:inherit;height:46px;padding:0 14px;border:1px solid var(--line);border-radius:12px;width:100%;margin:5px 0;background:#fff;color:var(--ink)}
+.btn{font:inherit;font-weight:700;height:46px;border:0;border-radius:12px;width:100%;margin:6px 0;color:#fff;display:flex;align-items:center;justify-content:center;gap:8px}
+.b{background:var(--bl)}.g{background:var(--gr)}.o{background:var(--or)}.r{background:var(--rd)}.gh{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.top{display:flex;justify-content:space-between;align-items:center;gap:6px}.top b{font-size:20px}
+/* the welcome name takes whatever the buttons leave, so the header icons never push
+   the header wider than the screen on a small phone */
+.top>div:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top>div:last-child{display:flex;gap:6px;flex:none}
+.ib{border:0;background:#fff;border-radius:10px;width:40px;height:40px;border:1px solid var(--line)}
+.id{display:flex;gap:12px;align-items:center}.av{width:46px;height:46px;border-radius:14px;background:var(--orl);color:var(--or);display:grid;place-items:center;font-size:20px}
+.chip{margin-left:auto;font-size:12px;font-weight:700;padding:4px 10px;border-radius:99px;background:var(--bll);color:var(--bl)}
+.spd{text-align:center}.spd b{font-size:56px;line-height:1}.spd span{color:var(--mut);margin-left:6px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.grid div{background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 10px}.grid small{color:var(--mut);display:block}.grid b{font-size:14px}
+#map{height:260px;border-radius:14px;border:1px solid var(--line);margin:10px 0;position:relative}.mapb{position:absolute;z-index:999;right:8px;top:8px;width:auto;padding:0 10px;font-weight:700;font-size:12px}
+.mk{width:34px;height:34px;border-radius:50%;border:3px solid #fff;box-shadow:0 1px 6px #0006;display:grid;place-items:center;color:#fff}
+#alert{position:fixed;top:env(safe-area-inset-top);left:8px;right:8px;background:var(--rd);color:#fff;padding:14px;border-radius:12px;font-weight:700;z-index:9999;text-align:center}
+.err{color:var(--rd);font-weight:600;min-height:20px}.err.good{color:var(--gr)}.err.warn{color:var(--or)}.foot{font-size:11px;color:var(--mut);text-align:center;margin:14px 0}
+.eye{position:absolute;right:6px;top:10px;border:0;background:none;color:var(--mut);width:40px;height:36px}
+.step{display:flex;gap:10px;align-items:center}.step i{width:24px;color:var(--bl);text-align:center}
+#app.screen{display:flex;flex-direction:column;height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));padding:8px 12px;gap:6px;overflow:hidden}#app.hide{display:none}
+#app .card{margin:0;padding:8px 10px}.top b{font-size:17px}.top small{font-size:11px}#app .foot{margin:0;font-size:10px}
+.spd{display:flex;align-items:center;gap:10px}.spd b{font-size:40px}.spd .pr{margin-left:auto;text-align:right;font-size:13px;color:var(--mut);min-width:0}.spd .pr b{display:block;font-size:15px;color:var(--ink);white-space:nowrap}
+.mcl button.on{background:var(--bl);color:#fff}
+.hero{width:100%;height:auto;border-radius:16px;display:block}
+.lgname{font-weight:900;font-size:22px;letter-spacing:.2px;margin:0 0 4px}
+#map{flex:1;min-height:80px;margin:0}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}.grid3 div{background:#fff;border:1px solid var(--line);border-radius:10px;padding:4px 8px;min-width:0}.grid3 small{display:block;color:var(--mut);font-size:10px}.grid3 b{font-size:12px;white-space:nowrap}.grid3 .w2{grid-column:span 2}
+.btns{display:flex;gap:8px}.btns .btn{margin:0;height:48px}
+.mcl{position:absolute;z-index:999;right:8px;top:8px;bottom:8px;display:flex;flex-direction:column;flex-wrap:wrap;align-items:flex-end;gap:6px}.mcl button{width:38px;height:38px;border:0;border-radius:10px;background:#fff;box-shadow:0 1px 6px #0004;color:var(--ink)}
+/* the style name has to be readable the moment the driver taps the layer button,
+   because a touch device never shows a button title - so it sits level with that
+   button (the second in the cluster) and just to the left of it */
+.layN{position:absolute;z-index:999;right:54px;top:53px;background:#fff;color:var(--ink);box-shadow:0 1px 6px #0004;border-radius:10px;padding:9px 11px;font-size:12px;font-weight:700;pointer-events:none;white-space:nowrap}
+/* grey squares with no signal are the map waiting for a tile, not a broken app:
+   the driver is told, and the route and the vehicle still draw */
+.mn{position:absolute;z-index:998;left:8px;bottom:8px;max-width:calc(100% - 60px);background:#16222ce6;color:#fff;
+ font-size:11px;font-weight:600;line-height:1.3;padding:5px 8px;border-radius:8px}
+#err{position:fixed;bottom:66px;left:12px;right:12px;font-size:12px;pointer-events:none;margin:0;z-index:1001}
+/* While the trip screen is open this same line is moved into that screen's own column (see
+   show()), where it takes a row of its own and the map gives way. Pinned to the bottom it
+   landed on top of the Start trip button, so a driver who had already reported
+   his loss in red read it straight over the control he was told to press. */
+#app #err{position:static;bottom:auto;left:auto;right:auto;margin:0;font-size:11px;line-height:1.3;z-index:auto}
+#app #err:empty{display:none}
+/* Short screens (a phone held sideways, a small window): every screen has to fit
+   without scrolling, so the login artwork and the step spacing give way first. */
+@media(max-height:660px){.hero{max-height:112px;width:auto;margin:2px auto}#lg{padding:8px 16px!important}.lgname{font-size:19px}#pm{padding:8px 16px}#pm h2{margin:0 0 4px}#pm p{margin:0 0 6px}#pm .card.step{padding:6px 8px}#pm .btn{height:42px;margin:4px 0}.spd b{font-size:28px}
+/* the three map buttons have to stay inside a short map, or the last one hangs over the
+   tiles below it */
+.mcl{gap:4px}.mcl button{width:31px;height:31px;border-radius:8px;font-size:12px}}
+</style></head><body>
+<div id="wt" class="screen hide" style="text-align:center;padding-top:64px">
+<div class="lgname">Fleet Tracker Lite</div>
+<p style="color:var(--mut);font-weight:600;margin:26px 0 0"><i class="fa-solid fa-circle-notch fa-spin"></i> Opening your last sign-in</p>
+<p style="color:var(--mut);margin:6px 0 0;font-size:12px">Nothing has to be typed. This only asks the server once whether the sign-in this phone kept is still valid.</p>
+<div class="foot">Fleet Tracker Lite Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</div></div>
+<!-- The form is the only screen not hidden in the markup: a page whose scripts never ran
+     still has to give the driver a way in. The last lines below hide it again the moment
+     the phone says a sign-in is worth opening. -->
+<div id="lg" class="screen" style="text-align:center;padding-top:40px">
+<div class="lgname">Fleet Tracker Lite</div>
+<svg class="hero" viewBox="0 0 320 180" role="img" aria-label="A vehicle monitored along a safe, controlled route"><defs><linearGradient id="hsky" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e9f2fd"/><stop offset="1" stop-color="#e6f7ee"/></linearGradient><linearGradient id="hsh" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3d8bf0"/><stop offset="1" stop-color="#1f5cbd"/></linearGradient></defs>
+<rect width="320" height="180" rx="18" fill="url(#hsky)"/>
+<g fill="#fff" opacity=".8"><rect x="14" y="14" width="64" height="38" rx="7"/><rect x="104" y="14" width="104" height="38" rx="7"/><rect x="234" y="70" width="72" height="46" rx="7"/><rect x="14" y="70" width="64" height="46" rx="7"/><rect x="104" y="136" width="104" height="30" rx="7"/><rect x="234" y="136" width="72" height="30" rx="7"/></g>
+<path d="M0 61H320M0 129H320M91 0V180M221 0V180" stroke="#fff" stroke-width="13"/><path d="M0 61H320M0 129H320M91 0V180M221 0V180" stroke="#cfe0f5" stroke-width="1" stroke-dasharray="6 6"/>
+<path d="M40 122C72 122 80 100 104 92S124 62 156 58 200 76 224 62 252 56 276 60" fill="none" stroke="#2f7fe6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="40" cy="122" r="6.5" fill="#27a46a" stroke="#fff" stroke-width="3"/>
+<path d="M276 26c-8 0-14 6-14 14 0 10 14 20 14 20s14-10 14-20c0-8-6-14-14-14z" fill="#2f7fe6" stroke="#fff" stroke-width="2"/><circle cx="276" cy="40" r="4.5" fill="#fff"/>
+<g transform="translate(236 61)"><circle r="11" fill="#f28c28" stroke="#fff" stroke-width="3"/><path d="M-5 -3h6v5h-6zM1 -1h3l2 2v2h-5z" fill="#fff"/><circle cx="-3" cy="3.6" r="1.5" fill="#fff"/><circle cx="3" cy="3.6" r="1.5" fill="#fff"/></g>
+<g transform="translate(16 16)"><path d="M16 0l15 5v11c0 9-6 16-15 19C7 32 1 25 1 16V5z" fill="url(#hsh)" stroke="#fff" stroke-width="2.5"/><path d="M8 16l6 6 10-11" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g transform="translate(14 148)"><rect width="66" height="22" rx="11" fill="#16222c" opacity=".88"/><circle cx="14" cy="11" r="4" fill="#3ddc97"/><text x="24" y="15" font-size="10" font-weight="800" fill="#fff" font-family="Nunito,system-ui,sans-serif">LIVE</text></g>
+<g transform="translate(88 148)"><rect width="94" height="22" rx="11" fill="#27a46a" opacity=".92"/><path d="M12 11l3 3 5-6" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><text x="26" y="15" font-size="10" font-weight="800" fill="#fff" font-family="Nunito,system-ui,sans-serif">IN CONTROL</text></g>
+</svg>
+<input id="em" placeholder="Username or email" autocomplete="username" autocapitalize="none">
+<div style="position:relative"><input id="pw" type="password" placeholder="Password" autocomplete="current-password"><button type="button" class="eye" onclick="eye()"><i class="fa-solid fa-eye" id="eyei"></i></button></div>
+<label style="display:flex;gap:8px;align-items:center;margin:8px 0;font-weight:600"><input type="checkbox" id="rem" style="width:20px;height:20px;margin:0"> Remember me</label>
+<button class="btn b" id="sib" onclick="signIn()"><i class="fa-solid fa-right-to-bracket"></i>Sign in</button>
+<small id="offh" class="hide" style="display:block;color:var(--mut);text-align:center">No internet: this phone signs in from the copy of your last sign-in. It cannot open for a user it has never signed in with a signal.</small>
+<div class="foot">Fleet Tracker Lite Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</div></div>
+<div id="pm" class="screen hide"><h2><i class="fa-solid fa-shield-halved" style="color:var(--bl)"></i> Permissions</h2>
+<p>The app needs these to track your trips reliably, even when the screen is off.</p>
+<div class="card step"><i class="fa-solid fa-location-dot"></i><div>Location<br><small>Tap Allow, then choose "Allow" on each question.</small></div></div>
+<button class="btn b" onclick="pAsk()"><i class="fa-solid fa-check"></i>Allow permissions</button>
+<div class="card step"><i class="fa-solid fa-location-crosshairs"></i><div>Location: "Allow all the time"<br><small>Opens settings. Tap Permissions → Location → Allow all the time.</small></div></div>
+<button class="btn o" onclick="CapPlugins.BG.openSettings()"><i class="fa-solid fa-gear"></i>Open location settings</button>
+<div class="card step" id="igcard"><i class="fa-solid fa-battery-full"></i><div>Battery: "Unrestricted"<br><small>Android stops apps it thinks nobody is using, and a stopped app cannot report a trip. Answer Allow once and this one keeps working with the screen locked.</small></div></div>
+<button class="btn o" id="igask" onclick="igAsk()"><i class="fa-solid fa-battery-bolt"></i>Allow unrestricted battery use</button>
+<button class="btn g" onclick="pmGo()"><i class="fa-solid fa-arrow-right"></i>Continue</button></div>
+<div id="app" class="screen hide">
+<div class="top"><div><small>Welcome,</small> <b id="wn"></b><b>!</b></div><div><button class="ib hide" id="dash" onclick="openDash()" title="Open dashboard"><i class="fa-solid fa-chart-line"></i></button><button class="ib" onclick="pwUi()" title="Change password"><i class="fa-solid fa-key"></i></button><button class="ib" onclick="signOut()" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i></button></div></div>
+<div class="card id"><div class="av" style="width:38px;height:38px;font-size:17px"><i id="vi" class="fa-solid fa-car"></i></div><div><b id="vn"></b><br><small><i class="fa-solid fa-id-card"></i> <span id="dn"></span></small><br><select id="pk" class="hide" onchange="pickV()" style="margin-top:6px;max-width:190px"></select></div><span class="chip" id="stc">Parking</span></div>
+<div class="card spd"><div><b id="sp">0</b><span>km/h</span></div><div class="pr"><small>Position</small><b id="v_pos">-</b><br><small id="lt">No record yet</small></div></div>
+<div id="map"><div class="mn hide" id="mn"><i class="fa-solid fa-wifi"></i> No signal: this area was not cached, the route is still drawn</div><div class="layN hide" id="layN"></div><div class="mcl"><button id="layB" onclick="togMap()" title="Map style"><i class="fa-solid fa-layer-group"></i></button><button id="fsB" onclick="fsMap()" title="Full screen"><i class="fa-solid fa-expand"></i></button><button id="pinB" class="on" onclick="togPin()" title="Pin: keep the vehicle in the centre"><i class="fa-solid fa-thumbtack"></i></button></div></div>
+<div class="grid3" id="vals"></div>
+<div class="btns" id="trow"><button id="go" class="btn g" onclick="start()" title="You can press this, but you no longer have to: a trip starts by itself once the vehicle has been above 5 km/h for 5 seconds"><i class="fa-solid fa-play"></i>Start trip</button><button id="stp" class="btn r hide" onclick="stop()" title="A trip also ends by itself after 10 minutes below 5 km/h"><i class="fa-solid fa-stop"></i>End trip</button></div>
+<div class="foot">Fleet Tracker Lite Version 1.0.0 | Ameer Naji © 2026 | All Rights Reserved</div>
+<div class="card hide" id="pwcard"><small id="pwnote" style="display:none;color:var(--or)">The administrator set the password you signed in with. Choose your own now.</small><small style="display:block;color:var(--mut)">New password — at least 6 characters</small>
+<input type="password" id="np1" placeholder="New password" autocomplete="new-password">
+<input type="password" id="np2" placeholder="Repeat new password" autocomplete="new-password">
+<div class="btns"><button class="btn g" onclick="changePw()">Save</button><button class="btn o" id="pwcx" onclick="pwUi()">Cancel</button></div></div></div>
+<p class="err" id="err"></p>
+<div id="alert" class="hide"></div>
+
+<script>
+const $=i=>document.getElementById(i);
+window.onerror=(m,s,l)=>{$('err').textContent='Error: '+m+' (line '+l+')'};
+// offline, a rejected network call is the plan working, not a fault: the outbox is
+// holding the records until the signal returns, so it must not scare the driver
+window.addEventListener('unhandledrejection',e=>{if(!navigator.onLine)return;
+ $('err').textContent='Error: '+(e.reason&&e.reason.message||e.reason)});
+</script>
+<script src="config.js"></script>
+<script src="bridge.js"></script>
+<script src="vendor/leaflet.js"></script>
+<script>window.L||document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous" integrity="sha384-NElt3Op+9NBMCYaef5HxeJmU4Xeard/Lku8ek6hoPTvYkQPh3zLIrJP7KiRocsxO"><\/script>')</script>
+<script src="vendor/supabase.js"></script>
+<script>window.supabase||document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" crossorigin="anonymous" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug"><\/script>')</script>
+<script>
+const DASH=(typeof DASH_URL==='string'&&/^https:\/\/.+\/$/.test(DASH_URL.trim()))?DASH_URL.trim():'https://ameernaji11.github.io/fleet-tracker/dashboard/';
+const mail=u=>u.includes('@')?u.trim():u.trim().toLowerCase()+'@fleet.local';
+const TI={Car:'fa-car',Sedan:'fa-car-side',Hatchback:'fa-car',SUV:'fa-car-rear',Pickup:'fa-truck-pickup',Van:'fa-van-shuttle',Minibus:'fa-van-shuttle',Bus:'fa-bus',Truck:'fa-truck','Heavy Truck':'fa-truck-moving',Tanker:'fa-truck-droplet',Taxi:'fa-taxi',Ambulance:'fa-truck-medical',Motorbike:'fa-motorcycle',Tractor:'fa-tractor',Trailer:'fa-trailer',Equipment:'fa-tractor'};
+let REM=localStorage.rem!=='0',sb=null,me,asg,watcher,lastSent=0,FIRSTRUN=false,HSENT=null,SENT=+(localStorage.sent||0),ASGS=[],PICK=localStorage.pick||null;
+// ---- the outbox. Everything the phone would send sits in IndexedDB until the
+// server has accepted it, so a vehicle can drive through hours without signal and
+// lose nothing. This build files one kind of record - a position, {t:'pos',p:<row>} -
+// kept in the order it happened, which is what lets the office rebuild a trip from the
+// queue alone once the signal returns.
+let OUT=null,outBusy=false,MEMQ=[];
+const outSt=m=>{try{return OUT&&OUT.transaction('out',m).objectStore('out')}catch(e){return null}};
+function outOpen(){return new Promise(res=>{if(!window.indexedDB||!indexedDB.open)return res(false);let req;
+ try{req=indexedDB.open('fleetout',1)}catch(e){return res(false)}
+ req.onupgradeneeded=()=>{const d=req.result;if(!d.objectStoreNames.contains('out'))d.createObjectStore('out',{keyPath:'k',autoIncrement:true})};
+ req.onsuccess=()=>{OUT=req.result;res(!!OUT&&OUT.objectStoreNames.contains('out'))};
+ req.onerror=()=>res(false);setTimeout(()=>res(false),5000)})}
+function outAdd(v){const s=outSt('readwrite');if(s){try{s.add({v,at:Date.now()});return}catch(e){}}
+ MEMQ.push({k:++MMX,v,mem:true})}
+let MMX=0;
+function outDel(r){if(r.mem){const i=MEMQ.findIndex(x=>x.k===r.k);if(i>=0)MEMQ.splice(i,1);return}
+ const s=outSt('readwrite');if(s)try{s.delete(r.k)}catch(e){}}
+// oldest-first page of the queue; the server accepts 200 rows per insert, so that
+// is the natural batch size. Reading a page never removes it: a record is only thrown
+// away once the server has taken it, and this holds for the memory queue the phone
+// falls back to when IndexedDB is not available - an unreadable store must not turn an
+// offline drive into lost records.
+function outTake(n,after){return new Promise(res=>{const s=outSt('readonly');
+ if(!s)return res(MEMQ.filter(x=>x.k>(after||0)).slice(0,n));
+ try{s.getAll(IDBKeyRange.lowerBound(after||0,true),n).onsuccess=e=>
+  res((e.target.result||[]).map(x=>({k:x.k,v:x.v})))}catch(e){res([])}})}
+const outCount=()=>new Promise(res=>{const s=outSt('readonly');
+ if(!s)return res(MEMQ.length);
+ try{const c=s.count();c.onsuccess=()=>res(c.result+MEMQ.length);c.onerror=()=>res(MEMQ.length)}catch(e){res(MEMQ.length)}});
+const mk=r=>supabase.createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{storage:r?localStorage:sessionStorage,persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,flowType:'implicit'}});
+try{if(!/^https:\/\/[a-z0-9]{15,30}\.supabase\.co$/.test(SUPABASE_URL)||!String(SUPABASE_KEY).startsWith('eyJ'))throw new Error('the address or key built into this app is not a fleet server');sb=mk(REM)}catch(e){$('err').textContent='This app cannot reach the office, so it cannot start a trip or send positions. Tell your office so they can rebuild it. ('+(e.message||e)+')'}
+const show=s=>{['wt','lg','pm','app'].forEach(x=>$(x).classList.toggle('hide',x!==s));
+ // one error line, two homes: inside the trip screen it takes a row above the trip button,
+ // everywhere else it stays the fixed line the wait and sign-in screens have always used.
+ // Every writer can keep calling it by the same id.
+ try{const e=$('err'),a=$('app'),t=$('trow');if(e&&a&&t){if(s==='app'){if(e.parentNode!==a)a.insertBefore(e,t)}else if(e.parentNode===a)document.body.appendChild(e)}}catch(x){}
+ if(s==='app'&&map)setTimeout(()=>map.invalidateSize(),100)};
+// ---- one status line, three colours. Writing to it plainly means "something broke".
+// note() is how the app delivers good news or a warning without borrowing the error red,
+// and since the colour is decided on every single write, an earlier note can never leave
+// the line painted green when a real error lands in it.
+const note=(()=>{const el=$('err'),p=Object.getOwnPropertyDescriptor(Node.prototype,'textContent');
+ let k='';
+ if(el&&p&&p.get&&p.set)Object.defineProperty(el,'textContent',{configurable:true,
+  get(){return p.get.call(el)},
+  set(v){p.set.call(el,v);el.className='err'+(v&&k?' '+k:'');k=''}});
+ return(m,c)=>{k=c==='ok'?'good':c==='warn'?'warn':'';if(el)el.textContent=m||''}})();
+function eye(){const i=$('pw');i.type=i.type==='password'?'text':'password';$('eyei').className='fa-solid '+(i.type==='password'?'fa-eye':'fa-eye-slash')}
+// ---- signing in with no signal. The server cannot be reached from a basement, a
+// tunnel or a dead spot, so the phone keeps its own way of checking the driver's
+// password: PBKDF2 (120 000 rounds, SHA-256) over a random per-device salt. The
+// password itself is never stored, only this one-way copy. Checking it takes a
+// fraction of a second here and a very long time for anyone who has the handset.
+// Signing out deletes it, and it is only accepted while it is less than 30 days
+// old, so an account the admin has closed cannot keep opening a phone forever.
+const OKI=12e4,OKMAX=30*864e5;
+const obuf=b=>btoa(String.fromCharCode.apply(null,new Uint8Array(b)));
+const oget=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function ohash(pw,salt){if(!window.crypto||!crypto.subtle||!crypto.subtle.deriveBits)return null;
+ try{const k=await crypto.subtle.importKey('raw',new TextEncoder().encode(pw),'PBKDF2',false,['deriveBits']);
+  return obuf(await crypto.subtle.deriveBits({name:'PBKDF2',salt:oget(salt),iterations:OKI,hash:'SHA-256'},k,256))}catch(e){return null}}
+// called after a sign-in the server itself accepted
+async function credSave(pw){try{if(!pw||!me||!me.id)return;
+ const s=obuf(crypto.getRandomValues(new Uint8Array(16))),h=await ohash(pw,s);if(!h)return;
+ localStorage.offl=JSON.stringify({s,h,e:me.email,i:me.id,at:Date.now()})}catch(e){}}
+async function credCheck(pw){try{const c=JSON.parse(localStorage.offl||'null');
+ if(!c||!c.s||!c.h||!c.i||!c.e||Date.now()-(+c.at||0)>OKMAX)return null;
+ if(c.e!==mail($('em').value))return null;
+ const h=await ohash(pw,c.s);return h&&h===c.h?c:null}catch(e){return null}}
+// does this phone know this user at all? picks which of the two offline messages
+// the driver is given
+function credKnown(){try{const c=JSON.parse(localStorage.offl||'null');
+ return !!(c&&c.e===mail($('em').value))}catch(e){return false}}
+// a phone in a dead spot can still say it is online, and a request to a server
+// that never answers can spin for half a minute. A rejected sign-in carries a
+// status code and a plain message ("Invalid login credentials"); anything that
+// looks like a broken pipe does not, so the two are told apart here.
+function noNet(e){try{if(!e||e.statusCode||e.code)return false;
+ return /failed to fetch|fetch failed|networkerror|network request failed|load failed|err_\w+|did not answer|timed out|timeout|no network/i
+  .test(String(e.message||e))}catch(x){return false}}
+// used when the server could not be reached: the same local check the no-signal
+// path uses, so nobody waits for a "Failed to fetch" that never resolves. A phone on
+// dead Wi-Fi says it is online and never reaches the no-signal branch below, so the
+// shut-after-five promise is kept here as well - otherwise the one path that has no
+// server to say "no" would also be the one path with no count.
+async function localEnter(){offAge();if(OFFFAIL>=LOCK_AT)throw Object.assign(new Error(offFail()),{soft:1});
+ const c=await credCheck($('pw').value);
+ if(!c)throw new Error(credKnown()?offFail():'The server did not answer, and this phone has not signed in as '+($('em').value.trim()||'that user')+' before. Sign in once while the server can be reached, then the phone can let you in without it.');
+ offClear();
+ await init(1,{id:c.i,email:c.e})}
+// ---- account lockout (v18, and expiring by itself since v21). The same five wrong
+// passwords as the dashboard, and the count is kept in the database rather than here, so
+// a driver cannot get around it by reloading the app or clearing its storage. Since v21
+// none of it waits for anybody: five tries that did not all come at once are counted
+// again from nothing after a quiet stretch, and a lockout that was reached opens itself
+// after the wait the fleet set - both answered by the database, which says the minutes on
+// the screen. A lock an administrator pressed on the Users page is the one that has no
+// expiry. With no signal there is no database to ask, so the handset keeps its own count
+// of wrong tries against the sign-in it remembers and stops offering the offline way in
+// until it next reaches the server — where the real count, and any lock, is waiting. That
+// local count ages out on the same quiet window, using the last setup this phone
+// downloaded, because it is only ever a convenience and never the fleet's record.
+const LOCK_AT=5;let OFFFAIL=+(localStorage.offfail||0);
+// Both halves of the lockout answer are asked with a deadline. They are pure
+// bookkeeping - a try counted, a lock named - and a request that hangs on a phone that
+// claims a signal used to stop the driver from ever getting in or out. Answering nothing
+// after 6 seconds lets the sign-in continue on the server's own verdict instead.
+const lockCall=(f,e)=>Promise.race([sb.rpc(f,{p_email:e}).then(({data,error})=>!error&&data&&data[0]||null).catch(()=>null),
+ new Promise(r=>setTimeout(()=>r(null),6000))]);
+const mins=m=>m<=1?'1 minute':Math.round(m)+' minutes';
+const lockMsg=m=>m==null?'locked until the administrator unlocks it.'
+ :'locked, and it opens again by itself in '+mins(m)+'.';
+const lockOn=p=>!!p&&!!p.locked_at&&(!p.locked_until||new Date(p.locked_until)>new Date());
+const offWin=()=>{const m=+(localStorage.lwin||0);return m>=1?m:15};
+function offAge(){try{const t=+localStorage.offfail_at;if(OFFFAIL&&(!t||Date.now()-t>offWin()*6e4))offClear()}catch(e){}}
+function offClear(){OFFFAIL=0;try{localStorage.offfail='0';localStorage.removeItem('offfail_at')}catch(e){}}
+function offFail(){offAge();OFFFAIL++;localStorage.offfail=String(OFFFAIL);localStorage.offfail_at=String(Date.now());
+ return OFFFAIL>=LOCK_AT?'This phone has been shut after '+LOCK_AT+' wrong passwords. Connect to the internet and sign in once, or ask the administrator to unlock the account.'
+ :'Wrong password. '+(LOCK_AT-OFFFAIL>1?LOCK_AT-OFFFAIL+' attempts left':'One attempt left')+' before this phone stops letting you in without a signal.'
+ +' It starts again from nothing after '+mins(offWin())+' without a wrong one.'}
+// ---- one account, one handset. A driver signed in twice puts two streams of positions on
+// the same vehicle and a trip that reads as though the cab was in two places, so the account
+// has one seat: a handset names itself into it, keeps naming itself every half minute, and
+// the seat only comes free when it stops. The phone arriving second is refused and told whose
+// seat it wanted; the phone sitting in it is never moved, only informed that somebody tried.
+// Two minutes of silence is a dead battery rather than a second handset, so a driver moving
+// to a spare phone waits two minutes instead of hunting for somebody in an office - and while
+// that phone is on a trip the wait is five, because Android puts a backgrounded page to sleep
+// for less than that on plenty of handsets, and a seat handed over mid-shift records the road
+// twice, which is the whole thing this exists to stop.
+//
+// With no signal there is nothing to ask, so the driver carries on working: a dead spot must
+// not stop a trip, which is the same bargain this phone already makes about signing in. The
+// seat is proved again the moment the network returns, and a phone that cannot prove it then
+// stands down instead of adding its records to another handset's.
+const CLMS=30000;
+let DID='',DMODEL='',CLAM=0,CLT=0,CLDOWN=false,CLTRY=+(localStorage.cltry||0);
+// The name this install answers to. Android's per-app device number is the same one after an
+// app update and a different one after the phone is wiped, which is the right life for a seat:
+// this handset, this install. A handset that will not give one up - or a browser used to try
+// the app out - keeps a random one of its own instead, and a phone that cannot keep even that
+// asks nothing at all rather than locking its driver out of his own account.
+async function didGet(){if(DID)return DID;
+ try{if(window.CapPlugins&&CapPlugins.Device&&CapPlugins.Device.getId){
+  const i=await CapPlugins.Device.getId(),n=CapPlugins.Device.getInfo?await CapPlugins.Device.getInfo():{};
+  DID=String((i&&i.uuid)||'');DMODEL=String((n&&n.model)||(n&&n.name)||'')}}catch(e){DID=''}
+ if(!DID){try{DID=localStorage.did||'';
+  if(!DID){DID='p-'+Math.random().toString(36).slice(2,10)+Date.now().toString(36);localStorage.did=DID}}
+ catch(e){DID=''}}
+ return DID}
+// What a refused handset is told. It names the phone holding the seat and says what to do
+// about it, because the driver being stood outside is the one who can go and close the other.
+function claimWhy(d){const mins=d.tripping?5:2;
+ return 'Your account is already running on '+(d.model||'another phone')+
+  (d.tripping&&d.trip_since?', and is on a trip there since '+new Date(d.trip_since).toLocaleTimeString('en-GB'):'')+
+  '. Sign out or close the app on that phone, then try here again. It frees itself about '+mins+
+  ' minutes after that phone stops answering, and if that phone is lost or broken your administrator can release the account.'}
+// Asking for the seat: null means carry on, a row back means a different handset holds it.
+// The ask is given four seconds and no more, because a network that is only pretending to be
+// there must not be allowed to hold up a driver setting off - the same reason the sign-in
+// screen races its own deadline. A project that has not run v28 answers with an error, and an
+// error is not evidence about a second phone.
+async function claimAsk(tripping){
+ if(!me||!sb||CLDOWN||!navigator.onLine)return null;
+ if(!await didGet())return null;
+ let r=null;
+ try{r=await Promise.race([sb.rpc('device_take',{p_did:DID,p_model:DMODEL||'another phone',p_trip:!!tripping}),
+  new Promise(res=>{setTimeout(()=>res(null),4000)})])}catch(e){return null}
+ if(!r||r.error||!r.data)return null;
+ const d=Array.isArray(r.data)?r.data[0]:r.data;
+ if(!d||typeof d.ok!=='boolean')return null;
+ if(d.ok){CLAM=1;
+  // only the phone sitting in the seat is told about an attempt; the one that made it has
+  // its own answer, and it is not allowed to notify itself
+  const at=+new Date(d.tried_at||0);
+  if(at>CLTRY){CLTRY=at;try{localStorage.cltry=String(at)}catch(e){}claimTell(d)}
+  return null}
+ CLAM=2;return d}
+// The driver whose seat somebody reached for hears about it and is otherwise left alone: his
+// trip, his records and his session carry on untouched, since the phone that asked is the one
+// that gets refused. Behind the screen the same notice is posted, because a trip is watched
+// from the lock screen as often as from the app.
+function claimTell(d){const who=esc(d.tried_model||'another phone');
+ banner('<i class="fa-solid fa-mobile-screen-button"></i> Another phone is trying to use your account: '+who+
+  '. Your trip and records here carry on - close the app there if it was not you.',12000);
+ if(document.hidden)try{CapPlugins.LN.schedule({notifications:[{id:Date.now()%2147483647,
+   title:'Fleet Tracker Lite: another phone is using your account',
+   body:'This phone keeps working. Close the app on '+who+' if it was not you.',channelId:'fleet.quiet'}]})}catch(e){}
+ logAct('Another phone tried to use this account',who)}
+// Standing down: this phone can no longer prove the account is its own, so it stops doing the
+// things that would put a second set of records on the vehicle - the trip, either watcher, and
+// whatever it still holds of his - and hands the sign-in screen back with the reason
+// written on it. Only a phone that actually asked and was actually refused gets here.
+async function claimOut(d){if(CLDOWN)return;CLDOWN=true;const msg=claimWhy(d);
+ try{
+  clearInterval(CLT);CLT=0;
+  // the trip this handset was recording is closed and sent first, so the vehicle keeps the
+  // shift it drove rather than ending with the phone that lost it. It is the one step here
+  // given a longer deadline, because it is the one whose work the fleet would rather have
+  // finished - and it still has a deadline, since a phone that no longer holds the seat
+  // must not go on being this driver's phone while an upload waits on a network that is
+  // not answering.
+  if(watcher||SRT||tripRead()){try{await outWait(stop(1),TRIP_MS)}catch(e){}}
+  await outWait(senOff());
+  // the runner gives back its unsent points first, and only then does this phone put down
+  // the order and the records it holds for that driver
+  await outWait(trkStop());
+  await outWait((async()=>{try{if(dmsApi())await CapPlugins.Dms.clear()}catch(e){}})());
+  await outWait(logAct('Account now running on another phone',msg.slice(0,140)));
+  // the same rule as signing out by hand: this handset must not keep a session it can
+  // no longer prove is its own, and it cannot be allowed to wait on the server for that
+  try{await outWait(sb&&sb.auth.signOut())}catch(e){}
+  outLocal();
+  me=null;OFFL=false;CLAM=2;show('lg');$('err').textContent=msg}
+ finally{CLDOWN=false}}
+// The keeping part, from the half-minute timer, from the phone coming back to the screen, and
+// from the moment it hears from the network again. A refusal at any of these is the seat having
+// gone - the page slept too long, or a spare handset took it over - so this is where a phone
+// that was already working steps down rather than carries on recording twice.
+function claimGo(tripping){claimAsk(tripping).then(d=>{if(d)claimOut(d)})}
+// Standing up from the seat at sign-out, so the next handset - this driver's own tomorrow
+// morning, or a spare this afternoon - never has to wait out the two minutes first. Only this
+// phone's own claim can be given up: the function deletes the row when the name in it matches,
+// which is what stops a refused handset pushing the one sitting in the seat out of it.
+async function claimGive(){clearInterval(CLT);CLT=0;
+ if(CLAM!==1||!DID||!sb)return;
+ try{await sb.rpc('device_give',{p_did:DID})}catch(e){}
+ CLAM=0}
+async function signIn(){
+ if(!sb)return;const want=$('rem').checked;if(want!==REM){REM=want;localStorage.rem=want?'1':'0';sb=mk(REM)}
+ const b=$('sib');b.disabled=true;b.innerHTML='<i class="fa-solid fa-circle-notch fa-spin"></i>Signing in...';$('err').textContent='';
+ const em=mail($('em').value);
+ // the app's own sentences are written for the driver, so they are shown as they
+ // are; anything that comes from the server keeps the "Error:" label
+ const soft=t=>{throw Object.assign(new Error(t),{soft:1})};
+ try{
+  offAge();
+  if(!navigator.onLine){if(OFFFAIL>=LOCK_AT)soft(offFail());
+   const c=await credCheck($('pw').value);
+   // the two cases say different things to the driver: this phone knows this user
+   // and disagrees with the password, or it has never seen this user at all
+   if(!c)soft(credKnown()?offFail()
+    :'No internet, and this phone has not signed in as '+($('em').value.trim()||'that user')+' before. Sign in once with a signal, then it can let you in offline.');
+   offClear();await init(1,{id:c.i,email:c.e});return}
+  // The lock question goes out with the password instead of in front of it. Awaiting
+  // one and then the other put a whole round trip in front of every sign-in, on a page
+  // that is already waiting for the server to grind out a password hash. The lock still
+  // wins: a session handed back for a locked account is thrown away here, the same way
+  // the opening check throws it away.
+  const g=lockCall('login_gate',em);
+  let r;try{r=await Promise.race([sb.auth.signInWithPassword({email:em,password:$('pw').value}),
+   new Promise((_,rej)=>{setTimeout(()=>rej(new Error('The server did not answer in time')),8e3)})])}
+  // a late answer from a request that already timed out must not be read as a
+  // second sign-in
+  catch(e){r={error:e}}
+  const gd=await g;
+  if(gd&&gd.locked){if(r&&!r.error&&r.data&&r.data.session){try{await outWait(sb.auth.signOut())}catch(e){}outLocal()}
+   soft('Your account is '+lockMsg(gd.wait_min))}
+  if(r.error&&noNet(r.error)){await localEnter();return}
+  if(r.error){const m=r.error.message||String(r.error);
+   if(/invalid login credentials/i.test(m)){const x=await lockCall('login_fail',em);
+    if(x&&x.locked)soft('That was the '+LOCK_AT+'th wrong password: your account is '+lockMsg(x.wait_min));
+    if(x)soft('Wrong password. '+(x.tries_left>1?x.tries_left+' attempts left':'One attempt left')+' before this account is locked.'
+     +(x.reset_min?' It starts again from nothing after '+mins(x.reset_min)+' without a wrong one.':''))}
+   if(/too many requests|rate limit/i.test(m))soft('Too many attempts just now. Wait a minute, then try again.');
+   throw r.error}
+  // counting the good try is bookkeeping the driver has no reason to watch
+  lockCall('login_ok',em);offClear();
+  want?localStorage.user=$('em').value.trim():localStorage.removeItem('user');
+  // init comes first, for two reasons. It is what gives the app the user's id, and the
+  // offline copy used to be made before it - when me was still null - so the very first
+  // sign-in stored nothing and the next dead-spot trip had no credential to open with.
+  // It also keeps a 120 000-round key derivation off the spinner: the driver is looking
+  // at his app while the phone makes the copy.
+  const pwv=$('pw').value;
+  await init(1);
+  credSave(pwv);runSess(em,pwv)}
+ catch(e){$('err').textContent=(e.soft?'':'Error: ')+(e.message||e)}
+ b.disabled=false;b.innerHTML='<i class="fa-solid fa-right-to-bracket"></i>Sign in'}
+// ---- signing out. This button did nothing at all on a weak signal, and the reason
+// is that every step of it waited on something that need not answer. Supabase returns
+// a failed logout as an error object instead of throwing, and when the logout request
+// fails for anything other than 401/403/404 it returns before removing the stored
+// session - so the reload below read the tokens back and signed the same driver
+// straight in again. A logout that cannot get the browser's auth lock - the dashboard
+// this phone just handed a session to, or a token refresh already in flight - never
+// answers at all, and the phone sat on the spinner. So each step gets a bounded
+// moment: the server is asked first, while the token it needs is still there, and the
+// copy this handset keeps is then thrown away whatever the answer was. That copy is
+// what signing out is actually about.
+const OUT_MS=2000,TRIP_MS=8000;
+const outWait=(p,ms)=>Promise.race([Promise.resolve(p).then(()=>1,()=>1),new Promise(r=>setTimeout(r,ms||OUT_MS))]);
+function outLocal(){try{const q=sb&&sb.auth&&sb.auth.stopAutoRefresh();if(q&&q.catch)q.catch(()=>{})}catch(e){}
+ try{[localStorage,sessionStorage].forEach(s=>Object.keys(s).forEach(k=>{if(/^sb-.+-auth-token/.test(k))s.removeItem(k)}))}catch(e){}
+ try{localStorage.removeItem('offl')}catch(e){}
+ // The offline identity is the second way back into this app. With no signal - or a
+ // signal slow enough to miss the four-second wait at opening - init() falls back to the
+ // last driver this phone proved and starts the app signed in as him, so wiping Supabase's
+ // tokens and leaving this copy would still end with "sign out does nothing". The setup
+ // in the same cache belongs to the fleet and stays for the next handset.
+ try{const c=JSON.parse(localStorage.cfg||'null');if(c&&c.who){delete c.who;localStorage.cfg=JSON.stringify(c)}}catch(e){}}
+async function signOut(){
+ // standing up from the seat with a trip running cuts that trip short: the office gets
+ // the route up to this moment and nothing after it. The icon is small and easy to tap
+ // by mistake, so ending a drive has to be the driver's own answer, not a side effect.
+ // The question is asked of the trip, not of the Start button's flag: SRT only stands while
+ // start() itself is still running, so a driver whose trip is open - auto-started, or long
+ // past his last press - used to be signed out without any warning at all, and with the
+ // record left open: stop() writes the boundary the office needs to close a trip, and
+ // signing out skipped it, leaving one journey that the dashboard only finished two hours
+ // later on its own gap rule.
+ if((watcher||SRT||tripLive())&&!confirm('A trip is still running. Signing out ends it now and sends the office the route so far. Sign out anyway?'))return;
+ // the flag that says "this handset is leaving the seat", set here too so the End-trip work
+ // below does not hand the runner back to a service that outlives the session it reports with
+ CLDOWN=true;
+ if(watcher||SRT||tripLive()){try{await outWait(stop(1),TRIP_MS)}catch(e){}}
+ try{sessStop()}catch(e){}
+ // The three things that still want his session go out together, under one deadline:
+ // the audit row, the watcher that listens for a vehicle moving, and standing up from
+ // the seat so the next handset is not left outside for the two minutes it would
+ // otherwise have to wait. The background reporter ends with his session too, and the
+ // points this phone kept for him are deleted rather than left for the next driver of
+ // the same handset.
+ await outWait(Promise.all([logAct('Signed out','Phone'),senOff(),claimGive(),
+  // the runner gives back its unsent points before its phone-side queue is deleted, or
+  // the trip's last minutes would be erased with the session
+  (async()=>{try{await trkStop();if(dmsApi())await CapPlugins.Dms.clear()}catch(e){}})()]));
+ // asked last, because it is what takes the token these other calls are written with
+ try{await outWait(sb&&sb.auth.signOut())}catch(e){}
+ outLocal();location.reload()}
+let PWFORCE=0;
+// force=1 opens the panel and takes the Cancel button away: a password the
+// administrator set for somebody else is only ever temporary, so the driver who
+// signed in with it has to replace it before the app carries on. A panel standing
+// under that order does not close when the key icon is tapped again — the ways out
+// are to choose a new password, or to sign out — or the temporary password would
+// keep working and the whole panel would be decoration.
+function pwUi(force){const c=$('pwcard');const open=force||!c.classList.contains('hide')&&PWFORCE?true:c.classList.contains('hide');
+ PWFORCE=open?1:0;c.classList.toggle('hide',!open);
+ // this panel takes the map's place on the screen, so a full-screen map steps back first
+ if(open&&document.fullscreenElement)document.exitFullscreen().catch(()=>{});
+ // the app screen is fixed-height, so the map gives up its space while the panel is open
+ $('map').classList.toggle('hide',open);
+ $('pwnote').style.display=force?'block':'none';$('pwcx').style.display=force?'none':'';
+ if(open){$('np1').focus();return}
+ if(map)setTimeout(()=>map.invalidateSize(),80);
+ $('np1').value=$('np2').value=''}
+async function changePw(){if(!sb)return;const a=$('np1').value,b=$('np2').value,was=PWFORCE;
+ if(a.length<6)return $('err').textContent='The new password must be at least 6 characters';
+ if(a!==b)return $('err').textContent='The two new passwords do not match';
+ const {error}=await sb.auth.updateUser({password:a});
+ if(error)return $('err').textContent='Error: '+(error.message||error);
+ // put down the "this password was set for you" flag; the database lets an account
+ // clear only that flag about itself, and only through this function
+ const {error:ce}=await sb.rpc('clear_pw_flag');
+ // the offline copy has to be the one that matches the new password
+ await credSave(a);
+ // the flag lives on the database row: if it stayed standing the panel would open again
+ // at the next sign-in, which reads as though this change had never been taken
+ note(ce?'Password changed, but the office still sees the "set a new password" mark on this account: '+ce.message:'Password changed.',ce?'warn':'ok');
+ // the order is what keeps the panel shut, so hand it back before closing
+ PWFORCE=0;pwUi();logAct('Changed own password',was?'after an administrator reset':'')}
+// Audit trail for the admin-only Activity Log. Silently ignored if the table is
+// not there yet, because a logging failure must never stop a driver's trip.
+function logAct(action,details,duration_s){if(!me)return;(async()=>{
+ try{await sb.from('user_activity').insert({user_id:me.id,user_name:(me.email||'').replace('@fleet.local',''),action,details:details==null?null:String(details).slice(0,300),device:'phone',...(duration_s==null?{}:{duration_s:Math.max(0,Math.round(duration_s))})})}catch(e){}})()}
+// Time on screen: Android hides this page when the app goes to the background, and
+// that flush is what lets the dashboard's Activity Log add up how long a driver
+// actually spent in the app. Under ten seconds is a glance at a notification.
+let SST=0;
+function sessStop(){if(!SST||!me)return;const s=Math.round((Date.now()-SST)/1000);SST=0;if(s>=10)logAct('Session time','App',s)}
+function sessStart(){if(me)SST=Date.now()}
+document.addEventListener('visibilitychange',()=>{if(document.hidden){sessStop();
+ // going behind another app is how this page starts sleeping, and it may sleep for the rest of
+ // the drive: what it is holding goes to the runner now, not at a flush that has no page to
+ // run it. Best effort by nature - a page Android kills outright never finishes this call, and
+ // the records simply stay where they were, unsent rather than lost.
+ trkHand();return}
+ sessStart();
+ // coming back to the front: push whatever the phone saved while it was away
+ outUi();if(PEND)flush();maybeResume();
+ // the runner kept reporting while this page slept, but it slept without a sign-in to send
+ // with: the fresh one goes over now, and one look tells the driver whether the trip was
+ // being reported at all in the meantime
+ trkTok();trkPoll();
+ // a page that was behind another app may have slept past its own seat: proved again from
+ // the front of the screen, before anything else this phone does for this driver
+ claimGo(!!(watcher||SRT))});
+addEventListener('pagehide',()=>{sessStop();trkHand()});
+// A driver with no signal still has to be able to open the app, start a trip and be
+// warned. The session may be unreadable offline, so the last identity the phone proved
+// is kept as a fallback and the app re-checks it the moment the network is back.
+function cachedWho(){try{const c=JSON.parse(localStorage.cfg||'null');return c&&c.who&&c.who.id?c.who:null}catch(e){return null}}
+// supabase-js reads the sign-in from the phone's own storage, unless it has gone past
+// its hour and has to ask the server for a new one - and that is the call that can spin
+// for half a minute on a network that is only pretending to be there. The opening screen
+// is not allowed to be held up by it: past the deadline the identity this phone already
+// proved is used, which is what no signal already does, and the answer that arrives late
+// is still taken up by the re-check below.
+function askSession(ms){return new Promise(res=>{const t=setTimeout(()=>res(null),ms);
+ try{sb.auth.getSession().then(r=>{clearTimeout(t);res(r.data&&r.data.session)},()=>{clearTimeout(t);res(null)})}
+ catch(e){clearTimeout(t);res(null)}})}
+async function init(fresh,who){
+ if(!sb)return;
+ let s=null,stale=false;
+ // With no signal there is nothing to ask: the identity this phone already proved is
+ // used straight away. Waiting for a server the handset cannot reach is what made
+ // signing in take so long offline. `who` is a password this phone checked itself.
+ if(navigator.onLine){if(who)s={user:who,offline:true};
+  else{s=await askSession(4000);if(!s){const w=cachedWho();if(w){s={user:w,offline:true};stale=true}}}
+ }
+ else{const w=who||cachedWho();if(w)s={user:w,offline:true}}
+ if(!s)return;me=s.user;OFFL=!!s.offline;
+ // a session that was only delayed, not missing: ask once more in the background and,
+ // when it answers, the phone is not offline any more and the queue can go up
+ if(stale)setTimeout(async()=>{try{const r=await sb.auth.getSession();const x=r&&r.data&&r.data.session;
+  if(x&&x.user&&x.user.id===me.id&&INAPP){me=x.user;OFFL=false;netUi();outUi();if(PEND&&!fl)flush()}}catch(e){}},9000);
+ // The two things the administrator can do to an account have to be noticed here as
+ // well: a lock set while this phone was already signed in ends the session on the
+ // spot, and a password they typed for the driver has to be replaced before the app
+ // carries on. With no signal neither can be asked.
+ // Both questions now go out at the same time as the queue and the settings open,
+ // instead of in front of them: the three of them are one after another on the only
+ // path the driver waits on, and none of them needs the answer to the others.
+ let chk=null;
+ const gate=OFFL?Promise.resolve(false):(async()=>{
+  try{let {data:a}=await sb.from('profiles').select('locked_at,locked_until,must_change').eq('id',me.id).single();
+   // a database that has not run v21 has no expiry column, and refusing the whole read
+   // would leave this phone riding through a lock; ask for the older two instead
+   if(!a)a=(await sb.from('profiles').select('locked_at,must_change').eq('id',me.id).single()).data;
+   // the sign-in function is the one that knows a lockout's own minute has come, because
+   // it reads the server's clock and not this handset's: a phone whose time is wrong by
+   // an hour would otherwise bounce a driver who had already waited his lock out
+   const g=me.email?await lockCall('login_gate',me.email):null;
+   chk={a,g};return g?g.locked:lockOn(a)}catch(e){return false}})();
+ await Promise.all([gate,outInit(),loadRules()]);
+ if(await gate){
+  // the lock is not named on the sign-in screen for simply opening the app - that
+  // sentence belongs to the moment the driver presses Sign in - and the phone loses
+  // its offline credential with it, so a lock cannot be signed around with no signal
+  try{await outWait(sb&&sb.auth.signOut())}catch(e){}outLocal();
+  // the sign-in is gone, so this phone has no identity any more - which is also what
+  // tells the opening screen to stop waiting and show the form
+  me=null;OFFL=false;show('lg');$('err').textContent='';return}
+ // The seat is asked for before this handset is allowed to behave as this driver, so the
+ // phone that arrives second never reaches the trip button at all. This is the one place
+ // both doors come through - a pressed Sign in and a phone reopening his own app - so a
+ // second handset is refused at either, and the notice about it belongs to the first one.
+ const cd=await claimAsk(!!tripRead());
+ if(cd){await logAct('Second phone refused',(cd.model||'another phone')+' holds this account');
+  try{await outWait(sb&&sb.auth.signOut())}catch(e){}outLocal();
+  me=null;OFFL=false;CLAM=2;show('lg');$('err').textContent=claimWhy(cd);return}
+ // The waits above give another handset's claim the chance to land in the middle of this
+ // one's opening: a seat that goes while the screen is still being painted is stood down by
+ // claimOut, which takes the session and the identity away and puts the form back. Everything
+ // below speaks for a driver this phone no longer has, so it stops here instead of throwing
+ // half-way through the first screen.
+ if(!me)return;
+ if(chk&&chk.a&&chk.a.must_change)pwUi(1);
+ // From here the phone also listens for a vehicle that starts moving without anybody
+ // pressing anything. A trip - resumed or pressed by hand - takes the watcher back.
+ senOn();
+ const nm=(me.email||'').replace('@fleet.local','');$('wn').textContent=nm;
+ const v=asg?.vehicles;$('vn').textContent=v?.name||'No vehicle linked';$('dn').textContent=asg?.drivers?.name||'No driver linked';$('vi').className='fa-solid '+(TI[v?.type]||'fa-car');
+ logAct(fresh?'Signed in':'Opened app',$('vn').textContent);sessStart();
+ $('dash').classList.remove('hide');
+ [['acc','Accuracy','fa-bullseye'],['alt','Elevation','fa-mountain'],['dir','Direction','fa-compass'],['ac','Accel.','fa-gauge'],['bat','Battery','fa-battery-half'],['sent','Sent','fa-cloud-arrow-up'],['trip','This trip','fa-road'],['bbox','Stored on phone','fa-box-archive','w2']].forEach(x=>{if(!$('v_'+x[0]))$('vals').insertAdjacentHTML('beforeend',`<div class="${x[3]||''}"><small><i class="fa-solid ${x[2]}"></i> ${x[1]}</small><b id="v_${x[0]}">-</b></div>`)});
+ // the blackbox opens after the tiles exist so its count has somewhere to show
+ bbInit();bbWatch();await outUi();
+ // records a previous session left in the queue go up as soon as the phone can
+ // reach the server, without waiting for the driver to press Start
+ if(PEND&&navigator.onLine)flush();
+ if(!navigator.onLine)banner('<i class="fa-solid fa-wifi"></i> Offline: signed in from this phone - the trip and every record are kept on the phone and sent when the signal returns',8000);
+ // a driver keeps this app open for a whole shift, so touch the session every
+ // 10 minutes — getSession() is what makes supabase-js refresh it early.
+ setInterval(()=>{if(!document.hidden)sb.auth.getSession().catch(()=>{})},10*60*1000);
+ // and this handset names itself as the one holding the account. The timer keeps running
+ // behind another app, because a driver who takes a call or a message mid-shift has not
+ // given his seat up - only a phone that is really gone stops answering it.
+ clearInterval(CLT);CLT=setInterval(()=>{claimGo(!!(watcher||SRT))},CLMS);
+ // Android can hand back the same page after killing the process while a trip was
+ // running, and it can hand back a fresh one; either way the driver must not have to
+ // notice, and must not have to press Start again
+ enter();maybeResume()}
+// ---- the outbox at work: open it, carry over anything the older build left in
+// localStorage, and push again whenever the phone hears from the network
+async function outInit(){
+ if(!await outOpen())note('This phone cannot keep a queue between sessions; records are held until the app closes.','warn');
+ try{const old=JSON.parse(localStorage.q||'[]');
+  if(old.length){old.forEach(p=>outAdd({t:'pos',p}));localStorage.removeItem('q');flush()}}catch(e){}
+ outUi()}
+addEventListener('online',async()=>{netUi();lgHint();banner('<i class="fa-solid fa-cloud-arrow-up"></i> Back online: sending '+((PEND||0)+TQ)+' saved records',5000);flush();bbAnswer();
+ // an app that opened with no signal may be running on the phone's own copy of the
+ // sign-in: the server has to accept it again before anything can be uploaded
+ if(OFFL){const s=await askSession(4000);
+  if(s&&s.user){me=s.user;OFFL=false;$('err').textContent='';outUi()}
+  else note('Signal is back. The trip and every record are safe on this phone until you sign in again.','ok')}
+ // the runner collects while the signal is down and can only post with a sign-in it was
+ // lent, so the one the server has just accepted goes over on this same breath
+ trkTok();
+ // the seat is proved again on the same path: a phone that drove through a dead spot where
+ // another handset took the account over must find that out here, not two hours later
+ claimGo(!!(watcher||SRT));
+ maybeResume()});
+addEventListener('offline',()=>{netUi();lgHint();banner('<i class="fa-solid fa-wifi"></i> No internet: keeping records on the phone',5000)});
+// the login screen says out loud what it can do without a signal
+function lgHint(){const h=$('offh');if(h)h.classList.toggle('hide',navigator.onLine)}
+// a queue that stops being written to still has to drain: the trip callback only
+// fires while the vehicle is moving
+setInterval(()=>{if(!document.hidden&&PEND&&!fl)flush()},60000);
+const pmOpen=()=>!$('pm').classList.contains('hide');
+// The sign-in this phone already holds is asked about while the Permissions card is still
+// on screen on a first run, and the map cannot be built behind a page that is not shown -
+// so the finished start waits here, and Continue hands the app over when the map has a
+// container that has a size. An old trip stays asleep until then, which is the same rule.
+let PARKD=false;
+function pmGo(){localStorage.perm='1';
+ if(PARKD){PARKD=false;showApp();if(!document.hidden)maybeResume();return}
+ show('lg')}
+function enter(){if(pmOpen()){PARKD=true;return}showApp()}
+// whether the app page has actually been painted. The sign-in the phone kept is
+// assigned before the queue and the rules are opened, so "there is no me" cannot be
+// used to tell a bad sign-in from a start that threw halfway through - and a start
+// that threw would otherwise leave the opening screen spinning for ever.
+let INAPP=false;
+function showApp(){PARKD=false;INAPP=true;show('app');initMap();showLast()}
+// ---- map
+let map,mrk,trail,tiles,follow=true,MI=0;
+const G=l=>'https://{s}.google.com/vt/lyrs='+l+'&x={x}&y={y}&z={z}',GS={subdomains:['mt0','mt1','mt2','mt3']};
+// the same five styles the dashboard offers, in the same order, so a manager and a
+// driver are always looking at the same picture. OpenStreetMap is not one of them:
+// its tile server blocks this app, so the style was removed rather than left broken.
+const MAPS=[['Google Map',G('m'),'Map data © Google',20,GS],
+ ['Google Hybrid',G('y'),'Map data © Google',20,GS],
+ ['Google Satellite',G('s'),'Map data © Google',20,GS],
+ ['Esri Street Map','https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}','Tiles © Esri',19,null],
+ ['Esri Satellite','https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}','Tiles © Esri',20,null]];
+function initMap(){if(map)return;map=L.map('map',{zoomControl:false}).setView([23.6,58.5],12);map.on('dragstart',()=>{follow=false;pinUi()});
+ document.addEventListener('fullscreenchange',()=>{topLift();const on=!!document.fullscreenElement,b=$('fsB');if(b){b.title=on?'Shrink back':'Full screen';const i=b.querySelector('i');if(i)i.className='fa-solid '+(on?'fa-minimize':'fa-expand')}setTimeout(()=>map.invalidateSize(),250)});
+ // this list is shorter than the one an older build saved its number against, and a
+// driver who never picked this style should not wake on it: out of range falls back
+// to the first one, exactly as the dashboard does for a saved name it no longer has
+ const sv=+localStorage.mbase;MI=sv>0&&sv<MAPS.length?sv:0;tiles=lay(MI);trail=L.polyline([],{color:'#2f7fe6',weight:4}).addTo(map);setTimeout(()=>map.invalidateSize(),200)}
+// a tile that will not arrive while there is no signal is expected, but it has to
+// be explained: the picture comes from the cache this app keeps of the areas the
+// driver has already driven through with internet
+function lay(i){const b=MAPS[i],t=L.tileLayer(b[1],{attribution:b[2],maxZoom:b[3],...(b[4]||{})}).addTo(map);
+ t.on('tileerror',()=>{if(!navigator.onLine)$('mn').classList.remove('hide')});
+ t.on('tileload',()=>{if(navigator.onLine)$('mn').classList.add('hide')});return t}
+let layT=0;
+function togMap(){if(!map)return;MI=(MI+1)%MAPS.length;localStorage.mbase=MI;
+ if(tiles)map.removeLayer(tiles);tiles=lay(MI);
+ // a touch device never shows a button title, so the name has to appear on screen
+ const n=$('layN');n.textContent=MAPS[MI][0];n.classList.remove('hide');clearTimeout(layT);layT=setTimeout(()=>n.classList.add('hide'),1600)}
+function fsMap(){document.fullscreenElement?document.exitFullscreen():$('map').requestFullscreen()}
+// A full-screen map is lifted out of the page into the browser's own top layer, so a
+// message that still hangs straight off the body - the alert banner and the error line -
+// paints UNDER the map and the driver never sees it until the map is shrunk again.
+// Handing those two to the full-screen element while it lasts, and back when it ends,
+// keeps every warning above the map he is looking at. A press on a banner that now sits
+// inside the map must not drag the map out of position with it.
+const TOPS=['alert','err'];
+function topLift(){const f=document.fullscreenElement;
+ TOPS.forEach(id=>{const el=$(id);if(!el)return;
+  if(!f){if(el._home&&el.parentElement!==el._home)el._home.appendChild(el);return}
+  if(el.parentElement===f)return;
+  if(!el._home)el._home=el.parentElement;
+  if(!el._tl){el._tl=1;['pointerdown','mousedown','touchstart','wheel','dblclick']
+   .forEach(ev=>el.addEventListener(ev,e=>e.stopPropagation(),{passive:true}))}
+  f.appendChild(el)})}
+function pinUi(){const b=$('pinB');b.classList.toggle('on',follow);
+ b.title=follow?'Pin on: the map follows the vehicle. Drag the map to unpin.':'Pin off: press to follow the vehicle'}
+function togPin(){follow=!follow;pinUi();if(follow&&mrk)map.setView(mrk.getLatLng(),Math.max(map.getZoom(),16))}
+let MICON=null;
+function mpos(loc,moving){const ll=[loc.latitude,loc.longitude];
+ MICON=L.divIcon({className:'',html:`<div class="mk" style="background:${moving?'#27a46a':'#f28c28'}"><i class="fa-solid ${$('vi').className.split(' ')[1]}"></i></div>`,iconSize:[34,34],iconAnchor:[17,17]});
+ // a fix reporting no usable accuracy is not plotted, but the trip row still
+ // goes into the upload queue so the record is not lost
+ if(loc.accuracy!=null&&+loc.accuracy<=0)return;
+ mrk?mrk.setLatLng(ll).setIcon(MICON):mrk=L.marker(ll,{icon:MICON}).addTo(map);trail.addLatLng(ll);if(follow)map.panTo(ll)}
+// ---- permissions
+async function pAsk(){await senOff();
+ try{const id=await CapPlugins.BG.addWatcher({requestPermissions:true,backgroundTitle:'Fleet Tracker Lite',backgroundMessage:'Checking permissions'},()=>{});
+  // one watcher at a time, so the sentry that waits for a vehicle to move stands down for
+  // the three seconds this probe needs and takes its place back afterwards
+  setTimeout(async()=>{try{await CapPlugins.BG.removeWatcher({id})}catch(e){}senOn()},3000)}
+ catch(e){$('err').textContent='Location: '+(e.message||e);senOn()}
+ await askNotif()}
+// The one notice this app still posts outside the screen is the security one: a driver who
+// never opened the Permissions page must still hear that somebody reached for his account.
+let CHAN=false;
+async function askNotif(){await logAct('Allowed permissions');
+ try{const p=await CapPlugins.LN.requestPermissions(),s=[p.display,p.alert,p.sound,p.badge].filter(Boolean);
+ if(s.includes('denied')&&!s.includes('granted'))note('Notifications are blocked, so the notice about another phone using your account will only show inside the app.','warn')}catch(e){}
+ if(CHAN)return;
+ try{await CapPlugins.LN.registerChannel({id:'fleet.quiet',name:'Fleet Tracker Lite',description:'Account security notices',importance:2,visibility:1,vibration:false});CHAN=true}catch(e){}}
+let aT;
+function banner(html,ms){const a=$('alert');a.innerHTML=html;a.classList.remove('hide');clearTimeout(aT);aT=setTimeout(()=>a.classList.add('hide'),ms)}
+// ---- the two readings this screen shows from the fixes themselves: the trip's distance and
+// the vehicle's acceleration. Nothing here raises an event or a warning - this build records
+// positions - but both numbers are computed exactly the way the full driver app computes them.
+const MIN_MOVING_KMH=2;
+const sepm=(a,b)=>{const r=x=>x*Math.PI/180,dLa=r(b.latitude-a.latitude),dLo=r(b.longitude-a.longitude),x=Math.sin(dLa/2)**2+Math.cos(r(a.latitude))*Math.cos(r(b.latitude))*Math.sin(dLo/2)**2;return 12742000*Math.asin(Math.sqrt(x))};
+let V={bb_on:1,bb_days:3,bb_min_kmh:1,
+// the two halves of the automatic trip, both on and at the waits the fleet started with.
+// A handset with no settings yet - offline on its first morning, or a database that has
+// never run v29 - behaves exactly as every handset has until now.
+auto_start:1,auto_start_s:5,auto_end:1,auto_end_min:10,auto_kmh:5};
+// the floor, in metres, a trip must cover before the acceleration reading is taken at all: a
+// phone carried from the house to the vehicle jolts without having driven, and a jolting
+// number on the Accel. tile would be read as a hard stop.
+let minDist=0;let prev=null,lastA=0,lastLoc=null,ODOM=0,pp=null,bat={},fl=false,batT,cfgT,MOV=10,STP=3600;
+// The accel reading needs a fix about a second old and no more than four seconds stale: the
+// same window the full app judges its harsh-braking records with, so the Accel. tile here
+// answers to the same pair of fixes the office's reports are built from.
+function telemetry(loc,kmh){
+ if(loc.accuracy>25)return;
+ if(pp){const d=sepm(pp,loc);if(d<200)ODOM+=d}
+ pp=loc;
+ if(ODOM<minDist)return;
+ const t=(loc.time||Date.now())/1000,v=kmh/3.6;
+ if(prev&&t-prev.t>=0.8&&t-prev.t<=4)lastA=(v-prev.v)/(t-prev.t);
+ if(!prev||t-prev.t>=0.8)prev={t,v}}
+// ---- the trip that keeps reporting with the screen locked.
+// Everything above this line is JavaScript, and Android stops JavaScript the moment a driver
+// locks his handset or picks up another app: the watcher's callback, the recording interval
+// that runs inside it, the queue and the send all go to sleep with the page. That is the whole
+// of why a trip drawn across a locked screen ends in one straight line and a red
+// "00:07:57 not reported". So the reporting is handed to the plugin's own service, which is a
+// foreground service of type location holding a wake lock and stays awake: it asks the phone
+// for positions by itself, applies the fleet's two recording intervals, and posts the rows to
+// the positions table with the sign-in this page lends it.
+// What this page keeps: the sign-in, which is the one thing that never goes on disk, because
+// Android can restart that service long after this driver has gone home, and every row the
+// service could not send, which comes back here into the same out-of-coverage queue the rest of
+// the app uses and is filed against the session this page holds. The page also carries on
+// writing positions whenever the service is not doing it - a phone that refused the service, or
+// a satellite provider the driver switched off at a fuel stop must never leave a trip with
+// nobody reporting it.
+const dmsApi=()=>!!(window.CapPlugins&&CapPlugins.Dms);
+let TRUN=false,TQ=0,trkT=0,TRKERR=false,HK=false,HKAT=0;
+const trkHas=()=>dmsApi()&&typeof CapPlugins.Dms.trackStart==='function';
+// Everything the runner needs about this trip, in the shape it reads. Never a token: the
+// settings belong on the phone so a service Android restarts mid-shift wakes up with the
+// fleet's own intervals, and a sign-in on the phone is a key that outlives the driver who was
+// lent it.
+function trkOrder(){const v=asg?.vehicles||{},d=asg?.drivers||{};
+ return{url:SUPABASE_URL,anon:SUPABASE_KEY,movingS:MOV,parkedS:STP,
+  // whether this phone is driving a trip or merely keeping the office told where the vehicle
+  // is. The runner writes it into the `ignition` column: a point taken with a trip open is a
+  // vehicle being driven even when it is standing at a light, and a point taken without one is
+  // a rest heartbeat the office's trip list must not join into a trip of its own.
+  // The third test is what stops the office cutting a live trip in two. Every app open and
+  // every five-minute settings refresh lands here, and on a phone Android had killed mid-
+  // journey `watcher` is gone with the process while the trip is still very much running -
+  // so this order used to say trip:false, the runner stamped the next point ignition:false,
+  // and the dashboard closed the trip at that second before maybeResume opened it again.
+  // The marker on the handset knows the truth, so it is asked.
+  trip:!!(watcher||SRT||tripLive()),
+  ids:{user_id:me?me.id:'',vehicle_id:asg?.vehicle_id||'',driver_id:asg?.driver_id||'',
+   vehicle_name:v.name||'',driver_name:d.name||''}
+ }
+}
+// Hand the trip over, or hand it over again. The settings are re-read every five minutes and
+// whenever the office changes them, and a runner that kept the old intervals would go on
+// reporting at the wrong beat for the rest of the driver's shift.
+// This order is not the trip's: a phone that is signed in with a vehicle always has one
+// standing, whether or not anybody has pressed Start. It is what keeps the office's map from
+// going blank - and the whole reason a driver's home-to-office run can arrive with no trip and
+// no points on it is that the only thing that ever asked for positions was a trip this page
+// had to be awake to start.
+async function trkGo(){if(!trkHas()||!me||!asg?.vehicle_id)return;let r=null;
+ try{r=await CapPlugins.Dms.trackStart({cfg:trkOrder()})}catch(e){r=null}
+ TRUN=!!(r&&r.started===true&&r.running!==false);
+ trkUi(r&&r.status);
+ clearInterval(trkT);trkT=setInterval(trkPoll,15000);
+ // whether the phone really took the order is not answerable from this call: a service that
+ // had to be started comes back a second or two later. This look is what finds out.
+ setTimeout(()=>{if(SRT||watcher||me)trkPoll()},4000);
+ if(TRUN)trkTok()}
+// The page's own sign-in, lent to the runner as often as the page is awake to see it. A runner
+// that has never been handed a sign-in of its own sends with this and nothing else - and the
+// reason that is not enough is that an hour after the driver signs in this page is frozen, the
+// lent token is dead, and there is nobody left awake to lend the next one. See runSess below.
+async function trkTok(){if(!trkHas()||!me||!sb)return;
+ try{const s=await sb.auth.getSession();const tk=s&&s.data&&s.data.session;
+  if(!tk||!tk.access_token)return;
+  const r=await CapPlugins.Dms.trackToken({token:tk.access_token});if(r&&r.ran)trkUi(r.status)}catch(e){}}
+// The runner behind the screen has to be able to send on its own, and a token this page lends
+// cannot do that: Android freezes this WebView for the whole of a drive, the lent token dies an
+// hour after sign-in, and there is nobody left awake to lend the next one. So the runner is
+// given a sign-in of its own, minted here once, in the background, while the driver is already
+// looking at his trip.
+// It is a second sign-in for the same driver rather than the one supabase-js is holding, and
+// that is the whole of the reason it is minted instead of copied: the server burns a refresh
+// token the moment it is exchanged, so a runner that refreshed the page's own would leave the
+// page unable to refresh it - and the driver would be signed out by his own background service
+// the next time he unlocked his phone, which is exactly the case this is for. Nothing is waited
+// for here, and nothing is said if it fails: a phone that will not keep one goes on doing what
+// it has always done, which is to collect until this page wakes up again.
+async function runSess(email,pw){if(!trkHas()||!pw)return;
+ try{const r=await fetch(SUPABASE_URL+'/auth/v1/token?grant_type=password',{method:'POST',
+   headers:{apikey:SUPABASE_KEY,'Content-Type':'application/json'},body:JSON.stringify({email,password:pw})});
+  if(!r.ok)return;
+  const p=await CapPlugins.Dms.trackSession({session:await r.text()});
+  if(p&&p.ran)trkUi(p.status)}catch(e){}}
+// The service answers on its own clock, so the page asks after it on one of its own. This is
+// the only way a runner that died, or a sign-in that ran out mid-shift, is found while the trip
+// is still running rather than two hours later in the office's report.
+function trkPoll(){if(!trkHas()||!me||!asg?.vehicle_id)return;let p=null;
+ try{p=CapPlugins.Dms.trackStatus({})}catch(e){return}
+ if(!p||!p.then)return;
+ p.then(r=>{const st=r&&r.status;
+  // the service itself is gone: nothing is sampling this trip, so whatever it was holding
+  // comes back here and the page reports again in its own words until a fresh order
+  // - the page's own writes take over at once, which is why TRUN goes false before the ask
+  if(r&&r.service===false){TRUN=false;TQ=0;outUi();trkBack();if(r.wanted)trkGo();return}
+  TRUN=!!(r&&r.running);
+  trkUi(st);
+  if(!TRUN)return;
+  if(st&&st.sending===false)trkTok();
+  // and on the same beat the queue this page cannot empty goes to the one that can
+  trkHand()}).catch(()=>{})}
+// The trip is over, for the runner as well as for this page. Answers with whether the runner
+// was the one reporting, which is what decides whose job the closing point was.
+// `keep` is the difference between a trip ending and this phone going quiet. A driver who
+// parks has not asked the office to stop seeing his vehicle, and the two intervals the
+// Configuration page sets are the fleet's own answer for how often a standing vehicle speaks,
+// so the order stays with the runner and only the trip flag comes down. Sign-out and a second
+// handset taking the account give it up entirely.
+async function trkStop(keep){clearInterval(trkT);trkT=0;const was=TRUN;TRUN=false;TQ=0;
+ if(!trkHas())return was;
+ try{await CapPlugins.Dms.trackStop({keep:keep===true})}catch(e){}
+ await trkBack();outUi();return was}
+// Everything the runner could not put on the server, taken back into this page's queue and
+// filed against the session this page holds. The names on each row are rewritten here because
+// the service was told who was driving when the trip began, and the queue has to carry
+// whoever holds the sign-in now.
+async function trkBack(){if(!trkHas())return;let items=null;
+ try{const r=await CapPlugins.Dms.trackDrain({});items=r&&r.items}catch(e){return}
+ if(!items||!items.length)return;
+ const v=asg?.vehicles||{},d=asg?.drivers||{};
+ for(const p of items){if(!p||!p.recorded_at||!Number.isFinite(+p.lat)||!Number.isFinite(+p.lng))continue;
+  if(me)p.user_id=me.id;
+  if(asg){p.vehicle_id=asg.vehicle_id;p.driver_id=asg.driver_id;
+   p.vehicle_name=v.name||null;p.driver_name=d.name||null}
+  outAdd({t:'pos',p})}
+ flush()}
+// The positions this page cannot send go to the runner, which can.
+// This is the other half of the blank map. A page Android froze hours ago leaves every point it
+// took in its own outbox, and nothing but a page can empty that outbox - so a driver's handset
+// reports perfectly, the office sees nothing, and the number he reads when he reopens the app is
+// the drive he just had. On the runner's queue the same rows go out with the phone's own
+// sign-in, on its own fifteen-second beat, whether this page ever wakes again or not.
+// This page's copies are thrown away only when the runner says it holds the whole batch, so a
+// record is in one queue or the other at every moment. That is once-and-a-half rather than once:
+// a phone killed in the moment between the answer and the delete sends the same seconds twice,
+// which the office reads as one more point on a bend, instead of losing a stretch of road.
+// A refusal is worth waiting on rather than asking about every beat: it means the runner is out
+// of signal for a day and its queue is full, or it has no sign-in yet, and both answer again
+// better in a minute than in fifteen seconds.
+async function trkHand(){if(!trkHas()||!TRUN||fl||!me||HK||!PEND||Date.now()-HKAT<120000)return;
+ HK=true;const run=[];let after=0;
+ try{for(let p=0;p<3&&run.length<400;p++){const b=await outTake(200,after);if(!b.length)break;
+   after=b[b.length-1].k;b.forEach(x=>{if(x.v&&x.v.t==='pos'&&x.v.p)run.push(x)})}
+  if(!run.length)return;
+  const r=await CapPlugins.Dms.trackPush({rows:run.map(x=>x.v.p)});
+  if(!r||r.kept!==run.length){HKAT=Date.now();return}
+  run.forEach(outDel);outUi();if(r.status)trkUi(r.status)}
+ catch(e){HKAT=Date.now()}
+ finally{HK=false}}
+// the two things the runner tells this page about itself, and the one line it has to say
+function trkUi(st){if(!st)return;
+ TQ=Math.max(0,+st.queued||0);
+ outUi();
+ // Why this trip is not being reported, in the same line the page uses for its own refusals -
+ // and only ever clearing the line this wrote. The runner's `why` is only worth a driver's
+ // attention while it is not reporting at all.
+ const bad=String(st.error||'')||(!st.running?String(st.why||''):'');
+ const e=$('err');if(!e)return;
+ if(bad){e.textContent='Background reporting: '+bad;TRKERR=true;return}
+ if(TRKERR){e.textContent='';TRKERR=false}}
+const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// a settings number that keeps a real zero: an interval of nothing is a choice the office
+// can make, and a truth test would turn it back into the default
+function num(v,d){const n=+v;return Number.isFinite(n)&&n>=0?n:d}
+// Android's own battery saving is the one thing outside this app that can leave a trip
+// unreported: it defers the uploads of a phone that slept in a yard, and on some handsets it
+// closes the service outright. The question is asked once, on this page, and never again on a
+// phone that has already been told to leave this app alone. An app built before this one has
+// no question to ask, so its driver is sent to the phone's own settings instead.
+const igHas=()=>dmsApi()&&typeof CapPlugins.Dms.ignoreAsk==='function';
+async function igAsk(){if(!igHas()){try{await CapPlugins.BG.openSettings()}catch(e){}return}
+ let r=null;try{r=await CapPlugins.Dms.ignoreAsk({})}catch(e){}
+ if(r&&r.asked)banner('<i class="fa-solid fa-battery-bolt"></i> Choose Allow on the next question: one answer, and the trip keeps reporting with the screen locked',9000);
+ else if(!r||!r.exempt)banner('<i class="fa-solid fa-battery-bolt"></i> This phone has no battery question to ask: set the app to Unrestricted in its own battery settings',9000);
+ igUi()}
+async function igUi(){const b=$('igask'),c=$('igcard');if(!b||!c||!igHas())return;
+ try{const s=await CapPlugins.Dms.ignoreState({});if(s&&s.exempt){b.classList.add('hide');c.classList.add('hide')}}catch(e){}}
+function pickUi(){const s=$('pk');if(!s)return;
+ $('vn').textContent=asg?.vehicles?.name||'No vehicle linked';$('dn').textContent=asg?.drivers?.name||'No driver linked';
+ if(ASGS.length<2){s.classList.add('hide');s.replaceChildren();return}
+ s.classList.remove('hide');s.replaceChildren(...ASGS.map(x=>{const o=document.createElement('option');o.value=x.vehicle_id;o.textContent=x.vehicles?.name||'Vehicle';o.selected=x.vehicle_id===PICK;return o}))}
+function pickV(){const s=$('pk'),to=s.value,nm=s.selectedOptions[0]?.textContent||'the other vehicle',
+ om=(s.querySelector('option[value="'+PICK+'"]')||{}).textContent||'this vehicle';
+ // choosing another vehicle with a trip still running ends that trip and starts the
+ // office's record of it here, which is more than a driver means by tapping the box
+ if(to!==PICK&&(watcher||SRT)&&!confirm('A trip is still running on '+om+'. Move to '+nm+' and end that trip now?')){s.value=PICK;return}
+ PICK=to;localStorage.pick=PICK;if(watcher||SRT)stop();
+ $('err').textContent='';logAct('Switched vehicle',nm||PICK);loadRules();showLast()}
+// The setup - which vehicle this login drives, and the fleet's own intervals - is
+// copied into localStorage every time it is read successfully, because a driver in a
+// basement, a tunnel or a dead spot still has to report at the intervals his fleet set
+// for him. Without that copy the app would open with no settings at all.
+function cfgSave(a,t){try{localStorage.cfg=JSON.stringify({a,t,who:{id:me.id,email:me.email},at:Date.now()})}catch(e){}}
+function cfgRead(){try{const c=JSON.parse(localStorage.cfg||'null');return c&&c.a&&c.t?c:null}catch(e){return null}}
+function applyCfg(a,t){
+ if(a){ASGS=a.filter(x=>x.vehicle_id);if(!ASGS.some(x=>x.vehicle_id===PICK))PICK=ASGS[0]?.vehicle_id||null;asg=ASGS.find(x=>x.vehicle_id===PICK)||ASGS[0]||null;pickUi()}
+ const S={},VC={};(t||[]).forEach(x=>VC[x.key]=x.value);(t||[]).forEach(x=>S[x.key]=+x.value);const v=asg?.vehicles||{};
+ V={bb_on:VC.bb_on==='0'?0:1,bb_days:Math.min(14,Math.max(1,+VC.bb_days||3)),
+  // the speed the blackbox starts storing at. A database that has not run v23 has no such
+  // key, which means every fix, and an administrator who types 0 means the same thing: this
+  // number is a floor, not a switch, so 0 is allowed and only a missing key falls back.
+  bb_min_kmh:VC.bb_min_kmh==null?1:Math.min(50,Math.max(0,num(VC.bb_min_kmh,1))),
+  // the two halves of the automatic trip, each with its own switch. Only an explicit 0 from
+  // the dashboard turns one off, so a database that has not run v29 - which has no auto_ keys
+  // at all - keeps the behaviour every handset has had since it learned to drive itself.
+  auto_start:VC.auto_start_on==='0'?0:1,auto_end:VC.auto_end_on==='0'?0:1,
+  auto_start_s:num(VC.auto_start_s,5),auto_end_min:num(VC.auto_end_min,10),auto_kmh:num(VC.auto_kmh,5),
+  // v37: how much longer a trip is still held open once the standing wait alone would have
+  // ended it. Absent from any database that has not run it, so 3 is the behaviour every
+  // handset gets - a stop sign, a queue at a loading bay or a short delivery stays one trip.
+  auto_end_grace_min:num(VC.auto_end_grace_min,3)};
+ // the offline wrong-try count ages out on the fleet's own window, and the sign-in
+ // screen has to read it out of storage because nothing is downloaded at that moment
+ try{localStorage.lwin=String(Math.max(1,Math.round(S.login_window_m||15)))}catch(e){}
+ // the odometer floor, in metres: below this, a drive is GPS jitter in a yard and not a trip
+ // the office asked to be told about.
+ minDist=Math.max(0,+v.min_moving_distance||0);
+ // the two waits, in seconds: how often a moving vehicle reports, and how often a standing
+ // one does. A parked vehicle has nowhere new to say, so its default is one point an hour -
+ // the same value the office sets per vehicle, and the reason Historical Tracking must accept
+ // an hour of silence before it calls a stop a second trip.
+ MOV=Math.min(3600,Math.max(1,v.moving_interval||S.moving_interval||10));STP=Math.min(43200,Math.max(5,v.stopped_interval||S.stopped_interval||3600));
+ // the runner works from the copy of this setup it was handed, so a change the office makes
+ // mid-trip goes over now: an interval moved from 30 to 60 seconds has to move on the phone
+ // with it, not wait for the driver's next trip. And it is handed this setup whether or not a
+ // trip is open: the office's two intervals are what a fleet agreed to be told by, and a
+ // handset that only ever reported during a trip went quiet for the whole of a drive that
+ // began with nobody pressing Start - which is how a vehicle arrives at the office having
+ // apparently done nothing at all.
+ if(me&&asg?.vehicle_id)trkGo();
+ // an administrator who switches the automatic start off takes the watcher down now rather
+ // than at the next trip, because a live watcher keeps opening trips the fleet has just said
+ // it does not want. Switching it back on hands the job to senOn, which refuses to install a
+ // second watcher, to work before anybody is signed in, or to run while a trip holds one.
+ // The other half needs no hook here: the trip's own callback asks V.auto_end on every
+ // position it is given, so a trip that was already running obeys the switch from its next fix.
+ autoTips();if(V.auto_start){if(!watcher&&!SRT)senOn()}else senOff();
+ // the setup is what a resumed trip was waiting for: an app that restarted with no
+ // signal, or with the settings query still running, can only start again from here
+ if(map&&!watcher)maybeResume()}
+// a failed query answers, it never throws: PostgREST can reject, and offline the
+// fetch itself rejects, and neither may take the trip down with it
+const q=p=>p?Promise.resolve(p).then(x=>({data:x.data,error:x.error}),()=>({data:null,error:{message:'no network'}})):{data:null,error:null};
+// The same, with a deadline, for the four reads the opening screen waits on. A phone
+// that claims a signal it does not have can leave a request unanswered for half a
+// minute, and that is how the wait screen became the sign-in screen: past the deadline
+// the cached setup is used, which is exactly what a rejected read already does. A late
+// answer is thrown away and the next five-minute poll picks it up.
+const qw=(p,ms)=>new Promise(res=>{const t=setTimeout(()=>res({data:null,error:{message:'The server did not answer in time'}}),ms);
+ q(p).then(x=>{clearTimeout(t);res(x)})});
+const AQL=u=>q(u.select('vehicle_id,driver_id,vehicles(name,type,moving_interval,stopped_interval,min_moving_distance),drivers(name)').eq('user_id',me.id));
+async function loadRules(){
+ const off=!navigator.onLine;
+ const [a,t]=await Promise.all([qw(AQL(sb.from('assignments')),9000),qw(q(sb.from('app_settings').select('*')),9000)]);
+ if(a.data&&t.data){applyCfg(a.data,t.data);cfgSave(a.data,t.data);netUi();return 1}
+ // nothing arrived: fall back to the last setup the phone did manage to read
+ const c=cfgRead();
+ if(c){applyCfg(c.a,c.t);netUi();return 1}
+ if(!off)$('err').textContent='Could not read your settings: '+(a.error&&a.error.message||t.error&&t.error.message||'unknown');
+ return 0}
+async function pollBat(){try{const b=await CapPlugins.Device.getBatteryInfo();bat={p:Math.round(b.batteryLevel*100),c:b.isCharging};$('v_bat').textContent=bat.p+'%'+(bat.c?' ⚡':'')}catch(e){}}
+// Every point names every column, with null where this fix has no answer. That is a wire rule,
+// not tidiness: a batch goes out as ONE array of these objects and the server refuses an array
+// whose rows do not all carry the same keys ("All object keys must match") - it refuses all of
+// them, so a point written before the battery was first read and one written after used to cost
+// the trip every position between the two. An undefined value would not survive the JSON either.
+const row=(loc,speed,ign)=>({user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,vehicle_name:asg.vehicles?.name??null,driver_name:asg.drivers?.name??null,lat:loc.latitude,lng:loc.longitude,speed,accuracy:loc.accuracy??null,altitude:loc.altitude??null,heading:loc.bearing??null,ignition:ign,accel:+(lastA*3.6).toFixed(1),battery_pct:bat.p??null,charging:bat.c??null,recorded_at:new Date(loc.time||Date.now()).toISOString()});
+let PEND=0,OFFL=false,lastTry=0;
+// The only record this app keeps is a position: it files no events, so nothing in the queue
+// needs an ids repair or a closing update afterwards. One INSERT answers for the whole batch,
+// and the batch is what posSend splits and retries.
+async function outSend(rows){const {error}=await q(sb.from('positions').insert(rows));return {ok:!error,error}}
+// Why the last batch of positions could not be delivered, in the words the driver sees.
+let POSWHY='',POSBAD={k:'',n:0};
+// A refusal that is this handset's own sign-in rather than the row's - the same answer the
+// background runner calls TOKEN. It is the one refusal that must never throw records away:
+// signing in again makes every one of them deliverable, so the queue keeps them and says why.
+const isAuth=e=>{try{if(!e)return false;return +e.statusCode===401||String(e.code||'').startsWith('PGRST30')||
+ /jwt expired|invalid json web token|invalid token/i.test(String(e.message||e))}catch(x){return false}}
+// One INSERT for the whole batch is what makes a drive cheap to upload - and it was also what
+// could lose a whole one. A batch the server ANSWERS "no" to is refused for a reason that
+// will not change by asking again, and the old code stopped the flush at that answer, so the
+// refused row sat at the head of the queue and everything behind it - the rest of the drive
+// - waited for a yes that was never coming. The driver
+// saw a number in brackets and nothing else. So a refused batch is split in two and tried
+// again, and again, until the row nobody will take is the only row in its request: that one
+// goes, out loud, and the rest of the drive lands beside it.
+// Two answers are not split this way, because neither of them says anything about the rows:
+// a request that never reached the server has told us nothing, and a sign-in that has run out
+// is this phone's fault and not the road's. Both keep the batch whole and wait.
+async function posSend(run){
+ const {ok,error}=await outSend(run.map(x=>x.v.p));
+ if(ok){run.forEach(outDel);SENT+=run.length;localStorage.sent=SENT;POSBAD={k:'',n:0};outUi();return 'gone'}
+ if(!navigator.onLine||noNet(error)){POSWHY='No signal: these records stay on the phone until it returns';return 'wait'}
+ if(isAuth(error)){POSWHY='The phone sign-in has run out: sign in again to send what is waiting';return 'wait'}
+ if(run.length===1){const m=String((error&&error.message)||error);
+  // Splitting is for the row the server will not take, not for a phone it will not take
+  // at all. The same answer ten times running is the second thing, and going on would
+  // spend the whole queue on it: the records stop being dropped and the phone waits,
+  // saying what the server said, because that is the office's problem to fix, not his.
+  POSBAD=(m===POSBAD.k)?{k:m,n:POSBAD.n+1}:{k:m,n:1};
+  if(POSBAD.n>10){POSWHY='The server refuses every position from this phone ('+m+'): tell your office';return 'wait'}
+  outDel(run[0]);POSWHY='A position was refused by the server and dropped: '+m;
+  $('err').textContent=POSWHY;outUi();return 'lost'}
+ const h=Math.ceil(run.length/2);
+ const a=await posSend(run.slice(0,h));if(a==='wait')return a;
+ const b=await posSend(run.slice(h));
+ return b==='wait'?'wait':(a==='lost'||b==='lost'?'lost':'gone')}
+async function flush(){if(fl||!me)return;fl=true;
+ try{let after=0,rounds=0,stop=false,why='';
+  while(!stop&&rounds++<200){const b=await outTake(200,after);if(!b.length)break;
+   after=b[b.length-1].k;
+   if(!navigator.onLine){stop=true;why='offline';break}
+   // Every record this app keeps is a position, so the whole batch goes out as one posSend
+   // run and that call does the splitting and retrying itself. Nothing was deleted yet, so a
+   // batch the server never heard about simply stays where it is and the next flush reads it
+   // again from the top of the queue.
+   const r=await posSend(b);if(r==='wait'){stop=true;why=POSWHY}
+   else if(r==='lost')why=POSWHY}
+  OFFL=!navigator.onLine;netUi(why)}
+ finally{fl=false;outUi()}}
+// the two tiles that tell the driver whether the phone is talking to the server
+function outUi(){return outCount().then(n=>{PEND=n;const w=n+TQ,t=$('v_sent');if(!t)return;
+ t.textContent=SENT+(w?' (+'+w+')':'');
+ // the two queues a driver can be waiting on are in different hands - one is this page's
+ // records, the other the background runner's, and only the page can empty the second one -
+ // so the bracket says which, instead of leaving him to guess from a number
+ if(w)t.title=n&&TQ?w+' waiting: '+n+' in the app, '+TQ+' in the background service':
+   TQ?TQ+' waiting in the background service':n+' waiting in the app'})}
+function netUi(why){const t=$('v_sent');if(!t)return;
+ if(!navigator.onLine){const w=(PEND||0)+TQ;t.textContent='⚠ '+w;t.title='No internet - '+w+' records waiting on the phone';return}
+ if(why)t.title=why;outUi()}
+// a trip the phone never got to finish: kept so that opening the app again after a
+// crash, an update, a phone call or a swipe-away resumes tracking instead of waiting
+// for the driver. `t` is when the trip began, `u` the last fix that reached it, `o` the
+// distance already driven, so a resumed trip keeps its own odometer.
+let SRT=false,SGEN=0,TS_TRIP=0;
+async function tripSave(){try{const t=tripRead();
+ localStorage.trip=JSON.stringify({v:asg?.vehicle_id,t:t&&t.v===asg?.vehicle_id?+t.t||Date.now():Date.now(),u:Date.now(),o:ODOM})}catch(e){}}
+const tripRead=()=>{try{const t=JSON.parse(localStorage.trip||'null');return t&&t.v?t:null}catch(e){return null}};
+// Whether a trip is open on this handset, judged from the marker rather than from the page's
+// own memory. The marker is the only copy that survives a process Android killed, and it is
+// the answer the runner has to be given before this page has got as far as picking the trip
+// back up - see trkOrder. Same 12-hour bound and the same vehicle test as maybeResume, so the
+// two can never disagree about what "still open" means.
+const tripLive=()=>{const t=tripRead();
+ return !!(t&&t.v===asg?.vehicle_id&&Date.now()-(+t.u||+t.t||0)<12*3600e3)};
+function tripClear(){localStorage.removeItem('trip')}
+// Android ends this app's process for a phone or video call, or simply to get the
+// memory back, and the driver used to come back to a finished-looking trip he had to
+// start again by hand. Nothing here stops a trip: the marker stays on the phone and
+// tracking restarts by itself as soon as the app can see its own setup again - after
+// a sign-in, after the settings load, when the signal returns, or when he comes back
+// to the app. Only an End trip press, another vehicle, or a trip untouched for 12
+// hours clears it.
+async function maybeResume(){
+ if(!map||!me||watcher||SRT||document.hidden||!window.CapPlugins||!asg?.vehicle_id)return;
+ const tr=tripRead();if(!tr)return;
+ // A marker thrown away here has to be thrown away by the runner too, in the same breath:
+ // trkGo has already ordered this trip as open on the way through applyCfg, and a runner left
+ // believing it would go on stamping ignition:true for another five minutes of standing in a
+ // yard - a trip that never ended, which is the opposite of the bug this page is fixing.
+ if(asg.vehicle_id!==tr.v||Date.now()-(+tr.u||+tr.t||0)>12*3600e3){tripClear();await trkGo();return}
+ await start(1);
+ if(watcher)banner('<i class="fa-solid fa-road"></i> Trip picked back up - the phone closed the app while you were driving',7000)}
+// ---- the trip the driver forgets. A handset in a cab knows when the cab is moving, and a
+// fleet whose records only begin when a man remembers to press a button loses the whole
+// first hour of every shift. While no trip is running one watcher stays alive for this
+// page alone: the vehicle moving above the fleet's own speed for the fleet's own number of
+// seconds starts a trip by itself, and standing below it for the fleet's own number of
+// minutes ends one. The same speed is the rule for both, so one number says what moving
+// means, and all five are set on the dashboard's Configuration page - each half with its
+// own switch, because a fleet that may only keep the hours a driver claimed needs the
+// buttons to be the only thing that can move a trip.
+// Only one watcher is ever alive, because Android hands this app one background location
+// service rather than two: the sentry steps down before the trip's own takes its place,
+// and steps back up when the trip ends.
+const A_KMH=()=>Math.min(60,Math.max(0.5,num(V.auto_kmh,5))),
+ A_START=()=>Math.max(1,Math.min(600,num(V.auto_start_s,5)))*1000,
+ A_END=()=>Math.max(1,Math.min(720,num(V.auto_end_min,10)))*60000,
+// The tolerance the office sets between "the vehicle has stood long enough to be finished"
+// and "this trip really ended". A driver who spends a quarter of an hour at a delivery point
+// is on one journey, and closing the record the second the standing wait expires cut it in
+// two: the sentry re-arms in the same breath as the end, and five seconds of movement opens
+// the next trip. While the end is pending the trip stays open exactly as it was, so nothing
+// is written twice and no boundary is stamped unless he is still standing when this expires.
+ A_GRACE=()=>Math.max(0,Math.min(720,num(V.auto_end_grace_min,3)))*60000,
+// each half of the automatic trip. Only an explicit 0 turns one off, so a cache written
+// before the dashboard learned about these switches keeps the behaviour it always had.
+ A_STARTON=()=>V.auto_start!==0,A_ENDON=()=>V.auto_end!==0;
+// The two buttons say what the phone will do without them, in the numbers the fleet chose,
+// because a driver who has been told a trip begins on its own will not press Start - and on
+// a fleet that has switched that off, the record of his whole shift then never opens.
+function autoTips(){const g=$('go'),s=$('stp');if(!g||!s)return;
+ g.title=A_STARTON()?'You can press this, but you no longer have to: a trip starts by itself once the vehicle has been above '+A_KMH()+' km/h for '+Math.round(A_START()/1000)+' seconds'
+  :'Only this button starts a trip: your fleet has switched the automatic start off, so press it when you set off';
+ s.title=A_ENDON()?'A trip also ends by itself after '+Math.round(A_END()/60000)+' minutes below '+A_KMH()+
+  ' km/h'+(A_GRACE()?' - and stays open '+Math.round(A_GRACE()/60000)+' minutes longer in case you set off again'
+  :' - and closes the moment that wait is up')
+  :'Only this button ends a trip: your fleet has switched the automatic end off, so press it when you park'}
+let SEN=null,SENUP=0,STILLAT=0,ENDPD=0;
+// How long the vehicle has really been standing, in milliseconds, answered by the runner
+// rather than by this page when the runner is alive. This page's own clock is the one Android
+// freezes when the driver locks his handset: a 40 minute drive with the screen off would look
+// like 40 minutes parked and end a live trip on the first fix after he unlocks. The runner is
+// a foreground service that sampled every one of those minutes and holds its own still clock.
+async function trkStood(n){if(!TRUN||!trkHas())return n-STILLAT;
+ try{const r=await CapPlugins.Dms.trackStatus({}),s=r&&r.status;
+  // -1 says the service has never seen a fix it could judge, which is not the same answer
+  // as zero and must not be mistaken for "the vehicle only just stopped"
+  if(s&&typeof s.stood==='number'&&s.stood>=0)return s.stood}catch(e){}
+ return n-STILLAT}
+async function senOff(){if(!SEN)return;const id=SEN;SEN=null;
+ try{await CapPlugins.BG.removeWatcher({id})}catch(e){}}
+async function senOn(){if(SEN||watcher||SRT||!me||!asg?.vehicle_id||!A_STARTON())return;
+ if(!window.CapPlugins||!CapPlugins.BG)return;
+ try{SEN=await CapPlugins.BG.addWatcher({requestPermissions:true,backgroundTitle:'Fleet Tracker Lite',
+  backgroundMessage:'Waiting for you to set off',stale:false,distanceFilter:10},async(loc,err)=>{
+  const id=SEN;
+  // a fix that comes to a watcher this page has already stopped, or one that arrives while
+  // a trip holds its own callback, is not the sentry's business
+  if(!id||id!==SEN||watcher||SRT)return;
+  if(err||!loc)return;
+  const kmh=Math.max(0,(loc.speed||0)*3.6);
+  if(kmh<=A_KMH()){SENUP=0;return}
+  const n=Date.now();
+  if(!SENUP){SENUP=n;return}
+  if(n-SENUP<A_START())return;
+  SENUP=0;await senOff();
+  await start(0,1);
+  banner('<i class="fa-solid fa-road"></i> Trip started by itself: the vehicle has been above '+A_KMH()+
+   ' km/h for '+Math.round(A_START()/1000)+' seconds. '+(A_ENDON()?'Press End trip when you park, or the phone ends it for you'
+    :'Press End trip when you park - your fleet has left the ending to you'),9000);
+ })}catch(e){SEN=null}}
+// the trip's own callback asks the same question on every fix it gets: a vehicle that has
+// stood below the moving speed for the fleet's own wait is parked, and a record left open
+// until somebody presses a button is a trip that every report counts again the next day.
+async function endAuto(){banner('<i class="fa-solid fa-road"></i> Trip ended by itself after '+
+  Math.round(A_END()/60000)+' minutes without moving'+(A_GRACE()?' and a further '+Math.round(A_GRACE()/60000)+' more of the same':'')+': Start a new one when you set off',9000);
+ await stop(1)}
+// ---- blackbox. Every fix the location watcher delivers above the fleet's own speed
+// (about one per second on the move, none at all while the vehicle stands still) is
+// stored on the handset in IndexedDB and never uploaded, so the server keeps only the
+// sampled stream. An admin asks for a window of time on the Vehicles page; this answers
+// that request by pushing exactly the stored fixes in it, each stamped with the moment it
+// was taken. One second is stored once, and once a second has reached the server it is
+// never pushed again.
+let BB=null,BBW=0,BBN=+(localStorage.bbn||0),bbBusy=false,BBT=null;
+const bbDays=()=>Math.min(14,Math.max(1,+V.bb_days||3));
+// 240 000 fixes is a little over two days at one per second. Stored in the compact
+// form below that is roughly 30 MB, which a handset can hold without being evicted.
+const BBM=240000;
+// Version 2 keys each fix by the second it was taken, so two readings for one
+// second overwrite each other and the handset physically cannot hold a duplicate.
+// The old auto-increment store had no such key and is replaced on the upgrade.
+function bbOpen(){return new Promise(res=>{if(!window.indexedDB||!indexedDB.open)return res(false);let req;
+ try{req=indexedDB.open('fleetbb',2)}catch(e){return res(false)}
+ req.onupgradeneeded=e=>{const db=req.result;
+  if(e.oldVersion>=1&&db.objectStoreNames.contains('bb'))db.deleteObjectStore('bb');
+  db.createObjectStore('bb',{keyPath:'at'})};
+ req.onsuccess=()=>{BB=req.result;res(!!BB&&BB.objectStoreNames.contains('bb'))};
+ req.onerror=()=>res(false);setTimeout(()=>res(false),5000)})}
+const bbSt=m=>{try{return BB&&BB.transaction('bb',m).objectStore('bb')}catch(e){return null}};
+// a stored row is identified by the whole second it belongs to
+const bbf=x=>Math.floor(+x/1000);
+// compact form: [taken ms, lat, lng, km/h, heading, accuracy, altitude, battery, charging]
+const bbPack=(loc,kmh)=>[loc.time||Date.now(),loc.latitude,loc.longitude,Math.round(kmh*10)/10,
+ loc.bearing==null?null:Math.round(loc.bearing),loc.accuracy==null?null:Math.round(loc.accuracy),
+ loc.altitude==null?null:Math.round(loc.altitude),bat.p||null,bat.c?1:0];
+function bbPut(arr){if(!V.bb_on||!BB||!arr)return;
+ // a fix below the fleet's own speed is a stationary second, and the store holds a fixed
+ // number of them: kept, they would crowd out the driving an investigation asks about
+ if(arr[3]<+V.bb_min_kmh)return;const s=bbSt('readwrite');if(!s)return;
+ try{s.put({at:bbf(arr[0]),d:arr});BBW++;
+  if(BBW%200===0)bbCount();
+  bbUi('')}catch(e){}}
+// counting the store is one read per 200 writes, which is cheaper than asking on
+// every fix whether this second was already taken; the count is what pruning uses
+function bbCount(){const s=bbSt('readonly');if(!s)return;try{const r=s.count();
+ r.onsuccess=()=>{BBN=+r.result||0;localStorage.bbn=BBN;bbUi('');bbPrune()}}catch(e){}}
+// drop what aged out, then the oldest surplus if the handset went over the cap.
+function bbPrune(){const s=bbSt('readwrite');if(!s)return;
+ try{let gone=0;const cut=bbf(Date.now()-bbDays()*864e5);
+  s.openCursor(IDBKeyRange.upperBound(cut)).onsuccess=e=>{const c=e.target.result;if(!c)return;
+   c.delete();c.continue();if(++gone===400){BBN=Math.max(0,BBN-gone);localStorage.bbn=BBN;gone=0}};
+  let over=Math.max(0,+(localStorage.bbn||BBN)-BBM),cut2=0;
+  if(over>4000){const cu=s.openCursor();cu.onsuccess=e=>{const c=e.target.result;if(!c||over<=0)return;
+   c.delete();over--;cut2++;c.continue();
+   if(over<=0){BBN=Math.max(0,BBN-cut2);localStorage.bbn=BBN}}}}catch(e){}}
+// the seconds this handset has already pushed, per vehicle, as merged windows.
+// Without this a second request that overlaps an earlier one, or a retry after one
+// batch failed, would send the same seconds again and the tacho report would show
+// each of them twice.
+let BSP={};try{BSP=JSON.parse(localStorage.bb_sent||'{}')||{}}catch(e){}
+const bbSave=()=>{try{localStorage.bb_sent=JSON.stringify(BSP)}catch(e){}};
+const bbMerge=ws=>{ws.sort((a,b)=>a[0]-b[0]);const o=[];ws.forEach(w=>{const l=o[o.length-1];
+ if(l&&w[0]<=l[1]+1)l[1]=Math.max(l[1],w[1]);else o.push(w.slice())});return o};
+// the parts of one window that no delivered window covers
+function bbOut(ws,a,b){let out=[[a,b]];
+ (ws||[]).forEach(w=>{const n=[];out.forEach(o=>{
+  if(w[1]<o[0]||w[0]>o[1]){n.push(o);return}
+  if(o[0]<w[0])n.push([o[0],w[0]-1]);if(w[1]<o[1])n.push([w[1]+1,o[1]])});out=n});
+ return out}
+function bbMark(v,a,b){if(!v||!(b>=a))return;const ws=BSP[v]||(BSP[v]=[]);
+ ws.push([a,b]);BSP[v]=bbMerge(ws).slice(-120);bbSave()}
+// windows older than anything the handset can still hold are dropped with the fixes
+function bbTrim(){const cut=bbf(Date.now()-bbDays()*864e5);
+ Object.keys(BSP).forEach(v=>{const w=bbMerge(BSP[v]||[]).filter(x=>x[1]>=cut);
+  if(w.length)BSP[v]=w;else delete BSP[v]});bbSave()}
+// read the whole seconds of a window, ends included
+function bbRange(from,to){return new Promise(res=>{const s=bbSt('readonly');if(!s)return res([]);
+ try{s.getAll(IDBKeyRange.bound(from,to)).onsuccess=e=>res(e.target.result||[])}catch(e){res([])}})}
+// the compact rows become position rows the server already accepts, one per second
+function bbRows(list){const v=asg&&asg.vehicles||{},seen={};
+ return (list||[]).filter(x=>{const s=bbf((x.d||[])[0]);if(seen[s])return false;seen[s]=1;return true})
+  .map(x=>{const d=x.d||[];return {user_id:me.id,vehicle_id:asg.vehicle_id,driver_id:asg.driver_id,
+  vehicle_name:v.name,driver_name:asg.drivers&&asg.drivers.name,lat:d[1],lng:d[2],speed:d[3]||0,
+  heading:d[4]==null?null:d[4],accuracy:d[5]==null?null:d[5],altitude:d[6]==null?null:d[6],
+  ignition:true,battery_pct:d[7]==null?null:d[7],charging:!!d[8],blackbox:true,
+  recorded_at:new Date(d[0]).toISOString()}})}
+function bbUi(pre){const t=$('v_bbox');if(t)t.textContent=(pre||'')+BBN.toLocaleString()}
+async function bbDone(id,status,n,error){try{await sb.from('bb_requests').update({status,n_rows:n,
+ error:error||null,answered_at:new Date().toISOString()}).eq('id',id)}catch(e){}}
+// answer every pending request about a vehicle this login is assigned to
+async function bbAnswer(){if(bbBusy||!BB||!me||!ASGS.length||!navigator.onLine)return;bbBusy=true;
+ try{const ids=ASGS.map(x=>x.vehicle_id);
+  const {data:qs}=await sb.from('bb_requests').select('*').eq('status','pending').in('vehicle_id',ids).order('requested_at');
+  for(const q of qs||[]){
+   const from=bbf(Date.parse(q.from_ts)),to=bbf(Date.parse(q.to_ts));
+   if(isNaN(from)||isNaN(to)){await bbDone(q.id,'failed',0,'The period in the request is not a date');continue}
+   // only the seconds never delivered before are read off the store and pushed
+   const parts=bbOut(BSP[q.vehicle_id],from,to),full=parts.length===1&&parts[0][0]===from&&parts[0][1]===to;
+   let rows=[];for(const p of parts)rows=rows.concat(bbRows(await bbRange(p[0],p[1])));
+   if(!rows.length){await bbDone(q.id,'sent',0,parts.length===0?'Already downloaded for that period':
+     full?'Nothing stored for that period':'Nothing stored for the part that was not sent before');continue}
+   banner('<i class="fa-solid fa-cloud-arrow-up"></i> Blackbox: sending '+rows.length.toLocaleString()+' fixes',9000);
+   let sent=0,err='';
+   for(let i=0;i<rows.length&&!err;i+=300){const b=rows.slice(i,i+300);
+    const {error}=await sb.from('positions').insert(b);
+    // credit each batch the moment it lands, so a retry of a broken pull starts
+    // where the last one stopped instead of pushing the whole window again
+    if(error)err=error.message;else{sent+=b.length;
+     bbMark(q.vehicle_id,bbf(Date.parse(b[0].recorded_at)),bbf(Date.parse(b[b.length-1].recorded_at)))}
+    bbUi('↑ ')}
+   await bbDone(q.id,err?'failed':'sent',sent,err);bbUi('');
+   logAct('Blackbox sent',(q.vehicle_name||'')+' '+new Date(from*1000).toLocaleString()+' to '+new Date(to*1000).toLocaleString()+
+    ' - '+sent+' fixes'+(err?' - '+err:''))}
+ }catch(e){$('err').textContent='Blackbox: '+(e.message||e)}
+ bbBusy=false}
+// the phone may be off, or out of coverage, when the request is made: the channel
+// catches it live and this poll catches it whenever the app next runs
+function bbWatch(){clearInterval(BBT);BBT=setInterval(()=>{if(!document.hidden)bbAnswer()},60000);
+ try{sb.channel('bbq').on('postgres_changes',{event:'INSERT',schema:'public',table:'bb_requests'},()=>bbAnswer()).subscribe()}catch(e){}}
+// open the store once at startup; a handset without IndexedDB simply shows "off"
+async function bbInit(){if(!await bbOpen()){bbUi('off');return}
+ try{if(navigator.storage&&navigator.storage.persist)await navigator.storage.persist()}catch(e){}
+ bbTrim();bbCount();bbUi(V.bb_on?'':'⏸ ')}
+function upd(loc,kmh,moving){const c=$('stc');c.textContent=moving?'Moving':'Idling';c.style.background=moving?'var(--grl)':'var(--orl)';c.style.color=moving?'var(--gr)':'var(--or)';
+ $('sp').textContent=Math.round(kmh);const V=(k,v)=>$('v_'+k).textContent=v;
+ V('pos',loc.latitude.toFixed(5)+', '+loc.longitude.toFixed(5));V('acc',loc.accuracy!=null?Math.round(loc.accuracy)+' m':'-');V('alt',loc.altitude!=null?Math.round(loc.altitude)+' m':'-');V('dir',loc.bearing!=null?Math.round(loc.bearing)+'°':'-');V('ac',(lastA*3.6).toFixed(1)+' km/h/s');V('trip',(ODOM/1000).toFixed(1)+' km');$('lt').textContent='Last record '+new Date().toLocaleTimeString('en-GB');mpos(loc,moving)}
+// the driver sees where the vehicle last was before pressing Start trip: the
+// newest stored fix is plotted and its readings fill the tiles
+async function showLast(){if(!asg?.vehicle_id)return;
+ // offline this simply has nothing to show: the newest fix on the server is
+ // unreachable, and the phone has not recorded one yet in this session
+ const r=await q(sb.from('positions').select('*').eq('vehicle_id',asg.vehicle_id).order('recorded_at',{ascending:false}).limit(1));
+ const p=r.data&&r.data[0];if(!p)return;const ll=[+p.lat,+p.lng],t=Date.parse(p.recorded_at),old=Date.now()-t>120000;
+ const o={latitude:+p.lat,longitude:+p.lng,accuracy:p.accuracy,altitude:p.altitude,bearing:p.heading,time:t};
+ upd(o,old?0:p.speed||0,!old&&(p.speed||0)>=MIN_MOVING_KMH);
+ if(old){const c=$('stc');c.textContent='Parking';c.style.background='var(--bll)';c.style.color='var(--bl)'}
+ $('lt').textContent='Last record '+new Date(t).toLocaleString('en-GB');
+ if(map){if(follow)map.setView(ll,Math.max(map.getZoom(),15));trail.addLatLng(ll)}}
+async function start(quiet,auto){
+ if(!asg?.vehicle_id){$('err').textContent='No vehicle linked to this user. Ask your admin.';return}
+ if(watcher||SRT)return;
+ // A trip is exactly the thing two handsets on one account must never record at the same
+ // time, so the seat is proved here - in front of all three doors a trip comes in through:
+ // the driver's press, the speed sentry's own start, and a phone picking up a trip Android
+ // left open. With no signal, or on a project that has not run v28, he sets off anyway: a
+ // dead spot is not a second phone, and a driver stopped from tracking is the worse failure.
+ const cd=await claimAsk(1);
+ if(cd){await claimOut(cd);return}
+ // one watcher per app: the sentry that watches for the vehicle starting has to hand its
+ // place over before the trip's own callback can take it
+ await senOff();
+ SRT=true;STILLAT=Date.now();FIRSTRUN=true;const myGen=++SGEN;
+ // Both clocks belong to the trip that is opening, not to whatever the phone was doing
+ // before. SENUP is the sentry's own "it has been moving for N seconds" start, and it was
+ // only ever cleared inside the sentry's callback: a value left standing from before this
+ // press survived the whole trip and made the NEXT automatic start fire on the first fix
+ // above the speed with no wait at all, so the fleet's own debounce was silently bypassed.
+ SENUP=0;ENDPD=0;
+ try{
+ // The driver gets his trip on the settings this phone already holds. The network copy is
+ // waited for, but only as long as a finger will look at a spinner: loadRules applies what
+ // it finds when it lands, the same way the five minute refresh does mid-trip, and on a
+ // dead line it falls back to the offline copy instead of failing the start. Before this,
+ // pressing Start on a weak signal meant standing at the door of the vehicle for up to
+ // nine seconds with the app already knowing everything it needed.
+ await Promise.race([loadRules(),new Promise(r=>setTimeout(r,1500))]);
+ pollBat();batT=setInterval(pollBat,30000);cfgT=setInterval(loadRules,300000);prev=null;pp=null;HSENT=null;ODOM=quiet?Math.max(0,+(tripRead()?.o||0)):0;TS_TRIP=0;
+ if(!window.CapPlugins)throw new Error('Plugin bridge missing: rebuild the APK with the latest build-apk.yml');
+ watcher=await CapPlugins.BG.addWatcher({backgroundTitle:quiet?'Trip resumed':'Trip in progress',backgroundMessage:'Sending location to fleet dashboard',requestPermissions:true,stale:false,distanceFilter:0},
+ async(loc,err)=>{
+  // a fix delivered by a watcher this page has already stopped must not write a
+  // position, and above all must not bring back the trip the driver ended
+  if(myGen!==SGEN)return;
+  if(err){if(err.code==='NOT_AUTHORIZED')$('err').textContent='Allow location "All the time" in app settings (Permissions button).';return}
+  const kmh=Math.max(0,(loc.speed||0)*3.6),moving=kmh>=MIN_MOVING_KMH,every=(moving?MOV:STP)*1000,n=Date.now();
+  // standing below the moving speed for the fleet's own wait makes the end pending, and only
+  // a further tolerance without a single moving fix makes it real. The clock the fleet's own
+  // wait is measured against comes from the runner whenever it is reporting, because this
+  // page's clock is the one that stops while the screen is off - and the same speed the auto
+  // start measures against says what moving means for both halves of a shift.
+  if(kmh>A_KMH()){STILLAT=n;ENDPD=0}
+  else{
+   if(!STILLAT)STILLAT=n;
+   if(A_ENDON()&&n-STILLAT>=A_END()){
+    const sd=await trkStood(n);
+    // the runner was right and this page was asleep: the vehicle only just stopped, so the
+    // standing clock is moved back to when it actually did and nothing is closed
+    if(sd<A_END()){STILLAT=n-sd;ENDPD=0}
+    else if(!ENDPD)ENDPD=n;
+    else if(n-ENDPD>=A_GRACE()){STILLAT=0;ENDPD=0;await endAuto();return}
+   }
+   else ENDPD=0;
+  }
+  // keep the trip marker fresh: it is the only thing that survives a process
+  // Android kills, and its timestamp is what says "this trip was still running"
+  if(n-TS_TRIP>60000){TS_TRIP=n;tripSave()}
+  // the blackbox is offered every fix, before the upload throttle below drops most of
+  // them; it keeps only those above the fleet's own speed, so a shift at a stop sign
+  // costs the handset nothing and cannot push real driving out of its store
+  bbPut(bbPack(loc,kmh));
+  // the two readings the tiles show come from the fixes themselves, so they are taken here,
+  // before the send throttle below drops most of them: the watcher speaks every second whether
+  // the fleet is being told or not
+  telemetry(loc,kmh);upd(loc,kmh,moving);
+  // a corner is worth a point of its own: two fixes spaced by the recording
+  // interval would otherwise draw a turn as one straight cut across the bend
+  const hd=loc.bearing,off=hd!=null&&HSENT!=null?Math.min(Math.abs(hd-HSENT),360-Math.abs(hd-HSENT)):0;
+  // The first fix a trip ever sees is sent whatever the wait says. A driver who presses
+  // Start while sitting in the yard is parked, so the throttle would hold that record back
+  // for the whole stopped interval - an hour on this fleet - and the office's map then puts
+  // the trip's start an hour after the man actually set off.
+  if(!FIRSTRUN&&n-lastSent<every-500&&!(moving&&off>=30&&n-lastSent>1200)){
+   // between two parked heartbeats this callback is the only clock this page has left, so
+   // it is what empties a queue an offline stretch filled: an hour of standing must not
+   // cost a driver the points he recorded before the signal went
+   if(!moving&&PEND&&n-lastTry>60000){lastTry=n;flush()}
+   return}const FSR=FIRSTRUN;FIRSTRUN=false;lastSent=n;if(hd!=null)HSENT=hd;
+  lastLoc=loc;
+  // The page's own writer stands down while the service is reporting the trip - but never on
+  // the fix that opens it: the office has to put the driver's Start press where he actually
+  // pressed it, and the runner's own first point can be a second or two behind. Two fixes a
+  // second apart at the start of a trip cost a report nothing, and a trip that appears to
+  // have begun a minute after the driver set off costs the office an argument with him.
+  if(!TRUN||FSR)outAdd({t:'pos',p:row(loc,moving?kmh:0,true)});
+  // try the server again every minute while records are waiting, so a phone that
+  // regains signal in a tunnel pushes without waiting for the next sampled point
+  if(PEND>=Math.ceil(5/MOV)||!moving||n-lastTry>60000){lastTry=n;flush()}});
+ $('go').classList.add('hide');$('stp').classList.remove('hide');$('err').textContent='';
+ tripSave();
+ logAct(quiet?'Resumed trip':auto?'Started trip automatically':'Started trip',(asg?.vehicles?.name||'')+
+  ' · records every '+MOV+' s moving, '+STP+' s parked'+(auto?' · started by speed, not by hand':''));
+ await askNotif();
+ // the runner takes the trip from the page: it is the one that keeps reporting when this
+ // page is frozen, so it has to be told the settings while the page can still speak
+ await trkGo();
+ if(!navigator.onLine)banner('<i class="fa-solid fa-wifi"></i> No internet: records are kept on the phone and sent later',7000);
+ }catch(e){$('err').textContent='Error: '+(e.message||e)}
+ SRT=false}
+async function stop(auto){SGEN++;FIRSTRUN=false;clearInterval(batT);clearInterval(cfgT);prev=null;pp=null;
+ // the runner is told the trip is over first, and keeps reporting after it: a runner that
+ // has already written the closing point of the trip cannot be caught mid-write by anything
+ // this page does next
+ const tr=await trkStop(true);
+ tripClear();
+ // the runner already wrote this trip's last point from the phone's own queue; only when
+ // there was no runner does the page's own copy of the place close the trip
+ if(!tr&&lastLoc)outAdd({t:'pos',p:row(lastLoc,0,false)});flush();
+ logAct(auto?'Ended trip automatically':'Ended trip',(asg?.vehicles?.name||'')+(lastLoc?' at '+lastLoc.latitude.toFixed(5)+', '+lastLoc.longitude.toFixed(5):''));
+ if(watcher){await CapPlugins.BG.removeWatcher({id:watcher});watcher=null}
+ // the trip's watcher is gone, so the one that waits for the next start takes its place -
+ // including after this very callback ended a trip nobody had pressed a button for. Both
+ // clocks of the trip that just closed are wiped with it: a pending end must not be carried
+ // into the next journey, and the sentry must earn its own wait again.
+ STILLAT=0;SENUP=0;ENDPD=0;senOn();
+ // the runner keeps the vehicle from the trip's end onwards, at the fleet's parked interval,
+ // so it is handed over again here: this is what renews the poll that lends it a sign-in, and
+ // a runner left without one collects in silence and stops sending an hour later. It carries
+ // the trip flag down with it, so the points it writes from now on rest outside any trip.
+ // A handset that is losing its seat is the one exception: the loss ends this on the very
+ // next line, and an order still in flight here would be a phone reporting a vehicle that it
+ // has just been told is no longer its driver's.
+ if(!CLDOWN)trkGo();
+ // the seat goes back to its two-minute wait the moment the trip does, instead of holding a
+ // spare handset outside for three minutes longer than it has to
+ claimGo(false);
+ $('go').classList.remove('hide');$('stp').classList.add('hide');const c=$('stc');c.textContent='Parking';c.style.background='var(--bll)';c.style.color='var(--bl)';$('sp').textContent='0'}
+async function openDash(){const {data:{session}}=await sb.auth.getSession();if(!session)return;
+ logAct('Opened dashboard from app',(asg?.vehicles?.name||''));
+ // the hour-long key only, never the one that mints new keys: this string is handed to the
+ // system browser, so it lives in that browser's address bar, in its history and in any
+ // history sync on a handset that is not the office's. The dashboard strips the fragment
+ // from its own address once it has read it, but a record already kept cannot be unkept -
+ // and a refresh token outlives the access token's hour by weeks. When this one runs out,
+ // the driver presses the button again and gets a fresh one.
+ const u=DASH+'#access_token='+session.access_token+'&expires_in=3600&token_type=bearer';
+ try{await CapPlugins.Browser.open({url:u})}catch(e){window.open(u,'_blank')}}
+// The pages and the map library travel inside the APK, so the only
+// thing a phone cannot read without a signal is the map picture. This small worker
+// keeps the tiles that already loaded, which is how the area a driver drove through
+// this morning is still drawn tonight with no internet. It is a bonus, never a
+// requirement: registering it offline, or failing to, changes nothing else.
+if('serviceWorker'in navigator&&/^https?:$/.test(location.protocol))addEventListener('load',()=>{
+ try{navigator.serviceWorker.register('sw.js',{scope:'./'}).catch(()=>{})}catch(e){}});
+lgHint();
+if(localStorage.user){$('em').value=localStorage.user;$('rem').checked=true}
+// A sign-in this phone can still open with: the one Supabase left in the store "Remember
+// me" writes to, or - with no signal at all - the identity this handset last proved.
+const hasWho=()=>{try{const s=REM?localStorage:sessionStorage;
+ if(Object.keys(s).some(k=>/^sb-.+-auth-token$/.test(k)&&String(s[k]||'').length>40))return true}catch(e){}
+ return !navigator.onLine&&!!cachedWho()};
+if(localStorage.perm!=='1'){show('pm');igUi()}else show(hasWho()?'wt':'lg');
+// A driver who signed in before has nothing to type, so he must not be shown an empty form
+// while the phone asks the server about the sign-in it kept. The opening screen stays up
+// until that answer arrives: the app when the sign-in is still good, the form only when it
+// is not - and never a form that fills itself in a few seconds later, which is what made a
+// remembered sign-in look like somebody else opening the account.
+function settle(){if(INAPP||pmOpen())return;
+ // the sign-in is there but the start could not finish (the queue would not open, the
+ // settings did not come back): the driver still has his account, so he gets the app
+ // and the reason on the alert - not an empty form that invites him to sign in again
+ if(me){showApp();banner('<i class="fa-solid fa-triangle-exclamation"></i> The app opened, but getting ready did not finish. Close it and open it again, or tell the administrator.',9000)}
+ else show('lg')}
+init().catch(()=>{}).then(settle);
+</script></body></html>

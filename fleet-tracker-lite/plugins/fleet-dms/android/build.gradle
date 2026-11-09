@@ -1,0 +1,66 @@
+// A library module of its own, in the same shape as the capacitor-android module the
+// app already builds against: its own buildscript block, AGP from google(), Java only.
+// No Kotlin here on purpose - the generated app project does not put the Kotlin
+// plugin on its classpath unless a Cordova plugin asks for it, and a module that
+// needs Kotlin would fail the build for a reason that has nothing to do with this
+// feature.
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.7.2'
+    }
+}
+
+apply plugin: 'com.android.library'
+
+android {
+    namespace "com.fleet.dms"
+    compileSdk project.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 35
+
+    defaultConfig {
+        // The floor Capacitor 7 itself asks for. The full driver app has to raise the
+        // app's minSdk to 24 because MediaPipe's Android tasks are built for 24 and up,
+        // and a library may not ask for less than the app it is merged into carries.
+        // With no vision library in this module nothing here asks for more than
+        // Capacitor does, so the generated project is left exactly as `cap add` writes it.
+        minSdkVersion 22
+        targetSdkVersion project.hasProperty('targetSdkVersion') ? rootProject.ext.targetSdkVersion : 35
+        versionCode 1
+        versionName "1.0"
+        consumerProguardFiles 'proguard-rules.pro'
+    }
+
+    buildTypes {
+        release {
+            // Left false, as in the full app. The size this build saves comes from what
+            // is not in it - no vision library and its native code, no model files, no
+            // camera, no tones - and switching R8 on here would put a second, untested
+            // reason for a driver's app to stop working in the way of that.
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+dependencies {
+    implementation project(':capacitor-android')
+    // ServiceCompat is what starts the foreground service with a location type on API 29
+    // and up, and ContextCompat answers whether the handset has granted the location
+    // permission this service needs before it declares itself. Both come from androidx.core,
+    // which capacitor-android already brings in - it is named here so the module still
+    // builds if that ever stops being true.
+    implementation "androidx.core:core:1.13.1"
+}
