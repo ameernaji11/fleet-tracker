@@ -226,6 +226,20 @@ jobs:
         run: |
           BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
           $BT/apksigner verify --print-certs fleet-tracker.apk || { echo "::error::fleet-tracker.apk is not a valid signed APK."; exit 1; }
+          # A handset rebooted at a depot takes the background runner down with it, and the
+          # driver does not open the app again until he notices the map has stopped moving.
+          # Three things have to survive the manifest merger for the receiver to be called,
+          # and all three are read off the built APK rather than the source: the permission,
+          # the receiver class, and its BOOT_COMPLETED filter. exported must be true - a
+          # system broadcast cannot reach a receiver that says false on API 31 and later.
+          # Missing any of them still builds, installs and drives; it just never comes back.
+          PERMS=$($BT/aapt dump permissions fleet-tracker.apk)
+          echo "$PERMS" | grep -q 'android.permission.RECEIVE_BOOT_COMPLETED' || { echo "::error::the APK cannot hear a reboot: RECEIVE_BOOT_COMPLETED is not in the merged manifest. It is declared in plugins/fleet-dms/android/src/main/AndroidManifest.xml, so check that the plugin module is still part of the build."; exit 1; }
+          $BT/aapt dump xmltree fleet-tracker.apk AndroidManifest.xml > manifest.txt
+          grep -q '"com.fleet.dms.BootReceiver"' manifest.txt || { echo "::error::com.fleet.dms.BootReceiver is not in the shipped manifest - the plugin manifest was not merged, so nothing brings the runner back after a reboot."; exit 1; }
+          BLOCK=$(grep -A6 '"com.fleet.dms.BootReceiver"' manifest.txt)
+          echo "$BLOCK" | grep -q 'android.intent.action.BOOT_COMPLETED' || { echo "::error::the boot receiver is declared without a BOOT_COMPLETED filter, so Android will never call it."; exit 1; }
+          echo "$BLOCK" | grep -q 'android:exported(0x01010010)=(type 0x12)0xffffffff' || { echo "::error::the boot receiver is not exported=true, so the system broadcast cannot reach it on API 31 and later."; exit 1; }
           ls -l fleet-tracker.apk
       - uses: actions/upload-artifact@v4
         with:
