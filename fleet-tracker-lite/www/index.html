@@ -497,7 +497,7 @@ async function changePw(){if(!sb)return;const a=$('np1').value,b=$('np2').value,
 // Audit trail for the admin-only Activity Log. Silently ignored if the table is
 // not there yet, because a logging failure must never stop a driver's trip.
 function logAct(action,details,duration_s){if(!me)return;(async()=>{
- try{await sb.from('user_activity').insert({user_id:me.id,user_name:(me.email||'').replace('@fleet.local',''),action,details:details==null?null:String(details).slice(0,300),device:'phone',...(duration_s==null?{}:{duration_s:Math.max(0,Math.round(duration_s))})})}catch(e){}})()}
+ try{await sb.from('user_activity').insert({user_id:me.id,user_name:(me.email||'').replace('@fleet.local',''),action,details:details==null?null:String(details).slice(0,300),device:'phone',app:'lite',...(duration_s==null?{}:{duration_s:Math.max(0,Math.round(duration_s))})})}catch(e){}})()}
 // Time on screen: Android hides this page when the app goes to the background, and
 // that flush is what lets the dashboard's Activity Log add up how long a driver
 // actually spent in the app. Under ten seconds is a glance at a notification.
