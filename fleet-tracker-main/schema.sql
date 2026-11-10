@@ -1709,6 +1709,38 @@ create trigger latest_stamp after insert on positions for each row execute funct
 insert into app_settings (key, value) values ('auto_end_grace_min','3')
   on conflict (key) do nothing;
 
+-- ------------------------------------------- v38: which app was in the hand ----
+-- Two handset apps write to this one database: the full Fleet Tracker and the
+-- tracking-only Lite. Nothing on a position or an event says which of them sent it,
+-- so the office could not tell a vehicle running the camera app from one running the
+-- light one. Every audit entry now names the app that wrote it, and the Vehicles page
+-- reads the newest sign-in beside each vehicle.
+--
+-- The column is nullable and nothing defaults it: entries written by an older build
+-- keep a blank app, which is the honest answer for a row that never carried one.
+alter table user_activity add column if not exists app text;
+
+-- One row per vehicle: the app its account last signed in or opened with. A vehicle
+-- given to several accounts is answered by whichever of them used the app most
+-- recently, which is the handset actually in the cab. 'Opened app' counts alongside
+-- 'Signed in' because a remembered session is still the driver using that app.
+--
+-- Not security definer: it reads user_activity, which only an admin may read, so it
+-- runs as the caller and a normal user gets nothing back. The existing
+-- user_activity_user index (user_id, recorded_at desc) is what this walks.
+create or replace function vehicle_apps()
+  returns table(vehicle_id uuid, app text, seen_at timestamptz)
+  language sql stable as $$
+  select distinct on (a.vehicle_id) a.vehicle_id, u.app, u.recorded_at
+  from assignments a
+  join user_activity u on u.user_id = a.user_id
+  where a.vehicle_id is not null
+    and u.app in ('main','lite')
+    and u.action in ('Signed in','Opened app')
+  order by a.vehicle_id, u.recorded_at desc
+$$;
+revoke execute on function vehicle_apps() from anon;
+
 -- ------------------------------------------------------------- admin seed ----
 -- Promote the owner account. Runs after the tables/policies exist, and is safe
 
@@ -2255,5 +2287,25 @@ end $$;
 --        the Tacho report and vehicle_report stop receiving the splits rather than learning to merge them.
 --        A trip that was already recorded as several stays several - rows on the server cannot be repaired from
 --        the phone, and the office that needs an old shift re-cut has to delete the wrongly-opened records by hand.
+--
+-- v38, on top of the above (which of the two apps is in the cab):
+--   user_activity.app                                                    -> the app that wrote the entry:
+--        'main', 'lite' or 'dashboard'. Nullable, with no default, so an entry from a build that predates this
+--        keeps a blank rather than guessing. The Activity Log prints it beside every row.
+--   vehicle_apps()                                                       -> one row per vehicle holding the app
+--        its account last signed in or opened with, and when. The Vehicles page prints it, so a vehicle moved
+--        from the full app to the Lite one changes column the next time that driver signs in.
+--   Run this file BEFORE uploading the apps and the dashboard. This is the ordering v24 and v28 already taught:
+--        the three logAct writers now name an app column on every insert, and against a database that has not
+--        run this block PostgREST refuses the whole row with "column app does not exist". logAct swallows that
+--        by design - a logging failure must never stop a trip - so the symptom is not an error on the phone but
+--        an Activity Log that quietly stops receiving entries until the paste is done.
+--   -> Nothing here repairs old rows: an entry written before this version has no app, and the Vehicles page
+--        shows a blank for a vehicle whose account has not signed in since. Both fill in from the next sign-in.
+--   -> vehicle_apps() is deliberately not security definer. It reads user_activity, which only an admin may
+--        read, so it answers a normal user with nothing rather than leaking another account's movements.
+--   -> The vehicle comes from assignments, the same link the phone itself reads at sign-in. An account given
+--        no vehicle - a supervisor's own login, typically - has no cab to name, so every row stays blank for
+--        it however often it signs in. Give that account a vehicle on the Users page to see the column move.
 
 -- ============================================================================
