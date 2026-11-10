@@ -864,7 +864,7 @@ function themeBtn(){const d=document.documentElement.dataset.theme==='dark';$('t
 // or pretend to undo the action the user actually took.
 const DEV=/android|iphone|ipad|mobile/i.test(navigator.userAgent)?'phone':'computer';
 function logAct(action,details,duration_s){if(!UID)return Promise.resolve();return (async()=>{
- try{await sb.from('user_activity').insert({user_id:UID,user_name:UNAME,action,details:details==null?null:String(details).slice(0,300),device:DEV,...(duration_s==null?{}:{duration_s:Math.max(0,Math.round(duration_s))})})}catch(e){}})()}
+ try{await sb.from('user_activity').insert({user_id:UID,user_name:UNAME,action,details:details==null?null:String(details).slice(0,300),device:DEV,app:'dashboard',...(duration_s==null?{}:{duration_s:Math.max(0,Math.round(duration_s))})})}catch(e){}})()}
 // ---- time on screen. Leaving the dashboard - signing out or hiding the tab -
 // writes one 'Session time' row holding the seconds spent there, which the
 // Activity Log adds up per login. Closing the browser outright is lost with the
@@ -966,12 +966,17 @@ async function refs(){
  // the two fleets are read together: this runs on every sign-in and on every tab that
  // shows a vehicle or driver picker, and a round trip spent waiting for nothing but the
  // previous round trip is what makes the page feel heavy on a phone tether
- const [v,d]=await Promise.all([sb.from('vehicles').select('*').order('name'),sb.from('drivers').select('*').order('name')]);
+ const [v,d,va]=await Promise.all([sb.from('vehicles').select('*').order('name'),sb.from('drivers').select('*').order('name'),sb.rpc('vehicle_apps')]);
  vehicles=v.data||[];drivers=d.data||[];
+ // Which app is in the cab: the newest sign-in among the accounts this vehicle is given to.
+ // A database that has not run v38 has no such function, and that must cost this one column
+ // rather than the whole Vehicles page - so a refused answer reads as "not known yet".
+ const vApp={};((va&&va.data)||[]).forEach(x=>{vApp[x.vehicle_id]=x});
+ vehicles.forEach(x=>{const a=vApp[x.id];x.last_app=a?`${APPL[a.app]||a.app} · ${new Date(a.seen_at).toLocaleDateString('en-GB')}`:''});
  $('hv').innerHTML=vehicles.map(v=>`<option value="${v.id}">${esc(v.name)}</option>`).join('');
  msel('lv_v',vehicles,'All vehicles',mselVal('lv_v'));if(!LVW){LVW=1;$('lv_v').addEventListener('change',lvChg)}
  msel('ev_v',vehicles,'All vehicles',mselVal('ev_v'));msel('ev_d',drivers,'All drivers',mselVal('ev_d'));msel('ev_t',Object.keys(EV).map(k=>({id:k,name:EV[k][0]})),'All events',mselVal('ev_t'));
- $('tr_v').innerHTML=$('hv').innerHTML;$('bb_v').innerHTML=$('hv').innerHTML;$('vehT').innerHTML=tbl(vehicles,['name','type','make_model','year','speed_limit','fuel_moving','fuel_idle'],'vehicles');$('drvT').innerHTML=tbl(drivers,['name','phone','license_no','license_expiry'],'drivers');tools($('vehT'));tools($('drvT'));
+ $('tr_v').innerHTML=$('hv').innerHTML;$('bb_v').innerHTML=$('hv').innerHTML;$('vehT').innerHTML=tbl(vehicles,['name','type','make_model','year','speed_limit','fuel_moving','fuel_idle','last_app'],'vehicles');$('drvT').innerHTML=tbl(drivers,['name','phone','license_no','license_expiry'],'drivers');tools($('vehT'));tools($('drvT'));
  // every page counts vehicle records, so a plate entered twice is two vehicles on Live
  // Tracking, in every report and in the alert rules - and an office that typed it once more
  // than they meant to keeps asking why the fleet looks bigger than it is. Say it here, where
@@ -987,7 +992,9 @@ async function refs(){
 // form above them uses for the same box. A column number means something different the
 // day a column is added; these words are also what the Columns button lists and stores.
 const COLW={name:'Name',type:'Type',make_model:'Make / model',year:'Year',speed_limit:'Speed limit km/h',
- fuel_moving:'Fuel moving L/100 km',fuel_idle:'Fuel idling L/hour',phone:'Phone',license_no:'Licence number',license_expiry:'Licence expiry'};
+ fuel_moving:'Fuel moving L/100 km',fuel_idle:'Fuel idling L/hour',phone:'Phone',license_no:'Licence number',license_expiry:'Licence expiry',
+ // the one column with no box above it: the phone reports it, the office only reads it
+ last_app:'App last used'};
 const tbl=(rows,cols,t)=>`<table><tr>${cols.map(c=>`<th>${COLW[c]||c.replace(/_/g,' ')}</th>`).join('')}<th></th></tr>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(r[c])}</td>`).join('')}<td class="act"><button class="btn b sm" onclick="edit('${t}','${r.id}')"><i class="fa-solid fa-pen"></i>Edit</button> <button class="btn r sm" onclick="del('${t}','${r.id}')"><i class="fa-solid fa-trash"></i>Delete</button></td></tr>`).join('')||'<tr><td colspan="9" class="empty">Nothing here yet. Add one above.</td></tr>'}</table>`;
 async function add(e,t,cols){e.preventDefault();if(!ADMIN)return;const f=e.target,id=f.dataset.id,o={};cols.forEach(c=>o[c]=f[c].value||null);
  const {error}=id?await sb.from(t).update(o).eq('id',id):await sb.from(t).insert(o);if(error)return toast(error.message);
@@ -1144,6 +1151,8 @@ async function loadAct(){if(!ADMIN)return;fSave('act');
  // the period does not silently widen the table back to everything
  renderAct()}
 const ACF_L={ph:'From phones',pc:'From computers',ss:'Sessions with a time on screen'};
+// Which build wrote the entry. A blank is an entry from before the apps named themselves.
+const APPL={main:'Main app',lite:'Lite app',dashboard:'Dashboard'};
 // pressing a tile narrows the table to that group; pressing it again clears it.
 function acSet(k){ACF=ACF===k?'':k;renderAct()}
 function renderAct(){
@@ -1160,9 +1169,9 @@ function renderAct(){
   +ct('bl','fa-laptop',ACT.length-ph,'From computers',"acSet('pc')",ACF==='pc')
   +ct('gr','fa-stopwatch',hms(SEC),'Time on screen',"acSet('ss')",ACF==='ss');
  $('acFl').innerHTML=ACF?`<span class="chip chipB">${ACF_L[ACF]}</span> <button class="btn gh sm" onclick="acSet('')"><i class="fa-solid fa-rotate-left"></i>Reset filter</button>`:'';
- const H=['Date and time','User','Activity','Details','Time on screen','From'];
- const R=r=>[new Date(r.recorded_at).toLocaleString('en-GB'),r.user_name||'-',r.action||'',r.details||'',r.duration_s==null?'':hms(+r.duration_s),r.device==='phone'?'Phone':'Computer'];
- $('acT').innerHTML=`<table><tr>${H.map(h=>`<th>${h}</th>`).join('')}</tr>${rows.map(r=>`<tr>${R(r).map(v=>`<td>${esc(v)}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="6" class="empty">${ACT.length?'No entry matches this filter — press Reset.':'Nothing recorded in this period.'}</td></tr>`}</table>`;
+ const H=['Date and time','User','Activity','Details','Time on screen','From','App'];
+ const R=r=>[new Date(r.recorded_at).toLocaleString('en-GB'),r.user_name||'-',r.action||'',r.details||'',r.duration_s==null?'':hms(+r.duration_s),r.device==='phone'?'Phone':'Computer',APPL[r.app]||''];
+ $('acT').innerHTML=`<table><tr>${H.map(h=>`<th>${h}</th>`).join('')}</tr>${rows.map(r=>`<tr>${R(r).map(v=>`<td>${esc(v)}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="7" class="empty">${ACT.length?'No entry matches this filter — press Reset.':'Nothing recorded in this period.'}</td></tr>`}</table>`;
  tools($('acT'),{title:'Activity Log',full:()=>({head:H,rows:rows.map(R)})})}
 // ---- live
 const TI={Car:'fa-car',Sedan:'fa-car-side',Hatchback:'fa-car',SUV:'fa-car-rear',Pickup:'fa-truck-pickup',Van:'fa-van-shuttle',Minibus:'fa-van-shuttle',Bus:'fa-bus',Truck:'fa-truck','Heavy Truck':'fa-truck-moving',Tanker:'fa-truck-droplet',Taxi:'fa-taxi',Ambulance:'fa-truck-medical',Motorbike:'fa-motorcycle',Tractor:'fa-tractor',Trailer:'fa-trailer',Equipment:'fa-tractor'};
